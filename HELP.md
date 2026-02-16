@@ -41,6 +41,8 @@
 - [.gitattributes](.gitattributes), [.gitignore](.gitignore) – служебные файлы
   для git, с описанием того, как обрабатывать различные файлы, и какие из них
   игнорировать
+- [bot/README.md](./bot/README.md) – инструкция по запуску и
+  использованию модуля `bot`
 
 ## Начало работы
 
@@ -138,11 +140,14 @@ mvn help:describe -Dplugin=compiler
 Пример `.env`-файла для модуля `bot`:
 
 ```properties
-APP_TELEGRAM_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+TELEGRAM_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
 ```
 
 Spring Boot автоматически подхватывает переменные окружения. Переменная
-`APP_TELEGRAM_TOKEN` соответствует свойству `app.telegram.token` в `application.yaml`.
+`TELEGRAM_TOKEN` соответствует свойству `app.telegram.token` в `application.yaml`.
+
+Также в модуле `bot` настроен импорт из локального файла `bot/.env` через
+`spring.config.import` в `application.yaml`.
 
 Убедитесь, что `.env`-файлы добавлены в `.gitignore` и не попадают в репозиторий.
 
