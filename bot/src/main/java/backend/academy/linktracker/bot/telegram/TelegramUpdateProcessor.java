@@ -6,17 +6,36 @@ import com.pengrad.telegrambot.model.Message;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.request.SendMessage;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-@Slf4j
 @Component
 @RequiredArgsConstructor
+/**
+ * Обрабатывает входящие Telegram-обновления и отправляет ответы пользователю.
+ */
 public class TelegramUpdateProcessor {
 
+    /**
+     * Логгер класса.
+     */
+    private static final Logger log = LoggerFactory.getLogger(TelegramUpdateProcessor.class);
+
+    /**
+     * Клиент Telegram API.
+     */
     private final TelegramBot telegramBot;
+    /**
+     * Диспетчер для маршрутизации команд к обработчикам.
+     */
     private final BotCommandDispatcher commandDispatcher;
 
+    /**
+     * Извлекает команду из входящего обновления, обрабатывает ее и отправляет ответ.
+     *
+     * @param update входящее обновление Telegram
+     */
     public void process(Update update) {
         if (update == null || update.message() == null) {
             return;

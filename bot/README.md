@@ -1,51 +1,95 @@
-# Bot Usage
+# Bot Module
+
+Инструкция по сборке, запуску и базовому использованию модуля `bot`.
+
+## Что делает модуль
+
+`bot` — Telegram-бот, который:
+- принимает команды пользователя;
+- регистрирует пользователя по команде `/start`;
+- показывает список команд по `/help`;
+- регистрирует список команд в Telegram при старте (если это включено конфигурацией).
 
 ## Требования
 
-- JDK 25+
-- Maven 3.9.12+ (или запуск через `mvnw`)
+- JDK и Maven-обертка версии из проекта (`pom.xml` + `mvnw`);
+- доступ в интернет к Telegram Bot API;
+- токен Telegram-бота от `@BotFather`.
 
-## Запуск Bot модуля
+## Шаг 1. Сборка проекта
 
-1. Перейдите в каталог проекта:
+Из корня репозитория:
 
-```shell
-cd hw6-link-tracker
-```
-
-2. Укажите токен Telegram бота одним из способов:
-
-- Локально в файле `bot/.env`:
-
-```properties
-TELEGRAM_TOKEN=<your_bot_token>
-```
-
-- Или через переменную окружения:
+Для Windows:
 
 ```shell
-set TELEGRAM_TOKEN=<your_bot_token>
+mvnw.cmd clean verify
 ```
 
-3. Запустите сервис бота:
+Для Unix/macOS:
+
+```shell
+./mvnw clean verify
+```
+
+## Шаг 2. Настройка конфигурации `bot`
+
+Основные параметры:
+- `app.telegram.url` — URL Telegram API (обычно `https://api.telegram.org`);
+- `app.telegram.token` — токен бота;
+- `app.telegram.update-listener-sleep` — интервал polling;
+- `app.telegram.debug` — debug-режим клиента;
+- `app.telegram.polling-enabled` — включение polling;
+- `app.telegram.set-my-commands-on-startup` — регистрация команд в Telegram.
+
+Параметры можно передавать через `application.yml`, переменные окружения или аргументы запуска.
+
+## Шаг 3. Запуск модуля `bot`
+
+Из корня проекта:
+
+Для Windows:
 
 ```shell
 mvnw.cmd -pl bot -am spring-boot:run
 ```
 
-Сервис стартует на порту `8080`.
+Для Unix/macOS:
 
-## Полезные команды
+```shell
+./mvnw -pl bot -am spring-boot:run
+```
 
-- Запуск тестов bot модуля:
+## Шаг 4. Проверка работы в Telegram
+
+1. Откройте чат с вашим ботом.
+2. Отправьте `/start`.
+3. Проверьте ответ:
+   - при первом вызове — приветствие и начало работы;
+   - при повторном — сообщение, что регистрация уже была.
+4. Отправьте `/help`.
+5. Проверьте, что бот вернул список доступных команд.
+
+## Примеры команд
+
+```text
+/start
+/help
+```
+
+## Полезные команды для разработки
+
+Запуск тестов модуля `bot`:
+
+Для Windows:
 
 ```shell
 mvnw.cmd -pl bot -am test
 ```
 
-- Полная проверка проекта:
+Для Unix/macOS:
 
 ```shell
-mvnw.cmd clean verify
+./mvnw -pl bot -am test
 ```
 

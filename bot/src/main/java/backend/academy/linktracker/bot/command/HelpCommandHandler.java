@@ -1,22 +1,57 @@
 package backend.academy.linktracker.bot.command;
 
+import java.util.function.Supplier;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
-public class HelpCommandHandler implements BotCommandHandler {
+/**
+ * Обработчик команды {@code /help}.
+ */
+public class HelpCommandHandler extends AbstractBotCommandHandler {
 
-    @Override
-    public String command() {
-        return "/help";
+    /**
+     * Источник зарегистрированных команд приложения.
+     */
+    private final Supplier<BotCommandDispatcher> commandDispatcherSupplier;
+    /**
+     * Сервис форматирования текста справки.
+     */
+    private final CommandHelpMessageFormatter helpMessageFormatter;
+
+    /**
+     * Создает обработчик команды {@code /help}.
+     *
+     * @param commandDispatcher источник зарегистрированных команд приложения
+     * @param helpMessageFormatter сервис форматирования текста справки
+     */
+    @Autowired
+    public HelpCommandHandler(
+            ObjectProvider<BotCommandDispatcher> commandDispatcherProvider,
+            CommandHelpMessageFormatter helpMessageFormatter) {
+        this(commandDispatcherProvider::getObject, helpMessageFormatter);
     }
 
-    @Override
-    public String description() {
-        return "список доступных команд";
+    /**
+     * Создает обработчик команды {@code /help} с явным источником команд.
+     *
+     * @param commandDispatcherSupplier поставщик диспетчера команд
+     * @param helpMessageFormatter сервис форматирования текста справки
+     */
+    HelpCommandHandler(
+            Supplier<BotCommandDispatcher> commandDispatcherSupplier,
+            CommandHelpMessageFormatter helpMessageFormatter) {
+        super("/help", "список доступных команд");
+        this.commandDispatcherSupplier = commandDispatcherSupplier;
+        this.helpMessageFormatter = helpMessageFormatter;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String handle(long chatId) {
-        return BotMessages.HELP;
+        return helpMessageFormatter.format(commandDispatcherSupplier.get().commands());
     }
 }

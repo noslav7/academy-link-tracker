@@ -14,8 +14,14 @@ import org.springframework.validation.annotation.Validated;
 @Setter
 @EqualsAndHashCode
 @NoArgsConstructor
+/**
+ * Набор настроек доступа к GitHub API.
+ */
 public class GithubProperties {
 
+    /**
+     * Токен для доступа к GitHub API.
+     */
     @NotEmpty
     private String token;
 }

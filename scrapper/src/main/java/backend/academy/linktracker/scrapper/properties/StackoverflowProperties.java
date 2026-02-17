@@ -14,11 +14,20 @@ import org.springframework.validation.annotation.Validated;
 @Setter
 @EqualsAndHashCode
 @NoArgsConstructor
+/**
+ * Набор настроек доступа к Stack Overflow API.
+ */
 public class StackoverflowProperties {
 
+    /**
+     * Ключ приложения для Stack Overflow API.
+     */
     @NotEmpty
     private String key;
 
+    /**
+     * Токен доступа к Stack Overflow API.
+     */
     @NotEmpty
     private String accessToken;
 }

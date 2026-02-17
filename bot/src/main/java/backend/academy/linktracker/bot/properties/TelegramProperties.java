@@ -18,21 +18,42 @@ import org.springframework.validation.annotation.Validated;
 @Setter
 @EqualsAndHashCode
 @NoArgsConstructor
+/**
+ * Набор настроек Telegram-клиента из конфигурации приложения.
+ */
 public class TelegramProperties {
 
+    /**
+     * Базовый URL Telegram Bot API.
+     */
     @NotEmpty
     @URL
     private String url;
 
+    /**
+     * Токен бота для аутентификации в Telegram API.
+     */
     @NotEmpty
     private String token;
 
+    /**
+     * Интервал ожидания между запросами обновлений.
+     */
     @DurationUnit(ChronoUnit.MILLIS)
     private Duration updateListenerSleep = Duration.ofSeconds(1);
 
+    /**
+     * Флаг включения подробного режима Telegram-клиента.
+     */
     private boolean debug;
 
+    /**
+     * Флаг включения long polling режима.
+     */
     private boolean pollingEnabled = true;
 
+    /**
+     * Флаг автоматической регистрации команд в Telegram при старте.
+     */
     private boolean setMyCommandsOnStartup = true;
 }

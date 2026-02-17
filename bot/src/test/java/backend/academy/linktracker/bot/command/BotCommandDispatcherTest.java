@@ -15,8 +15,10 @@ class BotCommandDispatcherTest {
     @BeforeEach
     void setUp() {
         var startHandler = new StartCommandHandler(new InMemoryUserRepository());
-        var helpHandler = new HelpCommandHandler();
-        dispatcher = new BotCommandDispatcher(List.of(startHandler, helpHandler));
+        BotCommandDispatcher[] dispatcherHolder = new BotCommandDispatcher[1];
+        var helpHandler = new HelpCommandHandler(() -> dispatcherHolder[0], new CommandHelpMessageFormatter());
+        dispatcherHolder[0] = new BotCommandDispatcher(List.of(startHandler, helpHandler));
+        dispatcher = dispatcherHolder[0];
     }
 
     @Test

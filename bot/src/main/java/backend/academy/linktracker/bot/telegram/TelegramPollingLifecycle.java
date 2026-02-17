@@ -5,22 +5,44 @@ import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-@Slf4j
 @Order(2)
 @Component
 @RequiredArgsConstructor
+/**
+ * Управляет жизненным циклом Telegram long polling.
+ */
 public class TelegramPollingLifecycle implements ApplicationRunner {
 
+    /**
+     * Логгер класса.
+     */
+    private static final Logger log = LoggerFactory.getLogger(TelegramPollingLifecycle.class);
+
+    /**
+     * Клиент Telegram API.
+     */
     private final TelegramBot telegramBot;
+    /**
+     * Параметры работы Telegram-клиента.
+     */
     private final TelegramProperties telegramProperties;
+    /**
+     * Обработчик входящих обновлений Telegram.
+     */
     private final TelegramUpdateProcessor updateProcessor;
 
+    /**
+     * Запускает слушатель обновлений, если polling включен.
+     *
+     * @param args аргументы запуска приложения
+     */
     @Override
     public void run(ApplicationArguments args) {
         if (!telegramProperties.isPollingEnabled()) {
@@ -36,6 +58,9 @@ public class TelegramPollingLifecycle implements ApplicationRunner {
         log.atInfo().addKeyValue("pollingEnabled", true).log("Telegram polling listener is started");
     }
 
+    /**
+     * Останавливает polling-слушатель при завершении приложения.
+     */
     @PreDestroy
     public void stop() {
         telegramBot.removeGetUpdatesListener();

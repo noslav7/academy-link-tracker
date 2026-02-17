@@ -6,8 +6,17 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+/**
+ * Конфигурация клиента Telegram Bot API.
+ */
 public class TelegramConfiguration {
 
+    /**
+     * Создает и настраивает экземпляр {@link TelegramBot}.
+     *
+     * @param properties параметры подключения к Telegram API
+     * @return настроенный клиент Telegram
+     */
     @Bean
     public TelegramBot telegramBot(TelegramProperties properties) {
         var builder = new TelegramBot.Builder(properties.getToken())

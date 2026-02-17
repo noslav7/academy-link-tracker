@@ -1,25 +1,32 @@
 package backend.academy.linktracker.bot.command;
 
 import backend.academy.linktracker.bot.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
-public class StartCommandHandler implements BotCommandHandler {
+/**
+ * Обработчик команды {@code /start}.
+ */
+public class StartCommandHandler extends AbstractBotCommandHandler {
 
+    /**
+     * Репозиторий зарегистрированных пользователей.
+     */
     private final UserRepository userRepository;
 
-    @Override
-    public String command() {
-        return "/start";
+    /**
+     * Создает обработчик команды {@code /start}.
+     *
+     * @param userRepository репозиторий зарегистрированных пользователей
+     */
+    public StartCommandHandler(UserRepository userRepository) {
+        super("/start", "начало работы");
+        this.userRepository = userRepository;
     }
 
-    @Override
-    public String description() {
-        return "начало работы";
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String handle(long chatId) {
         boolean isFirstTime = userRepository.registerIfAbsent(chatId);
