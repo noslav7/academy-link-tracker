@@ -9,6 +9,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,7 +54,8 @@ class TelegramBotIntegrationTest implements WithAssertions {
     }
 
     @Test
-    void nonExistingTokenRequest() {
+    void givenApiReturnsNotFoundWhenExecuteGetUpdatesThenResponseContainsNotFoundError() {
+        // Проверяет, что при ответе Telegram API 404 клиент возвращает ошибочный результат.
         stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
                 .willReturn(aResponse()
                         .withStatus(404)
@@ -62,8 +64,9 @@ class TelegramBotIntegrationTest implements WithAssertions {
         var getUpdatesRequest = new GetUpdates();
         var getUpdatesResponse = telegramBot.execute(getUpdatesRequest);
 
-        assertFalse(getUpdatesResponse.isOk());
-        assertEquals(404, getUpdatesResponse.errorCode());
+        assertAll(
+                () -> assertFalse(getUpdatesResponse.isOk()),
+                () -> assertEquals(Integer.valueOf(404), getUpdatesResponse.errorCode()));
 
         verify(
                 1,
@@ -72,7 +75,9 @@ class TelegramBotIntegrationTest implements WithAssertions {
     }
 
     @Test
-    void updatesListenerReceivesUpdates() throws InterruptedException {
+    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenListenerReceivesExpectedUpdatePayload()
+            throws InterruptedException {
+        // Проверяет, что listener получает апдейт с ожидаемыми полями сообщения.
         stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
                 .inScenario("Updates Listener")
                 .whenScenarioStateIs(STARTED)
@@ -130,15 +135,14 @@ class TelegramBotIntegrationTest implements WithAssertions {
 
         boolean received = latch.await(10, TimeUnit.SECONDS);
 
-        assertTrue(received);
-        assertThat(receivedUpdates)
+        assertAll(() -> assertTrue(received), () -> assertThat(receivedUpdates)
                 .hasSize(1)
                 .first()
-                .returns(123456, Update::updateId)
+                .returns(Integer.valueOf(123456), Update::updateId)
                 .extracting(Update::message)
                 .returns("Hello Bot", Message::text)
                 .extracting(Message::from)
-                .returns("testuser", User::username);
+                .returns("testuser", User::username));
 
         verify(postRequestedFor(urlPathTemplate("/bot{token}/getUpdates"))
                 .withPathParam("token", equalTo(telegramProperties.getToken())));
