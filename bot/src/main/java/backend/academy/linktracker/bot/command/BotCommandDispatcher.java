@@ -72,11 +72,16 @@ public class BotCommandDispatcher {
         }
 
         Optional<String> normalizedCommand = normalizeCommandToken(messageText);
-        if (normalizedCommand.isEmpty() || !supportedCommands.contains(normalizedCommand.get())) {
+        if (normalizedCommand.isEmpty()) {
             return BotMessages.UNKNOWN_COMMAND;
         }
 
-        BotCommandHandler handler = handlersByCommand.get(normalizedCommand.get());
+        String command = normalizedCommand.orElseThrow();
+        if (!supportedCommands.contains(command)) {
+            return BotMessages.UNKNOWN_COMMAND;
+        }
+
+        BotCommandHandler handler = handlersByCommand.get(command);
         return handler.handle(chatId);
     }
 
