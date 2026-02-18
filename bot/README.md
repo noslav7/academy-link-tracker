@@ -20,10 +20,10 @@
 
 Из корня репозитория:
 
-Для Windows:
+Для Windows (PowerShell):
 
-```shell
-mvnw.cmd clean verify
+```powershell
+.\mvnw.cmd clean verify
 ```
 
 Для Unix/macOS:
@@ -34,30 +34,58 @@ mvnw.cmd clean verify
 
 ## Шаг 2. Настройка конфигурации `bot`
 
-Основные параметры:
-- `app.telegram.url` — URL Telegram API (обычно `https://api.telegram.org`);
-- `app.telegram.token` — токен бота;
+Выполните следующие действия:
+
+1. Получите токен у `@BotFather` (если еще не получали).
+2. В корне репозитория создайте файл `bot/.env`.
+3. Добавьте в `bot/.env` строку:
+
+```properties
+TELEGRAM_TOKEN=ваш_токен_из_BotFather
+```
+
+4. Сохраните файл и убедитесь, что токен не попадает в git.
+
+Бот читает этот файл автоматически через `spring.config.import` из `bot/src/main/resources/application.yaml`.
+
+Обычно этого достаточно для запуска (рекомендуется):
+
+Для Windows (PowerShell):
+
+```powershell
+.\mvnw.cmd -f .\bot\pom.xml spring-boot:run
+```
+
+Если нужно переопределить параметры на запуске, используйте аргументы Spring Boot (опционально, пример).
+
+Для Windows (PowerShell):
+
+```powershell
+.\mvnw.cmd -f .\bot\pom.xml spring-boot:run "-Dspring-boot.run.arguments=--app.telegram.debug=true --app.telegram.update-listener-sleep=2s --app.telegram.polling-enabled=true --app.telegram.set-my-commands-on-startup=true"
+```
+
+Пояснение по параметрам:
+- `app.telegram.url` — URL Telegram API (обычно `https://api.telegram.org/bot`);
+- `app.telegram.token` — токен бота (обычно через `TELEGRAM_TOKEN` в `bot/.env`);
 - `app.telegram.update-listener-sleep` — интервал polling;
 - `app.telegram.debug` — debug-режим клиента;
 - `app.telegram.polling-enabled` — включение polling;
-- `app.telegram.set-my-commands-on-startup` — регистрация команд в Telegram.
-
-Параметры можно передавать через `application.yml`, переменные окружения или аргументы запуска.
+- `app.telegram.set-my-commands-on-startup` — регистрация команд в Telegram при старте.
 
 ## Шаг 3. Запуск модуля `bot`
 
 Из корня проекта:
 
-Для Windows:
+Для Windows (PowerShell):
 
-```shell
-mvnw.cmd -pl bot -am spring-boot:run
+```powershell
+.\mvnw.cmd -f .\bot\pom.xml spring-boot:run
 ```
 
 Для Unix/macOS:
 
 ```shell
-./mvnw -pl bot -am spring-boot:run
+./mvnw -f ./bot/pom.xml spring-boot:run
 ```
 
 ## Шаг 4. Проверка работы в Telegram
@@ -81,10 +109,10 @@ mvnw.cmd -pl bot -am spring-boot:run
 
 Запуск тестов модуля `bot`:
 
-Для Windows:
+Для Windows (PowerShell):
 
-```shell
-mvnw.cmd -pl bot -am test
+```powershell
+.\mvnw.cmd -pl bot -am test
 ```
 
 Для Unix/macOS:
