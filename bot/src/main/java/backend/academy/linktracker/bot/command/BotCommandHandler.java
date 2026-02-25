@@ -23,7 +23,8 @@ public interface BotCommandHandler {
      * Обрабатывает команду для указанного чата.
      *
      * @param chatId идентификатор чата
+     * @param messageText исходный текст сообщения
      * @return текст ответа пользователю
      */
-    String handle(long chatId);
+    String handle(long chatId, String messageText);
 }

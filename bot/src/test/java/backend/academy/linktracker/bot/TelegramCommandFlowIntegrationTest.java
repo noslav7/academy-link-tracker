@@ -56,8 +56,12 @@ class TelegramCommandFlowIntegrationTest {
 
         String expectedHelpText = """
                 Доступные команды:
+                /cancel - прервать текущий процесс
                 /help - список доступных команд
+                /list - показать отслеживаемые ссылки
                 /start - начало работы
+                /track - начать отслеживание ссылки
+                /untrack - прекратить отслеживание ссылки
                 """;
         await().atMost(10, SECONDS).untilAsserted(() -> verifySendMessage(chatId, expectedHelpText));
     }
@@ -72,6 +76,11 @@ class TelegramCommandFlowIntegrationTest {
     }
 
     private void stubFlowForSingleUpdate(String scenarioName, long chatId, String command) {
+        stubFor(post(urlMatching("/tg-chat/\\d+"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)));
+
         stubFor(post(urlMatching("/bot[^/]+/sendMessage"))
                 .willReturn(aResponse()
                         .withStatus(200)

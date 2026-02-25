@@ -51,7 +51,7 @@ public class HelpCommandHandler extends AbstractBotCommandHandler {
      * {@inheritDoc}
      */
     @Override
-    public String handle(long chatId) {
+    public String handle(long chatId, String messageText) {
         return helpMessageFormatter.format(commandDispatcherSupplier.get().commands());
     }
 }

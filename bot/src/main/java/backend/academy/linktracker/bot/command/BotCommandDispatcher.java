@@ -1,5 +1,6 @@
 package backend.academy.linktracker.bot.command;
 
+import backend.academy.linktracker.bot.service.TrackDialogService;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,17 +47,19 @@ public class BotCommandDispatcher {
      * Набор команд, поддерживаемых приложением.
      */
     private final Set<String> supportedCommands;
+    private final TrackDialogService trackDialogService;
 
     /**
      * Создает диспетчер и индексирует обработчики по имени команды.
      *
      * @param handlers список доступных обработчиков
      */
-    public BotCommandDispatcher(List<BotCommandHandler> handlers) {
+    public BotCommandDispatcher(List<BotCommandHandler> handlers, TrackDialogService trackDialogService) {
         this.handlersByCommand = handlers.stream()
                 .collect(Collectors.toUnmodifiableMap(
                         handler -> normalizeCommandToken(handler.command()).orElseThrow(), handler -> handler));
         this.supportedCommands = handlersByCommand.keySet();
+        this.trackDialogService = trackDialogService;
     }
 
     /**
@@ -71,6 +74,16 @@ public class BotCommandDispatcher {
             return BotMessages.UNKNOWN_COMMAND;
         }
 
+        if (trackDialogService.isActive(chatId)) {
+            if (!isCommandMessage(messageText)) {
+                return trackDialogService.consume(chatId, messageText);
+            }
+            Optional<String> commandInText = normalizeCommandToken(messageText);
+            if (!"/cancel".equals(commandInText.orElseThrow())) {
+                trackDialogService.cancel(chatId);
+            }
+        }
+
         Optional<String> normalizedCommand = normalizeCommandToken(messageText);
         if (normalizedCommand.isEmpty()) {
             return BotMessages.UNKNOWN_COMMAND;
@@ -82,7 +95,7 @@ public class BotCommandDispatcher {
         }
 
         BotCommandHandler handler = handlersByCommand.get(command);
-        return handler.handle(chatId);
+        return handler.handle(chatId, messageText);
     }
 
     /**
@@ -125,5 +138,10 @@ public class BotCommandDispatcher {
         }
 
         return Optional.of(withoutMention.toLowerCase(Locale.ROOT));
+    }
+
+    private static boolean isCommandMessage(String text) {
+        String trimmed = text == null ? "" : text.trim();
+        return !trimmed.isEmpty() && trimmed.charAt(0) == '/';
     }
 }

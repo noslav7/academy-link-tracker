@@ -4,10 +4,18 @@ server:
 spring:
   application:
     name: scrapper
+  config:
+    import: optional:file:./scrapper/.env[.properties],optional:file:./.env[.properties]
 
 app:
   stackoverflow:
-    key: ${STACKOVERFLOW_KEY} # Use env variable. DO NOT KEEP TOKEN HERE
-    access-token: ${STACKOVERFLOW_ACCESS_KEY} # Use env variable. DO NOT KEEP TOKEN HERE
+    key: ${STACKOVERFLOW_KEY:} # Use env variable. DO NOT KEEP TOKEN HERE
+    access-token: ${STACKOVERFLOW_ACCESS_KEY:} # Use env variable. DO NOT KEEP TOKEN HERE
+    base-url: ${STACKOVERFLOW_BASE_URL:https://api.stackexchange.com/2.3}
   github:
-    token: ${GITHUB_TOKEN} # Use env variable. DO NOT KEEP TOKEN HERE
+    token: ${GITHUB_TOKEN:} # Use env variable. DO NOT KEEP TOKEN HERE
+    base-url: ${GITHUB_BASE_URL:https://api.github.com}
+  bot:
+    base-url: ${BOT_BASE_URL:http://localhost:8080}
+  scheduler:
+    interval: ${SCRAPPER_SCHEDULER_INTERVAL:30s}

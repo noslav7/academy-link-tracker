@@ -1,10 +1,10 @@
 package backend.academy.linktracker.scrapper.properties;
 
-import jakarta.validation.constraints.NotEmpty;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.validator.constraints.URL;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -22,12 +22,13 @@ public class StackoverflowProperties {
     /**
      * Ключ приложения для Stack Overflow API.
      */
-    @NotEmpty
     private String key;
 
     /**
      * Токен доступа к Stack Overflow API.
      */
-    @NotEmpty
     private String accessToken;
+
+    @URL
+    private String baseUrl = "https://api.stackexchange.com/2.3";
 }

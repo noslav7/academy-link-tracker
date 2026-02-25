@@ -6,3 +6,5 @@ app:
     debug: false
     polling-enabled: false
     set-my-commands-on-startup: false
+  scrapper:
+    base-url: ${wiremock.server.baseUrl}
