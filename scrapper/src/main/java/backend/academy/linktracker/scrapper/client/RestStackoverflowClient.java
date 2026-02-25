@@ -32,20 +32,24 @@ public class RestStackoverflowClient implements StackoverflowClient {
             params.add("access_token", properties.getAccessToken());
         }
 
-        StackoverflowResponse response = restClient
-                .get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/questions/{id}")
-                        .queryParams(params)
-                        .build(questionId))
-                .retrieve()
-                .body(StackoverflowResponse.class);
+        try {
+            StackoverflowResponse response = restClient
+                    .get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/questions/{id}")
+                            .queryParams(params)
+                            .build(questionId))
+                    .retrieve()
+                    .body(StackoverflowResponse.class);
 
-        if (response == null || response.items() == null || response.items().isEmpty()) {
+            if (response == null || response.items() == null || response.items().isEmpty()) {
+                return Instant.EPOCH;
+            }
+            Long lastActivity = response.items().getFirst().lastActivityDate();
+            return lastActivity == null ? Instant.EPOCH : Instant.ofEpochSecond(lastActivity);
+        } catch (RuntimeException ex) {
             return Instant.EPOCH;
         }
-        Long lastActivity = response.items().getFirst().lastActivityDate();
-        return lastActivity == null ? Instant.EPOCH : Instant.ofEpochSecond(lastActivity);
     }
 
     private record StackoverflowResponse(List<StackoverflowItem> items) {}

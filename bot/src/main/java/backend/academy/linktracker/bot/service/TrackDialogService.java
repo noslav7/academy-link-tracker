@@ -81,7 +81,11 @@ public class TrackDialogService {
         }
         try {
             URI uri = URI.create(value.trim());
-            return uri.getScheme() != null && uri.getHost() != null;
+            String scheme = uri.getScheme();
+            if (scheme == null || uri.getHost() == null) {
+                return false;
+            }
+            return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
         } catch (RuntimeException ex) {
             return false;
         }

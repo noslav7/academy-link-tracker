@@ -20,21 +20,25 @@ public class RestGithubClient implements GithubClient {
 
     @Override
     public Instant fetchRepositoryUpdatedAt(String owner, String repository) {
-        GithubRepositoryResponse response = restClient
-                .get()
-                .uri("/repos/{owner}/{repository}", owner, repository)
-                .headers(headers -> {
-                    if (properties.getToken() != null && !properties.getToken().isBlank()) {
-                        headers.setBearerAuth(properties.getToken());
-                    }
-                })
-                .retrieve()
-                .body(GithubRepositoryResponse.class);
+        try {
+            GithubRepositoryResponse response = restClient
+                    .get()
+                    .uri("/repos/{owner}/{repository}", owner, repository)
+                    .headers(headers -> {
+                        if (properties.getToken() != null && !properties.getToken().isBlank()) {
+                            headers.setBearerAuth(properties.getToken());
+                        }
+                    })
+                    .retrieve()
+                    .body(GithubRepositoryResponse.class);
 
-        if (response == null || response.updatedAt() == null) {
+            if (response == null || response.updatedAt() == null) {
+                return Instant.EPOCH;
+            }
+            return response.updatedAt();
+        } catch (RuntimeException ex) {
             return Instant.EPOCH;
         }
-        return response.updatedAt();
     }
 
     private record GithubRepositoryResponse(@JsonProperty("updated_at") java.time.Instant updatedAt) {}

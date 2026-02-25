@@ -8,8 +8,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.convert.DurationUnit;
+import org.springframework.stereotype.Component;
 
 @ConfigurationProperties(prefix = "app.scheduler")
+@Component("schedulerProperties")
 @Getter
 @Setter
 @EqualsAndHashCode
