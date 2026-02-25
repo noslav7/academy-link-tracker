@@ -8,3 +8,7 @@ app:
     set-my-commands-on-startup: false
   scrapper:
     base-url: ${wiremock.server.baseUrl}
+    transport: HTTP
+  grpc:
+    server:
+      enabled: false

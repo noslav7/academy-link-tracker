@@ -20,4 +20,10 @@ public class ScrapperProperties {
     @NotEmpty
     @URL
     private String baseUrl;
+
+    private TransportMode transport = TransportMode.HTTP;
+
+    private String grpcHost = "localhost";
+
+    private int grpcPort = 9091;
 }

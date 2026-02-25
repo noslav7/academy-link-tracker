@@ -17,5 +17,12 @@ app:
     base-url: ${GITHUB_BASE_URL:https://api.github.com}
   bot:
     base-url: ${BOT_BASE_URL:http://localhost:8080}
+    transport: ${BOT_TRANSPORT:HTTP}
+    grpc-host: ${BOT_GRPC_HOST:localhost}
+    grpc-port: ${BOT_GRPC_PORT:9090}
   scheduler:
     interval: ${SCRAPPER_SCHEDULER_INTERVAL:30s}
+  grpc:
+    server:
+      enabled: ${SCRAPPER_GRPC_SERVER_ENABLED:false}
+      port: ${SCRAPPER_GRPC_SERVER_PORT:9091}

@@ -7,11 +7,9 @@ import backend.academy.linktracker.bot.client.dto.RemoveLinkRequest;
 import java.util.List;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-@Component
 public class RestScrapperClient implements ScrapperClient {
 
     private final RestClient restClient;

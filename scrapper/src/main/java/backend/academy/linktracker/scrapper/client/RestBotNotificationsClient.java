@@ -2,10 +2,8 @@ package backend.academy.linktracker.scrapper.client;
 
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-@Component
 public class RestBotNotificationsClient implements BotNotificationsClient {
 
     private final RestClient restClient;
