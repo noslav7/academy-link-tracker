@@ -43,7 +43,13 @@ public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
     @Override
     public TrackedLink save(long chatId, String url, List<String> tags, List<String> filters, Instant updatedAt) {
         TrackedLink trackedLink = new TrackedLink(
-                idGenerator.getAndIncrement(), chatId, url, List.copyOf(tags), List.copyOf(filters), Instant.now(), updatedAt);
+                idGenerator.getAndIncrement(),
+                chatId,
+                url,
+                List.copyOf(tags),
+                List.copyOf(filters),
+                Instant.now(),
+                updatedAt);
         linksByChatId.computeIfAbsent(chatId, key -> new ConcurrentHashMap<>()).put(url, trackedLink);
         return trackedLink;
     }
@@ -73,6 +79,8 @@ public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
 
     @Override
     public void updateTrackedLink(TrackedLink trackedLink) {
-        linksByChatId.computeIfAbsent(trackedLink.chatId(), key -> new ConcurrentHashMap<>()).put(trackedLink.url(), trackedLink);
+        linksByChatId
+                .computeIfAbsent(trackedLink.chatId(), key -> new ConcurrentHashMap<>())
+                .put(trackedLink.url(), trackedLink);
     }
 }

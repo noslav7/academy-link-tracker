@@ -20,7 +20,9 @@ public class LinkUpdatesScheduler {
     private final SchedulerProperties schedulerProperties;
 
     public LinkUpdatesScheduler(
-            LinkService linkService, BotNotificationsClient botNotificationsClient, SchedulerProperties schedulerProperties) {
+            LinkService linkService,
+            BotNotificationsClient botNotificationsClient,
+            SchedulerProperties schedulerProperties) {
         this.linkService = linkService;
         this.botNotificationsClient = botNotificationsClient;
         this.schedulerProperties = schedulerProperties;
@@ -32,7 +34,10 @@ public class LinkUpdatesScheduler {
             Instant currentUpdatedAt = linkService.resolveLastUpdated(trackedLink.url());
             if (currentUpdatedAt.isAfter(trackedLink.lastUpdatedAt())) {
                 botNotificationsClient.sendUpdate(new LinkUpdate(
-                        trackedLink.id(), trackedLink.url(), "Обнаружено обновление", java.util.List.of(trackedLink.chatId())));
+                        trackedLink.id(),
+                        trackedLink.url(),
+                        "Обнаружено обновление",
+                        java.util.List.of(trackedLink.chatId())));
                 linkService.updateTrackedLink(trackedLink.withLastCheck(Instant.now(), currentUpdatedAt));
                 log.atInfo()
                         .addKeyValue("chatId", trackedLink.chatId())

@@ -43,15 +43,18 @@ public class LinkService {
     public LinkResponse remove(long chatId, String link) {
         ensureChatExists(chatId);
         String normalizedLink = normalizeLink(link);
-        TrackedLink existing =
-                repository.findByChatIdAndUrl(chatId, normalizedLink).orElseThrow(() -> new LinkNotFoundException(normalizedLink));
+        TrackedLink existing = repository
+                .findByChatIdAndUrl(chatId, normalizedLink)
+                .orElseThrow(() -> new LinkNotFoundException(normalizedLink));
         repository.deleteByChatIdAndUrl(chatId, normalizedLink);
         return toResponse(existing);
     }
 
     public List<LinkResponse> list(long chatId) {
         ensureChatExists(chatId);
-        return repository.findAllByChatId(chatId).stream().map(LinkService::toResponse).toList();
+        return repository.findAllByChatId(chatId).stream()
+                .map(LinkService::toResponse)
+                .toList();
     }
 
     public List<TrackedLink> allTrackedLinks() {

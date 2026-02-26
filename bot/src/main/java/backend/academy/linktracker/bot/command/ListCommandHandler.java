@@ -21,7 +21,8 @@ public class ListCommandHandler extends AbstractBotCommandHandler {
         try {
             String optionalTag = extractOptionalTag(messageText);
             List<LinkResponse> links = scrapperClient.getLinks(chatId).stream()
-                    .filter(link -> optionalTag == null || (link.tags() != null && link.tags().contains(optionalTag)))
+                    .filter(link -> optionalTag == null
+                            || (link.tags() != null && link.tags().contains(optionalTag)))
                     .toList();
             if (links.isEmpty()) {
                 return BotMessages.LIST_EMPTY;

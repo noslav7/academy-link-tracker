@@ -47,6 +47,7 @@ public class BotCommandDispatcher {
      * Набор команд, поддерживаемых приложением.
      */
     private final Set<String> supportedCommands;
+
     private final TrackDialogService trackDialogService;
 
     /**

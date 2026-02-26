@@ -32,7 +32,8 @@ class ScrapperGrpcServiceTest {
         GithubClient githubClient = (owner, repository) -> Instant.parse("2026-02-25T00:00:00Z");
         StackoverflowClient stackoverflowClient = questionId -> Instant.parse("2026-02-25T00:00:00Z");
         TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
-        LinkService linkService = new LinkService(repository, new LinkMetadataResolver(githubClient, stackoverflowClient));
+        LinkService linkService =
+                new LinkService(repository, new LinkMetadataResolver(githubClient, stackoverflowClient));
         ChatService chatService = new ChatService(repository);
         server = ServerBuilder.forPort(0)
                 .addService(new ScrapperGrpcService(chatService, linkService))
@@ -61,8 +62,10 @@ class ScrapperGrpcServiceTest {
                 .setChatId(42L)
                 .setLink("https://github.com/octocat/Hello-World")
                 .build());
-        ListLinksResponse response = stub.listLinks(ChatIdRequest.newBuilder().setChatId(42L).build());
+        ListLinksResponse response =
+                stub.listLinks(ChatIdRequest.newBuilder().setChatId(42L).build());
         assertEquals(1, response.getSize());
-        assertEquals("https://github.com/octocat/Hello-World", response.getLinks(0).getUrl());
+        assertEquals(
+                "https://github.com/octocat/Hello-World", response.getLinks(0).getUrl());
     }
 }

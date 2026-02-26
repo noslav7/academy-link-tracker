@@ -121,8 +121,7 @@ class ScrapperHttpContractTest {
                   "tags": [],
                   "filters": []
                 }
-                """
-                .formatted(link);
+                """.formatted(link);
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -144,8 +143,7 @@ class ScrapperHttpContractTest {
                 {
                   "link": "%s"
                 }
-                """
-                .formatted(link);
+                """.formatted(link);
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -162,9 +160,8 @@ class ScrapperHttpContractTest {
     }
 
     private HttpResponse<String> deleteWithoutBody(String path) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + path))
-                .DELETE()
-                .build();
+        HttpRequest request =
+                HttpRequest.newBuilder(URI.create(baseUrl() + path)).DELETE().build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 

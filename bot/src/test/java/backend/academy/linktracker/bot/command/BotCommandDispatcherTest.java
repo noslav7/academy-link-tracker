@@ -25,8 +25,8 @@ class BotCommandDispatcherTest {
         var cancelHandler = new CancelCommandHandler(trackDialogService);
         BotCommandDispatcher[] dispatcherHolder = new BotCommandDispatcher[1];
         var helpHandler = new HelpCommandHandler(() -> dispatcherHolder[0], new CommandHelpMessageFormatter());
-        dispatcherHolder[0] =
-                new BotCommandDispatcher(List.of(startHandler, helpHandler, trackHandler, cancelHandler), trackDialogService);
+        dispatcherHolder[0] = new BotCommandDispatcher(
+                List.of(startHandler, helpHandler, trackHandler, cancelHandler), trackDialogService);
         dispatcher = dispatcherHolder[0];
     }
 
@@ -105,8 +105,8 @@ class BotCommandDispatcherTest {
         public void registerChat(long chatId) {}
 
         @Override
-        public LinkResponse addLink(long chatId, String link, List<String> tags) {
-            return new LinkResponse(1L, link, tags, List.of());
+        public LinkResponse addLink(long chatId, String link, List<String> tags, List<String> filters) {
+            return new LinkResponse(1L, link, tags, filters);
         }
 
         @Override

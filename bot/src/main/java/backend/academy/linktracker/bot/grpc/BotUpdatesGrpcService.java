@@ -18,8 +18,8 @@ public class BotUpdatesGrpcService extends BotUpdatesApiGrpc.BotUpdatesApiImplBa
 
     @Override
     public void sendUpdate(LinkUpdateRequest request, StreamObserver<EmptyMessage> responseObserver) {
-        updateNotificationService.notifyAboutUpdate(
-                new LinkUpdate(request.getId(), request.getUrl(), request.getDescription(), List.copyOf(request.getTgChatIdsList())));
+        updateNotificationService.notifyAboutUpdate(new LinkUpdate(
+                request.getId(), request.getUrl(), request.getDescription(), List.copyOf(request.getTgChatIdsList())));
         responseObserver.onNext(EmptyMessage.newBuilder().build());
         responseObserver.onCompleted();
     }

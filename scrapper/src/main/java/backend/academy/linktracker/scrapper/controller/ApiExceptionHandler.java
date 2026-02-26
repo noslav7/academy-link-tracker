@@ -42,7 +42,10 @@ public class ApiExceptionHandler {
                 String.valueOf(status.value()),
                 ex.getClass().getSimpleName(),
                 ex.getMessage(),
-                Arrays.stream(ex.getStackTrace()).limit(20).map(StackTraceElement::toString).toList());
+                Arrays.stream(ex.getStackTrace())
+                        .limit(20)
+                        .map(StackTraceElement::toString)
+                        .toList());
         return ResponseEntity.status(status).body(response);
     }
 }

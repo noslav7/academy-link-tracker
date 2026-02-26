@@ -25,7 +25,8 @@ public class RestGithubClient implements GithubClient {
                     .get()
                     .uri("/repos/{owner}/{repository}", owner, repository)
                     .headers(headers -> {
-                        if (properties.getToken() != null && !properties.getToken().isBlank()) {
+                        if (properties.getToken() != null
+                                && !properties.getToken().isBlank()) {
                             headers.setBearerAuth(properties.getToken());
                         }
                     })
@@ -41,5 +42,6 @@ public class RestGithubClient implements GithubClient {
         }
     }
 
-    private record GithubRepositoryResponse(@JsonProperty("updated_at") java.time.Instant updatedAt) {}
+    private record GithubRepositoryResponse(
+            @JsonProperty("updated_at") java.time.Instant updatedAt) {}
 }

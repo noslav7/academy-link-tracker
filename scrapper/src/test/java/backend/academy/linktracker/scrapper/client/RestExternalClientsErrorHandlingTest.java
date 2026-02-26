@@ -27,12 +27,16 @@ class RestExternalClientsErrorHandlingTest {
 
         GithubProperties githubProperties = new GithubProperties();
         githubProperties.setBaseUrl("http://localhost:%d/github".formatted(wireMockServer.port()));
-        githubClient = new RestGithubClient(RestClient.builder().baseUrl(githubProperties.getBaseUrl()).build(), githubProperties);
+        githubClient = new RestGithubClient(
+                RestClient.builder().baseUrl(githubProperties.getBaseUrl()).build(), githubProperties);
 
         StackoverflowProperties stackoverflowProperties = new StackoverflowProperties();
         stackoverflowProperties.setBaseUrl("http://localhost:%d/so".formatted(wireMockServer.port()));
         stackoverflowClient = new RestStackoverflowClient(
-                RestClient.builder().baseUrl(stackoverflowProperties.getBaseUrl()).build(), stackoverflowProperties);
+                RestClient.builder()
+                        .baseUrl(stackoverflowProperties.getBaseUrl())
+                        .build(),
+                stackoverflowProperties);
     }
 
     @AfterEach

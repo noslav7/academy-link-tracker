@@ -22,16 +22,18 @@ public class GrpcScrapperClient implements ScrapperClient {
 
     @Override
     public void registerChat(long chatId) {
-        invoke(() -> stub.registerChat(ChatIdRequest.newBuilder().setChatId(chatId).build()));
+        invoke(() ->
+                stub.registerChat(ChatIdRequest.newBuilder().setChatId(chatId).build()));
     }
 
     @Override
-    public LinkResponse addLink(long chatId, String link, List<String> tags) {
+    public LinkResponse addLink(long chatId, String link, List<String> tags, List<String> filters) {
         try {
             backend.academy.linktracker.grpc.LinkResponse response = stub.addLink(AddLinkRequest.newBuilder()
                     .setChatId(chatId)
                     .setLink(link)
                     .addAllTags(tags)
+                    .addAllFilters(filters)
                     .build());
             return toLinkResponse(response);
         } catch (StatusRuntimeException ex) {
@@ -45,8 +47,10 @@ public class GrpcScrapperClient implements ScrapperClient {
     @Override
     public LinkResponse removeLink(long chatId, String link) {
         try {
-            backend.academy.linktracker.grpc.LinkResponse response = stub.removeLink(
-                    RemoveLinkRequest.newBuilder().setChatId(chatId).setLink(link).build());
+            backend.academy.linktracker.grpc.LinkResponse response = stub.removeLink(RemoveLinkRequest.newBuilder()
+                    .setChatId(chatId)
+                    .setLink(link)
+                    .build());
             return toLinkResponse(response);
         } catch (StatusRuntimeException ex) {
             if (Status.NOT_FOUND.getCode().equals(ex.getStatus().getCode())) {
@@ -61,7 +65,9 @@ public class GrpcScrapperClient implements ScrapperClient {
         try {
             ListLinksResponse response =
                     stub.listLinks(ChatIdRequest.newBuilder().setChatId(chatId).build());
-            return response.getLinksList().stream().map(GrpcScrapperClient::toLinkResponse).toList();
+            return response.getLinksList().stream()
+                    .map(GrpcScrapperClient::toLinkResponse)
+                    .toList();
         } catch (StatusRuntimeException ex) {
             throw new ScrapperClientException("Failed to list links in scrapper over gRPC", ex);
         }
@@ -80,7 +86,10 @@ public class GrpcScrapperClient implements ScrapperClient {
 
     private static LinkResponse toLinkResponse(backend.academy.linktracker.grpc.LinkResponse response) {
         return new LinkResponse(
-                response.getId(), response.getUrl(), List.copyOf(response.getTagsList()), List.copyOf(response.getFiltersList()));
+                response.getId(),
+                response.getUrl(),
+                List.copyOf(response.getTagsList()),
+                List.copyOf(response.getFiltersList()));
     }
 
     @FunctionalInterface

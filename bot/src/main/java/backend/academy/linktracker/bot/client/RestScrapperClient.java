@@ -21,7 +21,8 @@ public class RestScrapperClient implements ScrapperClient {
     @Override
     public void registerChat(long chatId) {
         try {
-            restClient.post()
+            restClient
+                    .post()
                     .uri("/tg-chat/{id}", chatId)
                     .retrieve()
                     .onStatus(HttpStatus.CONFLICT::equals, (request, response) -> {})
@@ -32,17 +33,17 @@ public class RestScrapperClient implements ScrapperClient {
     }
 
     @Override
-    public LinkResponse addLink(long chatId, String link, List<String> tags) {
+    public LinkResponse addLink(long chatId, String link, List<String> tags, List<String> filters) {
         try {
-            return restClient.post()
+            return restClient
+                    .post()
                     .uri("/links")
                     .header("Tg-Chat-Id", String.valueOf(chatId))
-                    .body(new AddLinkRequest(link, tags, List.of()))
+                    .body(new AddLinkRequest(link, tags, filters))
                     .retrieve()
-                    .onStatus(
-                            HttpStatus.CONFLICT::equals, (request, response) -> {
-                                throw new LinkAlreadyTrackedException();
-                            })
+                    .onStatus(HttpStatus.CONFLICT::equals, (request, response) -> {
+                        throw new LinkAlreadyTrackedException();
+                    })
                     .body(LinkResponse.class);
         } catch (LinkAlreadyTrackedException ex) {
             throw ex;
@@ -54,15 +55,15 @@ public class RestScrapperClient implements ScrapperClient {
     @Override
     public LinkResponse removeLink(long chatId, String link) {
         try {
-            return restClient.method(HttpMethod.DELETE)
+            return restClient
+                    .method(HttpMethod.DELETE)
                     .uri("/links")
                     .header("Tg-Chat-Id", String.valueOf(chatId))
                     .body(new RemoveLinkRequest(link))
                     .retrieve()
-                    .onStatus(
-                            HttpStatus.NOT_FOUND::equals, (request, response) -> {
-                                throw new LinkNotFoundException();
-                            })
+                    .onStatus(HttpStatus.NOT_FOUND::equals, (request, response) -> {
+                        throw new LinkNotFoundException();
+                    })
                     .body(LinkResponse.class);
         } catch (LinkNotFoundException ex) {
             throw ex;
@@ -74,7 +75,8 @@ public class RestScrapperClient implements ScrapperClient {
     @Override
     public List<LinkResponse> getLinks(long chatId) {
         try {
-            ListLinksResponse response = restClient.get()
+            ListLinksResponse response = restClient
+                    .get()
                     .uri("/links")
                     .header("Tg-Chat-Id", String.valueOf(chatId))
                     .retrieve()

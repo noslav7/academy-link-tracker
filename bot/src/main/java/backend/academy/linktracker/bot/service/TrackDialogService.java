@@ -47,9 +47,14 @@ public class TrackDialogService {
             return BotMessages.TRACK_ENTER_TAGS;
         }
 
-        List<String> tags = parseTags(messageText);
+        if (state.tags == null) {
+            state.tags = parseCsvValues(messageText);
+            return BotMessages.TRACK_ENTER_FILTERS;
+        }
+
+        List<String> filters = parseCsvValues(messageText);
         try {
-            scrapperClient.addLink(chatId, state.link, tags);
+            scrapperClient.addLink(chatId, state.link, state.tags, filters);
             activeDialogs.remove(chatId);
             return BotMessages.TRACK_SUCCESS;
         } catch (LinkAlreadyTrackedException ex) {
@@ -61,7 +66,7 @@ public class TrackDialogService {
         }
     }
 
-    private static List<String> parseTags(String input) {
+    private static List<String> parseCsvValues(String input) {
         if (input == null) {
             return List.of();
         }
@@ -93,5 +98,6 @@ public class TrackDialogService {
 
     private static final class TrackState {
         private String link;
+        private List<String> tags;
     }
 }

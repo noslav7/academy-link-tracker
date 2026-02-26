@@ -1,7 +1,7 @@
 package backend.academy.linktracker.bot.command;
 
-import backend.academy.linktracker.bot.repository.UserRepository;
 import backend.academy.linktracker.bot.client.ScrapperClient;
+import backend.academy.linktracker.bot.repository.UserRepository;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,6 +14,7 @@ public class StartCommandHandler extends AbstractBotCommandHandler {
      * Репозиторий зарегистрированных пользователей.
      */
     private final UserRepository userRepository;
+
     private final ScrapperClient scrapperClient;
 
     /**

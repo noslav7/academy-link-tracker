@@ -54,5 +54,6 @@ public class RestStackoverflowClient implements StackoverflowClient {
 
     private record StackoverflowResponse(List<StackoverflowItem> items) {}
 
-    private record StackoverflowItem(@JsonProperty("last_activity_date") Long lastActivityDate) {}
+    private record StackoverflowItem(
+            @JsonProperty("last_activity_date") Long lastActivityDate) {}
 }

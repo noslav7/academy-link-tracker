@@ -41,8 +41,7 @@ class UpdatesControllerContractTest {
         HttpResponse<String> response = httpClient.send(
                 HttpRequest.newBuilder(URI.create(baseUrl() + "/updates"))
                         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .POST(HttpRequest.BodyPublishers.ofString(
-                                """
+                        .POST(HttpRequest.BodyPublishers.ofString("""
                                 {
                                   "id": 1,
                                   "url": "https://github.com/user/repo",
@@ -61,8 +60,7 @@ class UpdatesControllerContractTest {
         HttpResponse<String> response = httpClient.send(
                 HttpRequest.newBuilder(URI.create(baseUrl() + "/updates"))
                         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                        .POST(HttpRequest.BodyPublishers.ofString(
-                                """
+                        .POST(HttpRequest.BodyPublishers.ofString("""
                                 {
                                   "id": "wrong-type",
                                   "url": 42,

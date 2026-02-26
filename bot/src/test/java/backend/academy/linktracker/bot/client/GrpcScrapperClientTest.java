@@ -28,7 +28,10 @@ class GrpcScrapperClientTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        server = ServerBuilder.forPort(0).addService(new FakeScrapperService()).build().start();
+        server = ServerBuilder.forPort(0)
+                .addService(new FakeScrapperService())
+                .build()
+                .start();
         channel = io.grpc.ManagedChannelBuilder.forAddress("localhost", server.getPort())
                 .usePlaintext()
                 .build();
@@ -54,7 +57,9 @@ class GrpcScrapperClientTest {
 
     @Test
     void shouldMapAlreadyExistsToDomainException() {
-        assertThrows(LinkAlreadyTrackedException.class, () -> client.addLink(42L, "https://duplicate", List.of("tag")));
+        assertThrows(
+                LinkAlreadyTrackedException.class,
+                () -> client.addLink(42L, "https://duplicate", List.of("tag"), List.of("author=me")));
     }
 
     private static final class FakeScrapperService extends ScrapperApiGrpc.ScrapperApiImplBase {
@@ -66,7 +71,9 @@ class GrpcScrapperClientTest {
         }
 
         @Override
-        public void addLink(AddLinkRequest request, StreamObserver<backend.academy.linktracker.grpc.LinkResponse> responseObserver) {
+        public void addLink(
+                AddLinkRequest request,
+                StreamObserver<backend.academy.linktracker.grpc.LinkResponse> responseObserver) {
             if ("https://duplicate".equals(request.getLink())) {
                 responseObserver.onError(Status.ALREADY_EXISTS.asRuntimeException());
                 return;
@@ -81,7 +88,8 @@ class GrpcScrapperClientTest {
 
         @Override
         public void removeLink(
-                RemoveLinkRequest request, StreamObserver<backend.academy.linktracker.grpc.LinkResponse> responseObserver) {
+                RemoveLinkRequest request,
+                StreamObserver<backend.academy.linktracker.grpc.LinkResponse> responseObserver) {
             responseObserver.onNext(backend.academy.linktracker.grpc.LinkResponse.newBuilder()
                     .setId(1L)
                     .setUrl(request.getLink())

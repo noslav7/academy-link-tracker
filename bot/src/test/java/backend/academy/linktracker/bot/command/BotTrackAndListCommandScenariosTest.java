@@ -32,7 +32,8 @@ class BotTrackAndListCommandScenariosTest {
         var cancelHandler = new CancelCommandHandler(trackDialogService);
         BotCommandDispatcher[] dispatcherHolder = new BotCommandDispatcher[1];
         var helpHandler = new HelpCommandHandler(() -> dispatcherHolder[0], new CommandHelpMessageFormatter());
-        dispatcherHolder[0] = new BotCommandDispatcher(List.of(trackHandler, listHandler, cancelHandler, helpHandler), trackDialogService);
+        dispatcherHolder[0] = new BotCommandDispatcher(
+                List.of(trackHandler, listHandler, cancelHandler, helpHandler), trackDialogService);
         dispatcher = dispatcherHolder[0];
     }
 
@@ -40,14 +41,16 @@ class BotTrackAndListCommandScenariosTest {
     void givenTrackDialogAndValidLinkWhenUserProvidesTagsThenLinkSavedInLocalStorage() {
         assertEquals(BotMessages.TRACK_ENTER_LINK, dispatcher.dispatch("/track", CHAT_ID));
         assertEquals(BotMessages.TRACK_ENTER_TAGS, dispatcher.dispatch("https://github.com/user/repo", CHAT_ID));
+        assertEquals(BotMessages.TRACK_ENTER_FILTERS, dispatcher.dispatch("backend, java", CHAT_ID));
 
-        String result = dispatcher.dispatch("backend, java", CHAT_ID);
+        String result = dispatcher.dispatch("author=me, label=bug", CHAT_ID);
 
         assertEquals(BotMessages.TRACK_SUCCESS, result);
         List<LinkResponse> links = scrapperClient.getLinks(CHAT_ID);
         assertEquals(1, links.size());
         assertEquals("https://github.com/user/repo", links.getFirst().url());
         assertEquals(List.of("backend", "java"), links.getFirst().tags());
+        assertEquals(List.of("author=me", "label=bug"), links.getFirst().filters());
     }
 
     @Test
@@ -61,12 +64,13 @@ class BotTrackAndListCommandScenariosTest {
 
     @Test
     void givenAlreadyTrackedLinkWhenTrackRequestedAgainThenBotReturnsDuplicateMessage() {
-        trackLink(CHAT_ID, "https://github.com/user/repo", "work");
+        trackLink(CHAT_ID, "https://github.com/user/repo", "work", "author=me");
 
         assertEquals(BotMessages.TRACK_ENTER_LINK, dispatcher.dispatch("/track", CHAT_ID));
         assertEquals(BotMessages.TRACK_ENTER_TAGS, dispatcher.dispatch("https://github.com/user/repo", CHAT_ID));
+        assertEquals(BotMessages.TRACK_ENTER_FILTERS, dispatcher.dispatch("work", CHAT_ID));
 
-        String result = dispatcher.dispatch("work", CHAT_ID);
+        String result = dispatcher.dispatch("-", CHAT_ID);
 
         assertEquals(BotMessages.TRACK_DUPLICATE, result);
     }
@@ -102,10 +106,11 @@ class BotTrackAndListCommandScenariosTest {
         assertFalse(result.contains("https://github.com/user/repo-b"));
     }
 
-    private void trackLink(long chatId, String url, String tags) {
+    private void trackLink(long chatId, String url, String tags, String filters) {
         dispatcher.dispatch("/track", chatId);
         dispatcher.dispatch(url, chatId);
         dispatcher.dispatch(tags, chatId);
+        dispatcher.dispatch(filters, chatId);
     }
 
     private static final class InMemoryScrapperClient implements ScrapperClient {
@@ -117,12 +122,12 @@ class BotTrackAndListCommandScenariosTest {
         public void registerChat(long chatId) {}
 
         @Override
-        public LinkResponse addLink(long chatId, String link, List<String> tags) {
+        public LinkResponse addLink(long chatId, String link, List<String> tags, List<String> filters) {
             Map<String, LinkResponse> links = linksByChatId.computeIfAbsent(chatId, key -> new LinkedHashMap<>());
             if (links.containsKey(link)) {
                 throw new LinkAlreadyTrackedException();
             }
-            LinkResponse response = new LinkResponse(idSequence++, link, List.copyOf(tags), List.of());
+            LinkResponse response = new LinkResponse(idSequence++, link, List.copyOf(tags), List.copyOf(filters));
             links.put(link, response);
             return response;
         }
@@ -146,7 +151,7 @@ class BotTrackAndListCommandScenariosTest {
         }
 
         void storeLink(long chatId, String url, List<String> tags) {
-            addLink(chatId, url, tags);
+            addLink(chatId, url, tags, List.of());
         }
     }
 }

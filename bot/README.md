@@ -1,123 +1,118 @@
 # Bot Module
 
-Инструкция по сборке, запуску и базовому использованию модуля `bot`.
+Инструкция по запуску, тестированию и ручной проверке модуля `bot`.
 
 ## Что делает модуль
 
 `bot` — Telegram-бот, который:
-- принимает команды пользователя;
-- регистрирует пользователя по команде `/start`;
-- показывает список команд по `/help`;
-- регистрирует список команд в Telegram при старте (если это включено конфигурацией).
+- обрабатывает команды пользователя;
+- регистрирует чат через `scrapper` по команде `/start`;
+- показывает справку по `/help`;
+- запускает диалог добавления ссылки по `/track`;
+- удаляет ссылку из отслеживания по `/untrack <url>`;
+- показывает отслеживаемые ссылки по `/list` (опционально с фильтром по тегу: `/list <tag>`);
+- прерывает текущий диалог по `/cancel`;
+- принимает уведомления об обновлениях от `scrapper` по HTTP (`POST /updates`) или gRPC.
 
 ## Требования
 
-- JDK и Maven-обертка версии из проекта (`pom.xml` + `mvnw`);
-- доступ в интернет к Telegram Bot API;
-- токен Telegram-бота от `@BotFather`.
+- JDK и Maven Wrapper из проекта (`mvnw`, `pom.xml`);
+- токен Telegram-бота от `@BotFather`;
+- доступ в интернет к Telegram API;
+- запущенный `scrapper` для команд `/track`, `/untrack`, `/list` и регистрации чата.
 
-## Шаг 1. Сборка проекта
+## Настройка
 
-Из корня репозитория:
-
-Для Windows (PowerShell):
-
-```powershell
-.\mvnw.cmd clean verify
-```
-
-Для Unix/macOS:
-
-```shell
-./mvnw clean verify
-```
-
-## Шаг 2. Настройка конфигурации `bot`
-
-Выполните следующие действия:
-
-1. Получите токен у `@BotFather` (если еще не получали).
-2. В корне репозитория создайте файл `bot/.env`.
-3. Добавьте в `bot/.env` строку:
+1. В корне репозитория создайте файл `bot/.env`.
+2. Добавьте минимум:
 
 ```properties
 TELEGRAM_TOKEN=ваш_токен_из_BotFather
 ```
 
-4. Сохраните файл и убедитесь, что токен не попадает в git.
+3. При необходимости укажите адрес `scrapper`:
 
-Бот читает этот файл автоматически через `spring.config.import` из `bot/src/main/resources/application.yaml`.
+```properties
+SCRAPPER_BASE_URL=http://localhost:8081
+```
 
-Обычно этого достаточно для запуска (рекомендуется):
+`bot` автоматически читает `bot/.env` через `spring.config.import` в `bot/src/main/resources/application.yaml`.
 
-Для Windows (PowerShell):
+## Запуск
+
+Из корня репозитория.
+
+Windows (PowerShell):
 
 ```powershell
 .\mvnw.cmd -f .\bot\pom.xml spring-boot:run
 ```
 
-Если нужно переопределить параметры на запуске, используйте аргументы Spring Boot (опционально, пример).
-
-Для Windows (PowerShell):
-
-```powershell
-.\mvnw.cmd -f .\bot\pom.xml spring-boot:run "-Dspring-boot.run.arguments=--app.telegram.debug=true --app.telegram.update-listener-sleep=2s --app.telegram.polling-enabled=true --app.telegram.set-my-commands-on-startup=true"
-```
-
-Пояснение по параметрам:
-- `app.telegram.url` — URL Telegram API (обычно `https://api.telegram.org/bot`);
-- `app.telegram.token` — токен бота (обычно через `TELEGRAM_TOKEN` в `bot/.env`);
-- `app.telegram.update-listener-sleep` — интервал polling;
-- `app.telegram.debug` — debug-режим клиента;
-- `app.telegram.polling-enabled` — включение polling;
-- `app.telegram.set-my-commands-on-startup` — регистрация команд в Telegram при старте.
-
-## Шаг 3. Запуск модуля `bot`
-
-Из корня проекта:
-
-Для Windows (PowerShell):
-
-```powershell
-.\mvnw.cmd -f .\bot\pom.xml spring-boot:run
-```
-
-Для Unix/macOS:
+Unix/macOS:
 
 ```shell
 ./mvnw -f ./bot/pom.xml spring-boot:run
 ```
 
-## Шаг 4. Проверка работы в Telegram
+Опционально, запуск с переопределением параметров:
 
-1. Откройте чат с вашим ботом.
-2. Отправьте `/start`.
-3. Проверьте ответ:
-   - при первом вызове — приветствие и начало работы;
-   - при повторном — сообщение, что регистрация уже была.
-4. Отправьте `/help`.
-5. Проверьте, что бот вернул список доступных команд.
+```powershell
+.\mvnw.cmd -f .\bot\pom.xml spring-boot:run "-Dspring-boot.run.arguments=--app.telegram.debug=true --app.telegram.update-listener-sleep=2s --app.telegram.polling-enabled=true --app.telegram.set-my-commands-on-startup=true --app.scrapper.transport=HTTP"
+```
 
-## Примеры команд
+## Команды в Telegram
 
 ```text
 /start
 /help
+/track
+/untrack <url>
+/list
+/list <tag>
+/cancel
 ```
 
-## Полезные команды для разработки
+### Сценарий `/track`
 
-Запуск тестов модуля `bot`:
+1. Отправьте `/track`.
+2. Бот запросит ссылку.
+3. Отправьте URL (например, `https://github.com/octocat/Hello-World`).
+4. Бот запросит теги. Отправьте CSV (`работа, баг`) или `-`.
+5. Бот запросит фильтры. Отправьте CSV (`author=me, label=bug`) или `-`.
+6. Бот добавит ссылку в `scrapper` и вернет результат.
 
-Для Windows (PowerShell):
+Во время активного сценария можно прервать процесс командой `/cancel`.
+
+## Как тестировать
+
+### Автоматически
+
+Windows:
 
 ```powershell
 .\mvnw.cmd -pl bot -am test
 ```
 
-Для Unix/macOS:
+Unix/macOS:
 
 ```shell
 ./mvnw -pl bot -am test
 ```
+
+### Проверка "вручную"
+
+1. Запустите `scrapper`.
+2. Запустите `bot`.
+3. В Telegram проверьте:
+   - `/start` (первый и повторный вызовы);
+   - `/help` (список команд актуален);
+   - полный сценарий `/track`;
+   - `/list` и `/list <tag>`;
+   - `/untrack <url>`;
+   - `/cancel` в активном и неактивном состоянии.
+
+## Примечания
+
+- Если `scrapper` недоступен, команды, завязанные на него (`/track`, `/untrack`, `/list`), будут возвращать сообщения об ошибке.
+- Порт `bot` по умолчанию: `8080`.
 

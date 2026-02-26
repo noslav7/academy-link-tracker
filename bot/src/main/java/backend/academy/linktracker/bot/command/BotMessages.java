@@ -28,6 +28,9 @@ public final class BotMessages {
     public static final String TRACK_ENTER_TAGS =
             "Теперь отправьте теги через запятую (например: работа, баг) или '-' если без тегов.";
 
+    public static final String TRACK_ENTER_FILTERS =
+            "Теперь отправьте фильтры через запятую (например: author=me, label=bug) или '-' если без фильтров.";
+
     public static final String TRACK_CANCELLED = "Процесс отслеживания отменён.";
 
     public static final String TRACK_SUCCESS = "Ссылка добавлена в отслеживание.";

@@ -26,7 +26,8 @@ class LinkUpdatesSchedulerTest {
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
 
         TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
-        LinkService linkService = new LinkService(repository, new LinkMetadataResolver(githubClient, stackoverflowClient));
+        LinkService linkService =
+                new LinkService(repository, new LinkMetadataResolver(githubClient, stackoverflowClient));
         ChatService chatService = new ChatService(repository);
         chatService.register(42L);
         chatService.register(77L);
@@ -35,7 +36,8 @@ class LinkUpdatesSchedulerTest {
         CapturingBotNotificationsClient notificationsClient = new CapturingBotNotificationsClient();
         SchedulerProperties schedulerProperties = new SchedulerProperties();
         schedulerProperties.setInterval(Duration.ofSeconds(30));
-        LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(linkService, notificationsClient, schedulerProperties);
+        LinkUpdatesScheduler scheduler =
+                new LinkUpdatesScheduler(linkService, notificationsClient, schedulerProperties);
 
         githubUpdatedAt.set(Instant.parse("2026-02-26T00:00:00Z"));
         scheduler.checkUpdates();

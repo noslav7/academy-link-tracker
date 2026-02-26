@@ -34,7 +34,8 @@ public class LinksController {
     }
 
     @PostMapping
-    public ResponseEntity<LinkResponse> add(@RequestHeader(CHAT_HEADER) long chatId, @RequestBody AddLinkRequest request) {
+    public ResponseEntity<LinkResponse> add(
+            @RequestHeader(CHAT_HEADER) long chatId, @RequestBody AddLinkRequest request) {
         return ResponseEntity.ok(linkService.add(chatId, request));
     }
 

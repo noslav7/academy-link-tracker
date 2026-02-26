@@ -34,9 +34,11 @@ public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
             responseObserver.onNext(EmptyMessage.newBuilder().build());
             responseObserver.onCompleted();
         } catch (ChatAlreadyRegisteredException ex) {
-            responseObserver.onError(Status.ALREADY_EXISTS.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.ALREADY_EXISTS.withDescription(ex.getMessage()).asRuntimeException());
         } catch (RuntimeException ex) {
-            responseObserver.onError(Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
         }
     }
 
@@ -47,17 +49,24 @@ public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
         try {
             LinkResponse response = linkService.add(
                     request.getChatId(),
-                    new AddLinkRequest(request.getLink(), List.copyOf(request.getTagsList()), List.copyOf(request.getFiltersList())));
+                    new AddLinkRequest(
+                            request.getLink(),
+                            List.copyOf(request.getTagsList()),
+                            List.copyOf(request.getFiltersList())));
             responseObserver.onNext(toGrpcLinkResponse(response));
             responseObserver.onCompleted();
         } catch (LinkAlreadyTrackedException ex) {
-            responseObserver.onError(Status.ALREADY_EXISTS.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.ALREADY_EXISTS.withDescription(ex.getMessage()).asRuntimeException());
         } catch (ChatNotFoundException | LinkNotFoundException ex) {
-            responseObserver.onError(Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
         } catch (UnsupportedLinkException | IllegalArgumentException ex) {
-            responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT.withDescription(ex.getMessage()).asRuntimeException());
         } catch (RuntimeException ex) {
-            responseObserver.onError(Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
         }
     }
 
@@ -70,11 +79,14 @@ public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
             responseObserver.onNext(toGrpcLinkResponse(response));
             responseObserver.onCompleted();
         } catch (ChatNotFoundException | LinkNotFoundException ex) {
-            responseObserver.onError(Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
         } catch (IllegalArgumentException ex) {
-            responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.INVALID_ARGUMENT.withDescription(ex.getMessage()).asRuntimeException());
         } catch (RuntimeException ex) {
-            responseObserver.onError(Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
         }
     }
 
@@ -83,15 +95,19 @@ public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
         try {
             List<LinkResponse> links = linkService.list(request.getChatId());
             ListLinksResponse response = ListLinksResponse.newBuilder()
-                    .addAllLinks(links.stream().map(ScrapperGrpcService::toGrpcLinkResponse).toList())
+                    .addAllLinks(links.stream()
+                            .map(ScrapperGrpcService::toGrpcLinkResponse)
+                            .toList())
                     .setSize(links.size())
                     .build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } catch (ChatNotFoundException ex) {
-            responseObserver.onError(Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.NOT_FOUND.withDescription(ex.getMessage()).asRuntimeException());
         } catch (RuntimeException ex) {
-            responseObserver.onError(Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
+            responseObserver.onError(
+                    Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
         }
     }
 
