@@ -49,7 +49,7 @@ public final class BotMessages {
 
     public static final String UNTRACK_FAILED = "Не удалось удалить ссылку. Попробуйте позже.";
 
-    public static final String LIST_EMPTY = "Список отслеживаемых ссылок пуст.";
+    public static final String LIST_EMPTY = "нет ссылок";
 
     public static final String LIST_FAILED = "Не удалось получить список ссылок. Попробуйте позже.";
 
