@@ -11,6 +11,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
 import java.io.IOException;
@@ -139,7 +141,7 @@ class BotScrapperContainersE2ETest {
 
     @Test
     void shouldDeliverUpdateFromScrapperToBotOverHttpInContainers() throws Exception {
-        WireMock.configureFor(wiremock.getHost(), wiremock.getMappedPort(8080));
+        configureWiremock();
 
         stubFor(post(urlMatching("/bot[^/]+/sendMessage")).willReturn(okJson("{\"ok\":true}")));
 
@@ -157,35 +159,11 @@ class BotScrapperContainersE2ETest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"updated_at\":\"2026-02-26T00:00:00Z\"}")));
 
-        HttpClient httpClient = HttpClient.newHttpClient();
-        String scrapperBaseUrl = "http://%s:%d".formatted(scrapper.getHost(), scrapper.getMappedPort(8081));
+        HttpResponse<String> registerResponse = postWithoutBody("/tg-chat/42");
+        assertEquals(200, registerResponse.statusCode());
 
-        HttpResponse<String> registerResponse = httpClient.send(
-                HttpRequest.newBuilder(URI.create(scrapperBaseUrl + "/tg-chat/42"))
-                        .POST(HttpRequest.BodyPublishers.noBody())
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        if (registerResponse.statusCode() != 200) {
-            throw new IllegalStateException("Unexpected register response code: " + registerResponse.statusCode());
-        }
-
-        String addLinkBody = """
-                {
-                  "link": "https://github.com/octocat/Hello-World",
-                  "tags": [],
-                  "filters": []
-                }
-                """;
-        HttpResponse<String> addResponse = httpClient.send(
-                HttpRequest.newBuilder(URI.create(scrapperBaseUrl + "/links"))
-                        .header("Tg-Chat-Id", "42")
-                        .header("Content-Type", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(addLinkBody))
-                        .build(),
-                HttpResponse.BodyHandlers.ofString());
-        if (addResponse.statusCode() != 200) {
-            throw new IllegalStateException("Unexpected add link response code: " + addResponse.statusCode());
-        }
+        HttpResponse<String> addResponse = postLink(42L, "https://github.com/octocat/Hello-World");
+        assertEquals(200, addResponse.statusCode());
 
         await().atMost(30, SECONDS)
                 .untilAsserted(() -> WireMock.verify(postRequestedFor(urlMatching("/bot[^/]+/sendMessage"))
@@ -194,5 +172,67 @@ class BotScrapperContainersE2ETest {
         WireMock.verify(WireMock.getRequestedFor(urlEqualTo("/github/repos/octocat/Hello-World")));
         WireMock.verify(postRequestedFor(urlMatching("/bot[^/]+/sendMessage"))
                 .withRequestBody(WireMock.containing("chat_id=42")));
+    }
+
+    @Test
+    void shouldReturnNonOkWhenAddingLinkForUnknownChatInContainers() throws Exception {
+        configureWiremock();
+
+        HttpResponse<String> addResponse = postLink(999L, "https://github.com/octocat/Hello-World");
+
+        assertNotEquals(200, addResponse.statusCode());
+    }
+
+    @Test
+    void shouldReturnNonOkWhenAddingLinkToDeletedChatInContainers() throws Exception {
+        configureWiremock();
+        HttpResponse<String> registerResponse = postWithoutBody("/tg-chat/77");
+        assertEquals(200, registerResponse.statusCode());
+
+        HttpResponse<String> deleteResponse = deleteWithoutBody("/tg-chat/77");
+        assertEquals(200, deleteResponse.statusCode());
+
+        HttpResponse<String> addResponse = postLink(77L, "https://github.com/octocat/Hello-World");
+        assertNotEquals(200, addResponse.statusCode());
+    }
+
+    private void configureWiremock() {
+        WireMock.configureFor(wiremock.getHost(), wiremock.getMappedPort(8080));
+        WireMock.resetAllRequests();
+        WireMock.resetAllScenarios();
+    }
+
+    private HttpResponse<String> postWithoutBody(String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(scrapperBaseUrl() + path))
+                .POST(HttpRequest.BodyPublishers.noBody())
+                .build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> deleteWithoutBody(String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(scrapperBaseUrl() + path))
+                .DELETE()
+                .build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> postLink(long chatId, String link) throws IOException, InterruptedException {
+        String addLinkBody = """
+                {
+                  "link": "%s",
+                  "tags": [],
+                  "filters": []
+                }
+                """.formatted(link);
+        HttpRequest request = HttpRequest.newBuilder(URI.create(scrapperBaseUrl() + "/links"))
+                .header("Tg-Chat-Id", String.valueOf(chatId))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(addLinkBody))
+                .build();
+        return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private String scrapperBaseUrl() {
+        return "http://%s:%d".formatted(scrapper.getHost(), scrapper.getMappedPort(8081));
     }
 }

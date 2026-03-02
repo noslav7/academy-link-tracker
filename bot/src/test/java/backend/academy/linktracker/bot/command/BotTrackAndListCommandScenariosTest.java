@@ -8,7 +8,9 @@ import backend.academy.linktracker.bot.client.LinkAlreadyTrackedException;
 import backend.academy.linktracker.bot.client.LinkNotFoundException;
 import backend.academy.linktracker.bot.client.ScrapperClient;
 import backend.academy.linktracker.bot.client.dto.LinkResponse;
+import backend.academy.linktracker.bot.service.TrackDialogInputParser;
 import backend.academy.linktracker.bot.service.TrackDialogService;
+import backend.academy.linktracker.bot.service.TrackDialogSubmissionService;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,7 +28,8 @@ class BotTrackAndListCommandScenariosTest {
     @BeforeEach
     void setUp() {
         scrapperClient = new InMemoryScrapperClient();
-        var trackDialogService = new TrackDialogService(scrapperClient);
+        var trackDialogService =
+                new TrackDialogService(new TrackDialogInputParser(), new TrackDialogSubmissionService(scrapperClient));
         var trackHandler = new TrackCommandHandler(trackDialogService);
         var listHandler = new ListCommandHandler(scrapperClient);
         var cancelHandler = new CancelCommandHandler(trackDialogService);

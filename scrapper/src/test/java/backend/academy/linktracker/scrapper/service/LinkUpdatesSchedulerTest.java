@@ -26,8 +26,11 @@ class LinkUpdatesSchedulerTest {
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
 
         TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
-        LinkService linkService =
-                new LinkService(repository, new LinkMetadataResolver(githubClient, stackoverflowClient));
+        LinkService linkService = new LinkService(
+                repository,
+                new LinkMetadataResolver(new LinkFormatMetadataResolverFactory(List.of(
+                        new GithubLinkMetadataResolver(githubClient),
+                        new StackoverflowLinkMetadataResolver(stackoverflowClient)))));
         ChatService chatService = new ChatService(repository);
         chatService.register(42L);
         chatService.register(77L);

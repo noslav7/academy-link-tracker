@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import backend.academy.linktracker.bot.client.ScrapperClient;
 import backend.academy.linktracker.bot.client.dto.LinkResponse;
 import backend.academy.linktracker.bot.repository.InMemoryUserRepository;
+import backend.academy.linktracker.bot.service.TrackDialogInputParser;
 import backend.academy.linktracker.bot.service.TrackDialogService;
+import backend.academy.linktracker.bot.service.TrackDialogSubmissionService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -19,7 +21,8 @@ class BotCommandDispatcherTest {
     @BeforeEach
     void setUp() {
         ScrapperClient scrapperClient = new StubScrapperClient();
-        var trackDialogService = new TrackDialogService(scrapperClient);
+        var trackDialogService =
+                new TrackDialogService(new TrackDialogInputParser(), new TrackDialogSubmissionService(scrapperClient));
         var startHandler = new StartCommandHandler(new InMemoryUserRepository(), scrapperClient);
         var trackHandler = new TrackCommandHandler(trackDialogService);
         var cancelHandler = new CancelCommandHandler(trackDialogService);

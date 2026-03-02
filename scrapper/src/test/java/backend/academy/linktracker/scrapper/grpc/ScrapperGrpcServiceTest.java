@@ -11,12 +11,16 @@ import backend.academy.linktracker.scrapper.client.StackoverflowClient;
 import backend.academy.linktracker.scrapper.repository.InMemoryTrackedLinkRepository;
 import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
 import backend.academy.linktracker.scrapper.service.ChatService;
+import backend.academy.linktracker.scrapper.service.GithubLinkMetadataResolver;
+import backend.academy.linktracker.scrapper.service.LinkFormatMetadataResolverFactory;
 import backend.academy.linktracker.scrapper.service.LinkMetadataResolver;
 import backend.academy.linktracker.scrapper.service.LinkService;
+import backend.academy.linktracker.scrapper.service.StackoverflowLinkMetadataResolver;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,8 +36,11 @@ class ScrapperGrpcServiceTest {
         GithubClient githubClient = (owner, repository) -> Instant.parse("2026-02-25T00:00:00Z");
         StackoverflowClient stackoverflowClient = questionId -> Instant.parse("2026-02-25T00:00:00Z");
         TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
-        LinkService linkService =
-                new LinkService(repository, new LinkMetadataResolver(githubClient, stackoverflowClient));
+        LinkService linkService = new LinkService(
+                repository,
+                new LinkMetadataResolver(new LinkFormatMetadataResolverFactory(List.of(
+                        new GithubLinkMetadataResolver(githubClient),
+                        new StackoverflowLinkMetadataResolver(stackoverflowClient)))));
         ChatService chatService = new ChatService(repository);
         server = ServerBuilder.forPort(0)
                 .addService(new ScrapperGrpcService(chatService, linkService))
