@@ -1,7 +1,6 @@
 package backend.academy.linktracker.bot.command;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.bot.client.ScrapperClient;
 import backend.academy.linktracker.bot.client.dto.LinkResponse;
@@ -57,9 +56,14 @@ class BotCommandDispatcherTest {
         // Проверяет, что /help возвращает полный эталонный список команд.
         String response = dispatcher.dispatch("/help", 42L);
 
-        assertTrue(response.contains("/help - список доступных команд"));
-        assertTrue(response.contains("/start - начало работы"));
-        assertTrue(response.contains("/track - начать отслеживание ссылки"));
+        String expected = """
+                Доступные команды:
+                /cancel - прервать текущий процесс
+                /help - список доступных команд
+                /start - начало работы
+                /track - начать отслеживание ссылки
+                """;
+        assertEquals(expected, response);
     }
 
     @Test

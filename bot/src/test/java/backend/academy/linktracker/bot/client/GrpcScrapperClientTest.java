@@ -1,5 +1,6 @@
 package backend.academy.linktracker.bot.client;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -11,8 +12,9 @@ import backend.academy.linktracker.grpc.ListLinksResponse;
 import backend.academy.linktracker.grpc.RemoveLinkRequest;
 import backend.academy.linktracker.grpc.ScrapperApiGrpc;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import io.grpc.Status;
+import io.grpc.inprocess.InProcessChannelBuilder;
+import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
@@ -28,13 +30,13 @@ class GrpcScrapperClientTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        server = ServerBuilder.forPort(0)
+        String serverName = InProcessServerBuilder.generateName();
+        server = InProcessServerBuilder.forName(serverName)
+                .directExecutor()
                 .addService(new FakeScrapperService())
                 .build()
                 .start();
-        channel = io.grpc.ManagedChannelBuilder.forAddress("localhost", server.getPort())
-                .usePlaintext()
-                .build();
+        channel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
         client = new GrpcScrapperClient(channel);
     }
 
@@ -49,14 +51,21 @@ class GrpcScrapperClientTest {
     }
 
     @Test
-    void shouldListLinksOverGrpc() {
+    void givenGrpcListLinksResponseWhenGetLinksCalledThenReturnsMappedDomainLinks() {
+        // Проверяет, что gRPC-ответ со списком ссылок корректно маппится в доменную модель клиента.
         List<LinkResponse> links = client.getLinks(42L);
-        assertEquals(1, links.size());
-        assertEquals("https://github.com/octocat/Hello-World", links.getFirst().url());
+
+        assertAll(
+                () -> assertEquals(1, links.size()),
+                () -> assertEquals(
+                        List.of(new LinkResponse(
+                                1L, "https://github.com/octocat/Hello-World", List.of("work"), List.of())),
+                        links));
     }
 
     @Test
-    void shouldMapAlreadyExistsToDomainException() {
+    void givenGrpcAlreadyExistsErrorWhenAddLinkCalledThenThrowsDomainDuplicateException() {
+        // Проверяет, что ошибка ALREADY_EXISTS из gRPC конвертируется в LinkAlreadyTrackedException.
         assertThrows(
                 LinkAlreadyTrackedException.class,
                 () -> client.addLink(42L, "https://duplicate", List.of("tag"), List.of("author=me")));

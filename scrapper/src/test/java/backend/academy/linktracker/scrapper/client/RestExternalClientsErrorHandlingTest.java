@@ -48,6 +48,7 @@ class RestExternalClientsErrorHandlingTest {
 
     @Test
     void givenGithubClientWhenExternalApiReturnsHttpErrorThenReturnsEpoch() {
+        // Проверяет fallback в Instant.EPOCH при HTTP-ошибке GitHub API.
         wireMockServer.stubFor(get(urlEqualTo("/github/repos/user/repo"))
                 .willReturn(aResponse().withStatus(503).withBody("upstream unavailable")));
 
@@ -58,6 +59,7 @@ class RestExternalClientsErrorHandlingTest {
 
     @Test
     void givenGithubClientWhenExternalApiReturnsMalformedBodyThenReturnsEpoch() {
+        // Проверяет fallback в Instant.EPOCH при невалидном JSON от GitHub API.
         wireMockServer.stubFor(get(urlEqualTo("/github/repos/user/repo"))
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -71,6 +73,7 @@ class RestExternalClientsErrorHandlingTest {
 
     @Test
     void givenStackoverflowClientWhenExternalApiReturnsHttpErrorThenReturnsEpoch() {
+        // Проверяет fallback в Instant.EPOCH при HTTP-ошибке StackOverflow API.
         wireMockServer.stubFor(get(urlEqualTo("/so/questions/123?site=stackoverflow"))
                 .willReturn(aResponse().withStatus(500).withBody("internal error")));
 
@@ -81,6 +84,7 @@ class RestExternalClientsErrorHandlingTest {
 
     @Test
     void givenStackoverflowClientWhenExternalApiReturnsMalformedBodyThenReturnsEpoch() {
+        // Проверяет fallback в Instant.EPOCH при невалидном JSON от StackOverflow API.
         wireMockServer.stubFor(get(urlEqualTo("/so/questions/123?site=stackoverflow"))
                 .willReturn(aResponse()
                         .withStatus(200)

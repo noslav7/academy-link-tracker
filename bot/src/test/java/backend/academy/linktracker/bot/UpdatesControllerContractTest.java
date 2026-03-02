@@ -5,7 +5,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.io.IOException;
 import java.net.URI;
@@ -36,6 +35,7 @@ class UpdatesControllerContractTest {
 
     @Test
     void givenValidUpdatePayloadWhenPostUpdatesThenReturnsOk() throws IOException, InterruptedException {
+        // Проверяет, что валидный payload обновления принимается контроллером с HTTP 200.
         stubTelegramSendMessage();
 
         HttpResponse<String> response = httpClient.send(
@@ -56,7 +56,8 @@ class UpdatesControllerContractTest {
     }
 
     @Test
-    void givenInvalidUpdatePayloadWhenPostUpdatesThenReturnsNonOk() throws IOException, InterruptedException {
+    void givenInvalidUpdatePayloadWhenPostUpdatesThenReturnsBadRequest() throws IOException, InterruptedException {
+        // Проверяет, что невалидный payload отклоняется на этапе десериализации с HTTP 400.
         HttpResponse<String> response = httpClient.send(
                 HttpRequest.newBuilder(URI.create(baseUrl() + "/updates"))
                         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
@@ -71,7 +72,7 @@ class UpdatesControllerContractTest {
                         .build(),
                 HttpResponse.BodyHandlers.ofString());
 
-        assertNotEquals(200, response.statusCode());
+        assertEquals(400, response.statusCode());
     }
 
     private void stubTelegramSendMessage() {

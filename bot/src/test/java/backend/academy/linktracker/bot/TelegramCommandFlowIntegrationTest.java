@@ -40,7 +40,7 @@ class TelegramCommandFlowIntegrationTest {
     TelegramProperties telegramProperties;
 
     @Test
-    void givenStartCommandUpdateWhenPollingProcessesItThenSendMessageContainsWelcomeText() {
+    void givenStartCommandUpdateWhenPollingProcessesItThenSendMessageEqualsWelcomeText() {
         // Проверяет end-to-end обработку /start и отправку приветственного ответа.
         long chatId = 1001L;
         stubFlowForSingleUpdate("Start Command Flow", chatId, "/start");
@@ -49,7 +49,7 @@ class TelegramCommandFlowIntegrationTest {
     }
 
     @Test
-    void givenHelpCommandUpdateWhenPollingProcessesItThenSendMessageContainsFullHelpText() {
+    void givenHelpCommandUpdateWhenPollingProcessesItThenSendMessageEqualsFullHelpText() {
         // Проверяет end-to-end обработку /help и полный текст справки.
         long chatId = 1002L;
         stubFlowForSingleUpdate("Help Command Flow", chatId, "/help");
@@ -67,7 +67,7 @@ class TelegramCommandFlowIntegrationTest {
     }
 
     @Test
-    void givenUnsupportedCommandUpdateWhenPollingProcessesItThenSendMessageContainsUnknownCommandText() {
+    void givenUnsupportedCommandUpdateWhenPollingProcessesItThenSendMessageEqualsUnknownCommandText() {
         // Проверяет end-to-end обработку неподдерживаемой команды.
         long chatId = 1003L;
         stubFlowForSingleUpdate("Unknown Command Flow", chatId, "/unsupported");

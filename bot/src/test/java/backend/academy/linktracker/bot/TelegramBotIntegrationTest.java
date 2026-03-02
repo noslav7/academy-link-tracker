@@ -9,7 +9,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,7 +53,7 @@ class TelegramBotIntegrationTest implements WithAssertions {
     }
 
     @Test
-    void givenApiReturnsNotFoundWhenExecuteGetUpdatesThenResponseContainsNotFoundError() {
+    void givenApiReturnsNotFoundWhenExecuteGetUpdatesThenResponseHasNotFoundError() {
         // Проверяет, что при ответе Telegram API 404 клиент возвращает ошибочный результат.
         stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
                 .willReturn(aResponse()
@@ -64,9 +63,8 @@ class TelegramBotIntegrationTest implements WithAssertions {
         var getUpdatesRequest = new GetUpdates();
         var getUpdatesResponse = telegramBot.execute(getUpdatesRequest);
 
-        assertAll(
-                () -> assertFalse(getUpdatesResponse.isOk()),
-                () -> assertEquals(Integer.valueOf(404), getUpdatesResponse.errorCode()));
+        assertFalse(getUpdatesResponse.isOk());
+        assertEquals(Integer.valueOf(404), getUpdatesResponse.errorCode());
 
         verify(
                 1,
@@ -75,9 +73,33 @@ class TelegramBotIntegrationTest implements WithAssertions {
     }
 
     @Test
-    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenListenerReceivesExpectedUpdatePayload()
+    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenListenerReceivesSingleUpdate()
             throws InterruptedException {
-        // Проверяет, что listener получает апдейт с ожидаемыми полями сообщения.
+        // Проверяет, что listener получает один апдейт при первом polling-ответе.
+        stubSingleUpdateFlow();
+        List<Update> receivedUpdates = receiveUpdatesByListener();
+
+        assertEquals(1, receivedUpdates.size());
+    }
+
+    @Test
+    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenReceivedUpdateHasExpectedFields()
+            throws InterruptedException {
+        // Проверяет, что полученный апдейт содержит ожидаемые поля message и from.
+        stubSingleUpdateFlow();
+        List<Update> receivedUpdates = receiveUpdatesByListener();
+
+        assertThat(receivedUpdates)
+                .hasSize(1)
+                .first()
+                .returns(Integer.valueOf(123456), Update::updateId)
+                .extracting(Update::message)
+                .returns("Hello Bot", Message::text)
+                .extracting(Message::from)
+                .returns("testuser", User::username);
+    }
+
+    private void stubSingleUpdateFlow() {
         stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
                 .inScenario("Updates Listener")
                 .whenScenarioStateIs(STARTED)
@@ -123,7 +145,9 @@ class TelegramBotIntegrationTest implements WithAssertions {
                                   "result": []
                                 }
                                 """)));
+    }
 
+    private List<Update> receiveUpdatesByListener() throws InterruptedException {
         List<Update> receivedUpdates = new CopyOnWriteArrayList<>();
         CountDownLatch latch = new CountDownLatch(1);
 
@@ -134,17 +158,11 @@ class TelegramBotIntegrationTest implements WithAssertions {
         });
 
         boolean received = latch.await(10, TimeUnit.SECONDS);
-
-        assertAll(() -> assertTrue(received), () -> assertThat(receivedUpdates)
-                .hasSize(1)
-                .first()
-                .returns(Integer.valueOf(123456), Update::updateId)
-                .extracting(Update::message)
-                .returns("Hello Bot", Message::text)
-                .extracting(Message::from)
-                .returns("testuser", User::username));
+        assertTrue(received);
 
         verify(postRequestedFor(urlPathTemplate("/bot{token}/getUpdates"))
                 .withPathParam("token", equalTo(telegramProperties.getToken())));
+
+        return receivedUpdates;
     }
 }

@@ -21,6 +21,7 @@ class LinkUpdatesSchedulerTest {
 
     @Test
     void givenUpdatedLinkWhenSchedulerRunsThenOnlySubscribersReceiveNotification() {
+        // Проверяет, что при обновлении ссылки уведомление уходит только подписанному чату.
         AtomicReference<Instant> githubUpdatedAt = new AtomicReference<>(Instant.parse("2026-02-25T00:00:00Z"));
         GithubClient githubClient = (owner, repository) -> githubUpdatedAt.get();
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
@@ -47,6 +48,34 @@ class LinkUpdatesSchedulerTest {
 
         assertEquals(1, notificationsClient.sentUpdates.size());
         assertEquals(List.of(42L), notificationsClient.sentUpdates.getFirst().tgChatIds());
+    }
+
+    @Test
+    void givenLinkWasNotUpdatedWhenSchedulerRunsThenNoNotificationIsSent() {
+        // Проверяет, что при отсутствии обновлений scheduler не отправляет уведомления.
+        AtomicReference<Instant> githubUpdatedAt = new AtomicReference<>(Instant.parse("2026-02-25T00:00:00Z"));
+        GithubClient githubClient = (owner, repository) -> githubUpdatedAt.get();
+        StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
+
+        TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
+        LinkService linkService = new LinkService(
+                repository,
+                new LinkMetadataResolver(new LinkFormatMetadataResolverFactory(List.of(
+                        new GithubLinkMetadataResolver(githubClient),
+                        new StackoverflowLinkMetadataResolver(stackoverflowClient)))));
+        ChatService chatService = new ChatService(repository);
+        chatService.register(42L);
+        linkService.add(42L, new AddLinkRequest("https://github.com/user/repo", List.of("work"), List.of()));
+
+        CapturingBotNotificationsClient notificationsClient = new CapturingBotNotificationsClient();
+        SchedulerProperties schedulerProperties = new SchedulerProperties();
+        schedulerProperties.setInterval(Duration.ofSeconds(30));
+        LinkUpdatesScheduler scheduler =
+                new LinkUpdatesScheduler(linkService, notificationsClient, schedulerProperties);
+
+        scheduler.checkUpdates();
+
+        assertEquals(List.of(), notificationsClient.sentUpdates);
     }
 
     private static final class CapturingBotNotificationsClient implements BotNotificationsClient {

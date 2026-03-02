@@ -1,8 +1,6 @@
 package backend.academy.linktracker.bot.command;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.bot.client.LinkAlreadyTrackedException;
 import backend.academy.linktracker.bot.client.LinkNotFoundException;
@@ -41,7 +39,8 @@ class BotTrackAndListCommandScenariosTest {
     }
 
     @Test
-    void givenTrackDialogAndValidLinkWhenUserProvidesTagsThenLinkSavedInLocalStorage() {
+    void givenTrackDialogAndValidLinkWhenUserProvidesTagsAndFiltersThenReturnsSuccessMessage() {
+        // Проверяет, что happy-path диалога /track завершается успешным сообщением.
         assertEquals(BotMessages.TRACK_ENTER_LINK, dispatcher.dispatch("/track", CHAT_ID));
         assertEquals(BotMessages.TRACK_ENTER_TAGS, dispatcher.dispatch("https://github.com/user/repo", CHAT_ID));
         assertEquals(BotMessages.TRACK_ENTER_FILTERS, dispatcher.dispatch("backend, java", CHAT_ID));
@@ -49,6 +48,16 @@ class BotTrackAndListCommandScenariosTest {
         String result = dispatcher.dispatch("author=me, label=bug", CHAT_ID);
 
         assertEquals(BotMessages.TRACK_SUCCESS, result);
+    }
+
+    @Test
+    void givenTrackDialogAndValidLinkWhenUserProvidesTagsAndFiltersThenSavesExactLinkState() {
+        // Проверяет, что happy-path диалога /track сохраняет точные url, теги и фильтры.
+        assertEquals(BotMessages.TRACK_ENTER_LINK, dispatcher.dispatch("/track", CHAT_ID));
+        assertEquals(BotMessages.TRACK_ENTER_TAGS, dispatcher.dispatch("https://github.com/user/repo", CHAT_ID));
+        assertEquals(BotMessages.TRACK_ENTER_FILTERS, dispatcher.dispatch("backend, java", CHAT_ID));
+        dispatcher.dispatch("author=me, label=bug", CHAT_ID);
+
         List<LinkResponse> links = scrapperClient.getLinks(CHAT_ID);
         assertEquals(1, links.size());
         assertEquals("https://github.com/user/repo", links.getFirst().url());
@@ -58,6 +67,7 @@ class BotTrackAndListCommandScenariosTest {
 
     @Test
     void givenTrackDialogWhenUserProvidesInvalidLinkThenBotReturnsValidationMessage() {
+        // Проверяет валидацию URL в диалоге /track.
         assertEquals(BotMessages.TRACK_ENTER_LINK, dispatcher.dispatch("/track", CHAT_ID));
 
         String result = dispatcher.dispatch("tbank://github.com/user/repo", CHAT_ID);
@@ -67,6 +77,7 @@ class BotTrackAndListCommandScenariosTest {
 
     @Test
     void givenAlreadyTrackedLinkWhenTrackRequestedAgainThenBotReturnsDuplicateMessage() {
+        // Проверяет защиту от повторного добавления уже отслеживаемой ссылки.
         trackLink(CHAT_ID, "https://github.com/user/repo", "work", "author=me");
 
         assertEquals(BotMessages.TRACK_ENTER_LINK, dispatcher.dispatch("/track", CHAT_ID));
@@ -80,18 +91,23 @@ class BotTrackAndListCommandScenariosTest {
 
     @Test
     void givenUserHasActiveSubscriptionsWhenListRequestedThenBotReturnsTrackedLinks() {
+        // Проверяет, что /list возвращает полный эталонный список отслеживаемых ссылок.
         scrapperClient.storeLink(CHAT_ID, "https://github.com/user/repo-a", List.of("work"));
         scrapperClient.storeLink(CHAT_ID, "https://github.com/user/repo-b", List.of("study"));
 
         String result = dispatcher.dispatch("/list", CHAT_ID);
 
-        assertTrue(result.startsWith("Отслеживаемые ссылки:\n"));
-        assertTrue(result.contains("https://github.com/user/repo-a"));
-        assertTrue(result.contains("https://github.com/user/repo-b"));
+        String expected = """
+                Отслеживаемые ссылки:
+                - https://github.com/user/repo-a [work]
+                - https://github.com/user/repo-b [study]
+                """;
+        assertEquals(expected, result);
     }
 
     @Test
     void givenUserHasNoActiveSubscriptionsWhenListRequestedThenBotReturnsEmptyMessage() {
+        // Проверяет, что /list возвращает сообщение об отсутствии ссылок для пустого списка.
         String result = dispatcher.dispatch("/list", CHAT_ID);
 
         assertEquals(BotMessages.LIST_EMPTY, result);
@@ -99,14 +115,17 @@ class BotTrackAndListCommandScenariosTest {
 
     @Test
     void givenListByTagWhenUserHasTrackedLinksThenBotReturnsOnlyLinksWithRequestedTag() {
+        // Проверяет фильтрацию /list по тегу с полным совпадением эталонного ответа.
         scrapperClient.storeLink(CHAT_ID, "https://github.com/user/repo-a", List.of("work"));
         scrapperClient.storeLink(CHAT_ID, "https://github.com/user/repo-b", List.of("study"));
 
         String result = dispatcher.dispatch("/list work", CHAT_ID);
 
-        assertTrue(result.contains("https://github.com/user/repo-a"));
-        assertTrue(result.contains("[work]"));
-        assertFalse(result.contains("https://github.com/user/repo-b"));
+        String expected = """
+                Отслеживаемые ссылки:
+                - https://github.com/user/repo-a [work]
+                """;
+        assertEquals(expected, result);
     }
 
     private void trackLink(long chatId, String url, String tags, String filters) {

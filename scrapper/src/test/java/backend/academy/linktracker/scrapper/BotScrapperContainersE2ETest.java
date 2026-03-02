@@ -1,6 +1,8 @@
 package backend.academy.linktracker.scrapper;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.findAll;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
@@ -8,22 +10,27 @@ import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
+import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -140,11 +147,61 @@ class BotScrapperContainersE2ETest {
     }
 
     @Test
-    void shouldDeliverUpdateFromScrapperToBotOverHttpInContainers() throws Exception {
+    void givenUpdatedGithubLinkWhenSchedulerRunsInContainersThenBotReceivesExactNotificationRequest() throws Exception {
+        // Проверяет e2e-контракт: обновление ссылки в scrapper приводит к точному запросу sendMessage в bot.
+        configureWiremock();
+        stubFor(post(urlMatching("/bot[^/]+/sendMessage")).willReturn(okJson("{\"ok\":true}")));
+        stubGithubUpdatedFlow();
+        registerChatAndAddGithubLink(42L);
+
+        await().atMost(30, SECONDS)
+                .untilAsserted(() -> verifySendMessage(42L, "Обнаружено обновление по отслеживаемой ссылке."));
+    }
+
+    @Test
+    void givenUpdatedGithubLinkWhenSchedulerRunsInContainersThenScrapperRequestsGithubApi() throws Exception {
+        // Проверяет e2e-контракт: scheduler scrapper запрашивает GitHub API при отслеживании обновления.
+        configureWiremock();
+        stubFor(post(urlMatching("/bot[^/]+/sendMessage")).willReturn(okJson("{\"ok\":true}")));
+        stubGithubUpdatedFlow();
+        registerChatAndAddGithubLink(43L);
+
+        await().atMost(30, SECONDS)
+                .untilAsserted(() ->
+                        WireMock.verify(WireMock.getRequestedFor(urlEqualTo("/github/repos/octocat/Hello-World"))));
+    }
+
+    @Test
+    void givenUnknownChatWhenAddLinkRequestedInContainersThenReturnsNotFound() throws Exception {
+        // Проверяет e2e-контракт: добавление ссылки в несуществующий чат возвращает HTTP 404.
         configureWiremock();
 
-        stubFor(post(urlMatching("/bot[^/]+/sendMessage")).willReturn(okJson("{\"ok\":true}")));
+        HttpResponse<String> addResponse = postLink(999L, "https://github.com/octocat/Hello-World");
 
+        assertEquals(404, addResponse.statusCode());
+    }
+
+    @Test
+    void givenDeletedChatWhenAddLinkRequestedInContainersThenReturnsNotFound() throws Exception {
+        // Проверяет e2e-контракт: добавление ссылки в удалённый чат возвращает HTTP 404.
+        configureWiremock();
+        HttpResponse<String> registerResponse = postWithoutBody("/tg-chat/77");
+        assertEquals(200, registerResponse.statusCode());
+
+        HttpResponse<String> deleteResponse = deleteWithoutBody("/tg-chat/77");
+        assertEquals(200, deleteResponse.statusCode());
+
+        HttpResponse<String> addResponse = postLink(77L, "https://github.com/octocat/Hello-World");
+        assertEquals(404, addResponse.statusCode());
+    }
+
+    private void configureWiremock() {
+        WireMock.configureFor(wiremock.getHost(), wiremock.getMappedPort(8080));
+        WireMock.resetAllRequests();
+        WireMock.resetAllScenarios();
+    }
+
+    private void stubGithubUpdatedFlow() {
         stubFor(get(urlEqualTo("/github/repos/octocat/Hello-World"))
                 .inScenario("Github Updated")
                 .whenScenarioStateIs(STARTED)
@@ -158,48 +215,35 @@ class BotScrapperContainersE2ETest {
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"updated_at\":\"2026-02-26T00:00:00Z\"}")));
+    }
 
-        HttpResponse<String> registerResponse = postWithoutBody("/tg-chat/42");
+    private void registerChatAndAddGithubLink(long chatId) throws IOException, InterruptedException {
+        HttpResponse<String> registerResponse = postWithoutBody("/tg-chat/" + chatId);
         assertEquals(200, registerResponse.statusCode());
-
-        HttpResponse<String> addResponse = postLink(42L, "https://github.com/octocat/Hello-World");
+        HttpResponse<String> addResponse = postLink(chatId, "https://github.com/octocat/Hello-World");
         assertEquals(200, addResponse.statusCode());
-
-        await().atMost(30, SECONDS)
-                .untilAsserted(() -> WireMock.verify(postRequestedFor(urlMatching("/bot[^/]+/sendMessage"))
-                        .withRequestBody(WireMock.containing("chat_id=42"))));
-
-        WireMock.verify(WireMock.getRequestedFor(urlEqualTo("/github/repos/octocat/Hello-World")));
-        WireMock.verify(postRequestedFor(urlMatching("/bot[^/]+/sendMessage"))
-                .withRequestBody(WireMock.containing("chat_id=42")));
     }
 
-    @Test
-    void shouldReturnNonOkWhenAddingLinkForUnknownChatInContainers() throws Exception {
-        configureWiremock();
+    private void verifySendMessage(long chatId, String expectedText) {
+        var requestPattern = postRequestedFor(urlPathTemplate("/bot{token}/sendMessage"))
+                .withPathParam("token", equalTo("test-token"));
+        verify(1, requestPattern);
 
-        HttpResponse<String> addResponse = postLink(999L, "https://github.com/octocat/Hello-World");
-
-        assertNotEquals(200, addResponse.statusCode());
+        LoggedRequest request = findAll(requestPattern).getFirst();
+        Map<String, String> actualFormData = parseFormData(request.getBodyAsString());
+        Map<String, String> expectedFormData = Map.of("chat_id", String.valueOf(chatId), "text", expectedText);
+        assertEquals(expectedFormData, actualFormData);
     }
 
-    @Test
-    void shouldReturnNonOkWhenAddingLinkToDeletedChatInContainers() throws Exception {
-        configureWiremock();
-        HttpResponse<String> registerResponse = postWithoutBody("/tg-chat/77");
-        assertEquals(200, registerResponse.statusCode());
-
-        HttpResponse<String> deleteResponse = deleteWithoutBody("/tg-chat/77");
-        assertEquals(200, deleteResponse.statusCode());
-
-        HttpResponse<String> addResponse = postLink(77L, "https://github.com/octocat/Hello-World");
-        assertNotEquals(200, addResponse.statusCode());
-    }
-
-    private void configureWiremock() {
-        WireMock.configureFor(wiremock.getHost(), wiremock.getMappedPort(8080));
-        WireMock.resetAllRequests();
-        WireMock.resetAllScenarios();
+    private Map<String, String> parseFormData(String body) {
+        Map<String, String> result = new LinkedHashMap<>();
+        for (String pair : body.split("&")) {
+            String[] keyValue = pair.split("=", 2);
+            String key = URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
+            String value = keyValue.length == 2 ? URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8) : "";
+            result.put(key, value);
+        }
+        return result;
     }
 
     private HttpResponse<String> postWithoutBody(String path) throws IOException, InterruptedException {

@@ -1,9 +1,11 @@
 package backend.academy.linktracker.scrapper.grpc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import backend.academy.linktracker.grpc.AddLinkRequest;
 import backend.academy.linktracker.grpc.ChatIdRequest;
+import backend.academy.linktracker.grpc.LinkResponse;
 import backend.academy.linktracker.grpc.ListLinksResponse;
 import backend.academy.linktracker.grpc.ScrapperApiGrpc;
 import backend.academy.linktracker.scrapper.client.GithubClient;
@@ -17,7 +19,10 @@ import backend.academy.linktracker.scrapper.service.LinkMetadataResolver;
 import backend.academy.linktracker.scrapper.service.LinkService;
 import backend.academy.linktracker.scrapper.service.StackoverflowLinkMetadataResolver;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.inprocess.InProcessChannelBuilder;
+import io.grpc.inprocess.InProcessServerBuilder;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -42,13 +47,13 @@ class ScrapperGrpcServiceTest {
                         new GithubLinkMetadataResolver(githubClient),
                         new StackoverflowLinkMetadataResolver(stackoverflowClient)))));
         ChatService chatService = new ChatService(repository);
-        server = ServerBuilder.forPort(0)
+        String serverName = InProcessServerBuilder.generateName();
+        server = InProcessServerBuilder.forName(serverName)
+                .directExecutor()
                 .addService(new ScrapperGrpcService(chatService, linkService))
                 .build()
                 .start();
-        channel = io.grpc.ManagedChannelBuilder.forAddress("localhost", server.getPort())
-                .usePlaintext()
-                .build();
+        channel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
         stub = ScrapperApiGrpc.newBlockingStub(channel);
     }
 
@@ -63,7 +68,8 @@ class ScrapperGrpcServiceTest {
     }
 
     @Test
-    void shouldRegisterAddAndListViaGrpc() {
+    void givenRegisteredChatAndAddedLinkWhenListLinksCalledThenReturnsExactGrpcResponse() {
+        // Проверяет базовый gRPC-контракт: регистрация чата, добавление ссылки и полный ответ listLinks.
         stub.registerChat(ChatIdRequest.newBuilder().setChatId(42L).build());
         stub.addLink(AddLinkRequest.newBuilder()
                 .setChatId(42L)
@@ -71,8 +77,52 @@ class ScrapperGrpcServiceTest {
                 .build());
         ListLinksResponse response =
                 stub.listLinks(ChatIdRequest.newBuilder().setChatId(42L).build());
-        assertEquals(1, response.getSize());
-        assertEquals(
-                "https://github.com/octocat/Hello-World", response.getLinks(0).getUrl());
+        ListLinksResponse expected = ListLinksResponse.newBuilder()
+                .addLinks(LinkResponse.newBuilder()
+                        .setId(1L)
+                        .setUrl("https://github.com/octocat/Hello-World")
+                        .build())
+                .setSize(1)
+                .build();
+        assertEquals(expected, response);
+    }
+
+    @Test
+    void givenAlreadyRegisteredChatWhenRegisterCalledAgainThenReturnsAlreadyExists() {
+        // Проверяет, что повторная регистрация чата возвращает gRPC-ошибку ALREADY_EXISTS.
+        stub.registerChat(ChatIdRequest.newBuilder().setChatId(42L).build());
+
+        StatusRuntimeException exception = assertThrows(
+                StatusRuntimeException.class,
+                () -> stub.registerChat(
+                        ChatIdRequest.newBuilder().setChatId(42L).build()));
+
+        assertEquals(Status.ALREADY_EXISTS.getCode(), exception.getStatus().getCode());
+    }
+
+    @Test
+    void givenMissingChatWhenAddLinkCalledThenReturnsNotFound() {
+        // Проверяет, что добавление ссылки для несуществующего чата возвращает NOT_FOUND.
+        StatusRuntimeException exception = assertThrows(
+                StatusRuntimeException.class,
+                () -> stub.addLink(AddLinkRequest.newBuilder()
+                        .setChatId(42L)
+                        .setLink("https://github.com/octocat/Hello-World")
+                        .build()));
+
+        assertEquals(Status.NOT_FOUND.getCode(), exception.getStatus().getCode());
+    }
+
+    @Test
+    void givenBlankLinkWhenAddLinkCalledThenReturnsInvalidArgument() {
+        // Проверяет валидацию ссылки: пустое значение должно давать INVALID_ARGUMENT.
+        stub.registerChat(ChatIdRequest.newBuilder().setChatId(42L).build());
+
+        StatusRuntimeException exception = assertThrows(
+                StatusRuntimeException.class,
+                () -> stub.addLink(
+                        AddLinkRequest.newBuilder().setChatId(42L).setLink(" ").build()));
+
+        assertEquals(Status.INVALID_ARGUMENT.getCode(), exception.getStatus().getCode());
     }
 }
