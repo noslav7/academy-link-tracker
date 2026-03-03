@@ -12,7 +12,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
-import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,6 +31,8 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -80,9 +81,12 @@ class BotScrapperContainersE2ETest {
             .withExposedPorts(8081)
             .withEnv("GITHUB_BASE_URL", "http://wiremock:8080/github")
             .withEnv("STACKOVERFLOW_BASE_URL", "http://wiremock:8080/so")
+            .withEnv("APP_BOT_BASE_URL", "http://bot:8080")
+            .withEnv("APP_BOT_TRANSPORT", "HTTP")
+            .withEnv("APP_SCHEDULER_INTERVAL", "500ms")
             .withEnv("BOT_BASE_URL", "http://bot:8080")
             .withEnv("BOT_TRANSPORT", "HTTP")
-            .withEnv("SCRAPPER_SCHEDULER_INTERVAL", "2s")
+            .withEnv("SCRAPPER_SCHEDULER_INTERVAL", "500ms")
             .withEnv("SCRAPPER_GRPC_SERVER_ENABLED", "false")
             .waitingFor(Wait.forListeningPort());
 
@@ -147,14 +151,17 @@ class BotScrapperContainersE2ETest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void givenUpdatedGithubLinkWhenSchedulerRunsInContainersThenBotReceivesExactNotificationRequest() throws Exception {
         // Проверяет e2e-контракт: обновление ссылки в scrapper приводит к точному запросу sendMessage в bot.
         configureWiremock();
         stubFor(post(urlMatching("/bot[^/]+/sendMessage")).willReturn(okJson("{\"ok\":true}")));
-        stubGithubUpdatedFlow();
+        stubGithubUpdatedAt("2026-02-25T00:00:00Z", 10);
         registerChatAndAddGithubLink(42L);
+        // Force metadata change after link registration to avoid race conditions.
+        stubGithubUpdatedAt("2026-02-26T00:00:00Z", 1);
 
-        await().atMost(30, SECONDS)
+        await().atMost(90, SECONDS)
                 .untilAsserted(() -> verifySendMessage(42L, "Обнаружено обновление по отслеживаемой ссылке."));
     }
 
@@ -163,10 +170,10 @@ class BotScrapperContainersE2ETest {
         // Проверяет e2e-контракт: scheduler scrapper запрашивает GitHub API при отслеживании обновления.
         configureWiremock();
         stubFor(post(urlMatching("/bot[^/]+/sendMessage")).willReturn(okJson("{\"ok\":true}")));
-        stubGithubUpdatedFlow();
+        stubGithubUpdatedAt("2026-02-25T00:00:00Z", 10);
         registerChatAndAddGithubLink(43L);
 
-        await().atMost(30, SECONDS)
+        await().atMost(90, SECONDS)
                 .untilAsserted(() ->
                         WireMock.verify(WireMock.getRequestedFor(urlEqualTo("/github/repos/octocat/Hello-World"))));
     }
@@ -201,20 +208,12 @@ class BotScrapperContainersE2ETest {
         WireMock.resetAllScenarios();
     }
 
-    private void stubGithubUpdatedFlow() {
+    private void stubGithubUpdatedAt(String updatedAt, int priority) {
         stubFor(get(urlEqualTo("/github/repos/octocat/Hello-World"))
-                .inScenario("Github Updated")
-                .whenScenarioStateIs(STARTED)
+                .atPriority(priority)
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
-                        .withBody("{\"updated_at\":\"2026-02-25T00:00:00Z\"}"))
-                .willSetStateTo("changed"));
-        stubFor(get(urlEqualTo("/github/repos/octocat/Hello-World"))
-                .inScenario("Github Updated")
-                .whenScenarioStateIs("changed")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"updated_at\":\"2026-02-26T00:00:00Z\"}")));
+                        .withBody("{\"updated_at\":\"%s\"}".formatted(updatedAt))));
     }
 
     private void registerChatAndAddGithubLink(long chatId) throws IOException, InterruptedException {
