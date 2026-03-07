@@ -3,10 +3,10 @@ package backend.academy.linktracker.bot.command;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-@Component
 /**
  * Формирует текст справки со списком доступных команд.
  */
+@Component
 public class CommandHelpMessageFormatter {
 
     /**

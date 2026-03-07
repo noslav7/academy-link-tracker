@@ -10,14 +10,28 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+/**
+ * HTTP-реализация клиента взаимодействия с scrapper API.
+ */
 public class RestScrapperClient implements ScrapperClient {
 
+    /**
+     * REST-клиент вызовов scrapper API.
+     */
     private final RestClient restClient;
 
+    /**
+     * Создает HTTP-клиент scrapper-сервиса.
+     *
+     * @param scrapperRestClient REST-клиент scrapper
+     */
     public RestScrapperClient(RestClient scrapperRestClient) {
         this.restClient = scrapperRestClient;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void registerChat(long chatId) {
         try {
@@ -32,6 +46,9 @@ public class RestScrapperClient implements ScrapperClient {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public LinkResponse addLink(long chatId, String link, List<String> tags, List<String> filters) {
         try {
@@ -52,6 +69,9 @@ public class RestScrapperClient implements ScrapperClient {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public LinkResponse removeLink(long chatId, String link) {
         try {
@@ -72,6 +92,9 @@ public class RestScrapperClient implements ScrapperClient {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<LinkResponse> getLinks(long chatId) {
         try {

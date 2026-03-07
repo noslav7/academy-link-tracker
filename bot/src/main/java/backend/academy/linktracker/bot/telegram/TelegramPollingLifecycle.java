@@ -12,12 +12,12 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-@Order(2)
-@Component
-@RequiredArgsConstructor
 /**
  * Управляет жизненным циклом Telegram long polling.
  */
+@Order(2)
+@Component
+@RequiredArgsConstructor
 public class TelegramPollingLifecycle implements ApplicationRunner {
 
     /**

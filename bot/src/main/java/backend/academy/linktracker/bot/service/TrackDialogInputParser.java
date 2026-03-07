@@ -6,10 +6,10 @@ import java.util.Locale;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
-@Component
 /**
  * Проверяет и разбирает пользовательский ввод для диалога {@code /track}.
  */
+@Component
 public class TrackDialogInputParser {
 
     /**

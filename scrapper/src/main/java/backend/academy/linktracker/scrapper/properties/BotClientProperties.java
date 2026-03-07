@@ -9,6 +9,9 @@ import org.hibernate.validator.constraints.URL;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Набор настроек подключения scrapper к bot-сервису.
+ */
 @ConfigurationProperties(prefix = "app.bot")
 @Validated
 @Getter
@@ -17,13 +20,25 @@ import org.springframework.validation.annotation.Validated;
 @NoArgsConstructor
 public class BotClientProperties {
 
+    /**
+     * Базовый URL bot HTTP API.
+     */
     @NotEmpty
     @URL
     private String baseUrl;
 
+    /**
+     * Транспорт отправки уведомлений в bot.
+     */
     private TransportMode transport = TransportMode.HTTP;
 
+    /**
+     * Хост gRPC-сервера bot.
+     */
     private String grpcHost = "localhost";
 
+    /**
+     * Порт gRPC-сервера bot.
+     */
     private int grpcPort = 9090;
 }

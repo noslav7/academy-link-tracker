@@ -6,10 +6,10 @@ import backend.academy.linktracker.bot.client.ScrapperClientException;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
-@Service
 /**
  * Отвечает за отправку данных диалога {@code /track} в scrapper.
  */
+@Service
 public class TrackDialogSubmissionService {
 
     /**

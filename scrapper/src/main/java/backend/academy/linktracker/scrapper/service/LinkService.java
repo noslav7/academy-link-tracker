@@ -11,10 +11,10 @@ import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
-@Service
 /**
  * Сервис управления отслеживаемыми ссылками для Telegram-чатов.
  */
+@Service
 public class LinkService {
 
     /**

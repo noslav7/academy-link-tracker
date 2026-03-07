@@ -9,10 +9,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-@Component
 /**
  * Маршрутизирует входящие сообщения к обработчикам команд.
  */
+@Component
 public class BotCommandDispatcher {
 
     /**
@@ -48,6 +48,9 @@ public class BotCommandDispatcher {
      */
     private final Set<String> supportedCommands;
 
+    /**
+     * Сервис пошагового диалога команды {@code /track}.
+     */
     private final TrackDialogService trackDialogService;
 
     /**
@@ -141,6 +144,12 @@ public class BotCommandDispatcher {
         return Optional.of(withoutMention.toLowerCase(Locale.ROOT));
     }
 
+    /**
+     * Проверяет, является ли сообщение командой Telegram.
+     *
+     * @param text текст входящего сообщения
+     * @return {@code true}, если сообщение начинается с символа {@code '/'}
+     */
     private static boolean isCommandMessage(String text) {
         String trimmed = text == null ? "" : text.trim();
         return !trimmed.isEmpty() && trimmed.charAt(0) == '/';

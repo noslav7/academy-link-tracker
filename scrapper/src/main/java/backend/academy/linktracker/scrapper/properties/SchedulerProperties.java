@@ -10,6 +10,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.stereotype.Component;
 
+/**
+ * Настройки периодического планировщика проверки ссылок.
+ */
 @ConfigurationProperties(prefix = "app.scheduler")
 @Component("schedulerProperties")
 @Getter
@@ -18,6 +21,9 @@ import org.springframework.stereotype.Component;
 @NoArgsConstructor
 public class SchedulerProperties {
 
+    /**
+     * Интервал между запусками проверки обновлений.
+     */
     @DurationUnit(ChronoUnit.SECONDS)
     private Duration interval = Duration.ofSeconds(30);
 }

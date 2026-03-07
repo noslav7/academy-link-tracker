@@ -17,16 +17,37 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
 
+/**
+ * gRPC-реализация API scrapper-сервиса.
+ */
 public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
 
+    /**
+     * Сервис регистрации/удаления чатов.
+     */
     private final ChatService chatService;
+    /**
+     * Сервис управления отслеживаемыми ссылками.
+     */
     private final LinkService linkService;
 
+    /**
+     * Создает gRPC-сервис scrapper.
+     *
+     * @param chatService сервис чатов
+     * @param linkService сервис ссылок
+     */
     public ScrapperGrpcService(ChatService chatService, LinkService linkService) {
         this.chatService = chatService;
         this.linkService = linkService;
     }
 
+    /**
+     * Регистрирует чат через gRPC API.
+     *
+     * @param request запрос регистрации чата
+     * @param responseObserver observer ответа
+     */
     @Override
     public void registerChat(ChatIdRequest request, StreamObserver<EmptyMessage> responseObserver) {
         try {
@@ -42,6 +63,12 @@ public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
         }
     }
 
+    /**
+     * Добавляет ссылку в отслеживание через gRPC API.
+     *
+     * @param request gRPC-запрос добавления ссылки
+     * @param responseObserver observer ответа
+     */
     @Override
     public void addLink(
             backend.academy.linktracker.grpc.AddLinkRequest request,
@@ -70,6 +97,12 @@ public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
         }
     }
 
+    /**
+     * Удаляет ссылку из отслеживания через gRPC API.
+     *
+     * @param request gRPC-запрос удаления ссылки
+     * @param responseObserver observer ответа
+     */
     @Override
     public void removeLink(
             backend.academy.linktracker.grpc.RemoveLinkRequest request,
@@ -90,6 +123,12 @@ public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
         }
     }
 
+    /**
+     * Возвращает список ссылок чата через gRPC API.
+     *
+     * @param request запрос списка ссылок
+     * @param responseObserver observer ответа
+     */
     @Override
     public void listLinks(ChatIdRequest request, StreamObserver<ListLinksResponse> responseObserver) {
         try {
@@ -111,6 +150,12 @@ public class ScrapperGrpcService extends ScrapperApiGrpc.ScrapperApiImplBase {
         }
     }
 
+    /**
+     * Конвертирует внутренний DTO ссылки в gRPC DTO.
+     *
+     * @param response внутренний DTO ссылки
+     * @return gRPC DTO ссылки
+     */
     private static backend.academy.linktracker.grpc.LinkResponse toGrpcLinkResponse(LinkResponse response) {
         return backend.academy.linktracker.grpc.LinkResponse.newBuilder()
                 .setId(response.id())

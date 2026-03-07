@@ -9,6 +9,9 @@ import org.hibernate.validator.constraints.URL;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Набор настроек подключения к scrapper-сервису.
+ */
 @ConfigurationProperties(prefix = "app.scrapper")
 @Validated
 @Getter
@@ -17,13 +20,25 @@ import org.springframework.validation.annotation.Validated;
 @NoArgsConstructor
 public class ScrapperProperties {
 
+    /**
+     * Базовый URL scrapper HTTP API.
+     */
     @NotEmpty
     @URL
     private String baseUrl;
 
+    /**
+     * Транспорт взаимодействия с scrapper.
+     */
     private TransportMode transport = TransportMode.HTTP;
 
+    /**
+     * Хост gRPC-сервера scrapper.
+     */
     private String grpcHost = "localhost";
 
+    /**
+     * Порт gRPC-сервера scrapper.
+     */
     private int grpcPort = 9091;
 }

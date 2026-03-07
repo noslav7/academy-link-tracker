@@ -4,10 +4,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Repository;
 
-@Repository
 /**
  * In-memory реализация репозитория пользователей.
  */
+@Repository
 public class InMemoryUserRepository implements UserRepository {
 
     /**

@@ -5,12 +5,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication
-@ConfigurationPropertiesScan
-@EnableScheduling
 /**
  * Точка входа в приложение scrapper-сервиса.
  */
+@SpringBootApplication
+@ConfigurationPropertiesScan
+@EnableScheduling
 public class ScrapperApplication {
 
     /**

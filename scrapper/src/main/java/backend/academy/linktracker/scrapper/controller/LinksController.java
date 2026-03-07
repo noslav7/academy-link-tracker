@@ -15,30 +15,64 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST-контроллер управления отслеживаемыми ссылками чата.
+ */
 @RestController
 @RequestMapping("/links")
 public class LinksController {
 
+    /**
+     * Имя обязательного HTTP-заголовка с идентификатором чата.
+     */
     private static final String CHAT_HEADER = "Tg-Chat-Id";
 
+    /**
+     * Сервис управления ссылками.
+     */
     private final LinkService linkService;
 
+    /**
+     * Создает контроллер управления ссылками.
+     *
+     * @param linkService сервис управления ссылками
+     */
     public LinksController(LinkService linkService) {
         this.linkService = linkService;
     }
 
+    /**
+     * Возвращает список всех ссылок, отслеживаемых указанным чатом.
+     *
+     * @param chatId идентификатор Telegram-чата из заголовка
+     * @return список ссылок и их количество
+     */
     @GetMapping
     public ResponseEntity<ListLinksResponse> list(@RequestHeader(CHAT_HEADER) long chatId) {
         List<LinkResponse> links = linkService.list(chatId);
         return ResponseEntity.ok(new ListLinksResponse(links, links.size()));
     }
 
+    /**
+     * Добавляет новую ссылку в отслеживание.
+     *
+     * @param chatId идентификатор Telegram-чата из заголовка
+     * @param request тело запроса с ссылкой, тегами и фильтрами
+     * @return добавленная ссылка
+     */
     @PostMapping
     public ResponseEntity<LinkResponse> add(
             @RequestHeader(CHAT_HEADER) long chatId, @RequestBody AddLinkRequest request) {
         return ResponseEntity.ok(linkService.add(chatId, request));
     }
 
+    /**
+     * Удаляет ссылку из отслеживания.
+     *
+     * @param chatId идентификатор Telegram-чата из заголовка
+     * @param request тело запроса с удаляемой ссылкой
+     * @return удаленная ссылка
+     */
     @DeleteMapping
     public ResponseEntity<LinkResponse> remove(
             @RequestHeader(CHAT_HEADER) long chatId, @RequestBody RemoveLinkRequest request) {

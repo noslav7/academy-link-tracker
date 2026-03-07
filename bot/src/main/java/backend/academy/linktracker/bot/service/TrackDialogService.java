@@ -6,10 +6,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 
-@Service
 /**
  * Управляет пошаговым диалогом команды {@code /track} для каждого чата.
  */
+@Service
 public class TrackDialogService {
 
     /**

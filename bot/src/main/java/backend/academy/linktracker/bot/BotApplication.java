@@ -4,11 +4,11 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
-@SpringBootApplication
-@ConfigurationPropertiesScan
 /**
  * Точка входа в приложение Telegram-бота.
  */
+@SpringBootApplication
+@ConfigurationPropertiesScan
 public class BotApplication {
 
     /**

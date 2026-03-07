@@ -12,15 +12,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * Набор настроек Telegram-клиента из конфигурации приложения.
+ */
 @ConfigurationProperties(prefix = "app.telegram")
 @Validated
 @Getter
 @Setter
 @EqualsAndHashCode
 @NoArgsConstructor
-/**
- * Набор настроек Telegram-клиента из конфигурации приложения.
- */
 public class TelegramProperties {
 
     /**

@@ -4,10 +4,10 @@ import backend.academy.linktracker.bot.client.ScrapperClient;
 import backend.academy.linktracker.bot.repository.UserRepository;
 import org.springframework.stereotype.Component;
 
-@Component
 /**
  * Обработчик команды {@code /start}.
  */
+@Component
 public class StartCommandHandler extends AbstractBotCommandHandler {
 
     /**
@@ -15,12 +15,16 @@ public class StartCommandHandler extends AbstractBotCommandHandler {
      */
     private final UserRepository userRepository;
 
+    /**
+     * Клиент взаимодействия с scrapper для регистрации чата.
+     */
     private final ScrapperClient scrapperClient;
 
     /**
      * Создает обработчик команды {@code /start}.
      *
      * @param userRepository репозиторий зарегистрированных пользователей
+     * @param scrapperClient клиент взаимодействия со scrapper
      */
     public StartCommandHandler(UserRepository userRepository, ScrapperClient scrapperClient) {
         super("/start", "начало работы");

@@ -12,20 +12,37 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.util.List;
 
+/**
+ * gRPC-реализация клиента взаимодействия с scrapper.
+ */
 public class GrpcScrapperClient implements ScrapperClient {
 
+    /**
+     * Блокирующий gRPC stub сервиса ScrapperApi.
+     */
     private final ScrapperApiGrpc.ScrapperApiBlockingStub stub;
 
+    /**
+     * Создает gRPC-клиент scrapper.
+     *
+     * @param managedChannel gRPC-канал до scrapper-сервиса
+     */
     public GrpcScrapperClient(ManagedChannel managedChannel) {
         this.stub = ScrapperApiGrpc.newBlockingStub(managedChannel);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void registerChat(long chatId) {
         invoke(() ->
                 stub.registerChat(ChatIdRequest.newBuilder().setChatId(chatId).build()));
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public LinkResponse addLink(long chatId, String link, List<String> tags, List<String> filters) {
         try {
@@ -44,6 +61,9 @@ public class GrpcScrapperClient implements ScrapperClient {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public LinkResponse removeLink(long chatId, String link) {
         try {
@@ -60,6 +80,9 @@ public class GrpcScrapperClient implements ScrapperClient {
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<LinkResponse> getLinks(long chatId) {
         try {
@@ -73,6 +96,11 @@ public class GrpcScrapperClient implements ScrapperClient {
         }
     }
 
+    /**
+     * Выполняет gRPC-вызов регистрации чата с унифицированной обработкой ошибок.
+     *
+     * @param call операция gRPC-вызова
+     */
     private void invoke(RunnableCall call) {
         try {
             call.run();
@@ -84,6 +112,12 @@ public class GrpcScrapperClient implements ScrapperClient {
         }
     }
 
+    /**
+     * Преобразует gRPC DTO ссылки в клиентский DTO.
+     *
+     * @param response gRPC-ответ scrapper
+     * @return клиентское представление ссылки
+     */
     private static LinkResponse toLinkResponse(backend.academy.linktracker.grpc.LinkResponse response) {
         return new LinkResponse(
                 response.getId(),
@@ -92,8 +126,16 @@ public class GrpcScrapperClient implements ScrapperClient {
                 List.copyOf(response.getFiltersList()));
     }
 
+    /**
+     * Контракт лямбды для вызова gRPC-операций без аргументов.
+     */
     @FunctionalInterface
     private interface RunnableCall {
+        /**
+         * Выполняет gRPC-вызов.
+         *
+         * @return пустой ответ gRPC
+         */
         EmptyMessage run();
     }
 }

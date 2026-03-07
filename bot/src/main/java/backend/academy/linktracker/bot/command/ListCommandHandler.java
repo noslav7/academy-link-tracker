@@ -6,16 +6,30 @@ import backend.academy.linktracker.bot.client.dto.LinkResponse;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
+/**
+ * Обработчик команды {@code /list}.
+ */
 @Component
 public class ListCommandHandler extends AbstractBotCommandHandler {
 
+    /**
+     * Клиент запроса списка ссылок из scrapper.
+     */
     private final ScrapperClient scrapperClient;
 
+    /**
+     * Создает обработчик команды {@code /list}.
+     *
+     * @param scrapperClient клиент scrapper-сервиса
+     */
     public ListCommandHandler(ScrapperClient scrapperClient) {
         super("/list", "показать отслеживаемые ссылки");
         this.scrapperClient = scrapperClient;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String handle(long chatId, String messageText) {
         try {
@@ -42,6 +56,12 @@ public class ListCommandHandler extends AbstractBotCommandHandler {
         }
     }
 
+    /**
+     * Извлекает необязательный тег для фильтрации из сообщения команды.
+     *
+     * @param messageText исходный текст команды
+     * @return тег или {@code null}, если фильтр не задан
+     */
     private static String extractOptionalTag(String messageText) {
         String[] tokens = messageText.trim().split("\\s+", 3);
         if (tokens.length < 2 || tokens[1].isBlank()) {

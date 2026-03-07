@@ -4,10 +4,10 @@ import java.net.URI;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
 
-@Service
 /**
  * Выбирает подходящий форматный резолвер и делегирует ему получение метаданных ссылки.
  */
+@Service
 public class LinkMetadataResolver {
 
     /**

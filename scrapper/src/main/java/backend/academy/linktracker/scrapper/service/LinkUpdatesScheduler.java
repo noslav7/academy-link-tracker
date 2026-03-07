@@ -10,15 +10,37 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * Планировщик периодической проверки обновлений отслеживаемых ссылок.
+ */
 @Component
 public class LinkUpdatesScheduler {
 
+    /**
+     * Логгер компонента.
+     */
     private static final Logger log = LoggerFactory.getLogger(LinkUpdatesScheduler.class);
 
+    /**
+     * Сервис чтения/обновления ссылок.
+     */
     private final LinkService linkService;
+    /**
+     * Клиент отправки уведомлений в bot.
+     */
     private final BotNotificationsClient botNotificationsClient;
+    /**
+     * Настройки интервала планировщика.
+     */
     private final SchedulerProperties schedulerProperties;
 
+    /**
+     * Создает планировщик проверки ссылок.
+     *
+     * @param linkService сервис ссылок
+     * @param botNotificationsClient клиент отправки уведомлений
+     * @param schedulerProperties настройки интервала
+     */
     public LinkUpdatesScheduler(
             LinkService linkService,
             BotNotificationsClient botNotificationsClient,
@@ -28,6 +50,9 @@ public class LinkUpdatesScheduler {
         this.schedulerProperties = schedulerProperties;
     }
 
+    /**
+     * Проверяет все отслеживаемые ссылки и отправляет уведомления о новых обновлениях.
+     */
     @Scheduled(fixedDelayString = "#{@schedulerProperties.interval.toMillis()}")
     public void checkUpdates() {
         for (TrackedLink trackedLink : linkService.allTrackedLinks()) {

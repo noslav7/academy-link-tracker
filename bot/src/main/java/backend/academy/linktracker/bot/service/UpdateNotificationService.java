@@ -8,16 +8,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * Сервис отправки уведомлений пользователям Telegram-бота.
+ */
 @Service
 public class UpdateNotificationService {
 
+    /**
+     * Логгер компонента.
+     */
     private static final Logger log = LoggerFactory.getLogger(UpdateNotificationService.class);
+    /**
+     * Клиент Telegram API.
+     */
     private final TelegramBot telegramBot;
 
+    /**
+     * Создает сервис отправки уведомлений.
+     *
+     * @param telegramBot клиент Telegram API
+     */
     public UpdateNotificationService(TelegramBot telegramBot) {
         this.telegramBot = telegramBot;
     }
 
+    /**
+     * Отправляет уведомление всем чатам из входящего обновления.
+     *
+     * @param update данные обновления ссылки
+     */
     public void notifyAboutUpdate(LinkUpdate update) {
         if (update == null || update.tgChatIds() == null) {
             return;

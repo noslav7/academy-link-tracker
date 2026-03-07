@@ -6,10 +6,10 @@ import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-@Component
 /**
  * Резолвер метаданных для ссылок на репозитории GitHub.
  */
+@Component
 public class GithubLinkMetadataResolver extends AbstractHostBasedLinkMetadataResolver {
 
     /**

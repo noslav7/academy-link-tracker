@@ -5,10 +5,10 @@ import com.pengrad.telegrambot.TelegramBot;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-@Configuration
 /**
  * Конфигурация клиента Telegram Bot API.
  */
+@Configuration
 public class TelegramConfiguration {
 
     /**

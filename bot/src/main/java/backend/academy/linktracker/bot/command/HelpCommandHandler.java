@@ -5,10 +5,10 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-@Component
 /**
  * Обработчик команды {@code /help}.
  */
+@Component
 public class HelpCommandHandler extends AbstractBotCommandHandler {
 
     /**

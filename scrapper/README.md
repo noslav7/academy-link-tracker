@@ -115,5 +115,5 @@ Unix/macOS:
 
 ## Контейнерный E2E
 
-В модуле есть контейнерный E2E-тест `BotScrapperContainersE2ETest`.
-Он запускается в составе обычного `test` и требует Docker.
+В модуле есть контейнерные E2E-тесты в `BotScrapperContainersE2ETest`.
+Они запускаются в составе обычного `test` и требуют Docker.

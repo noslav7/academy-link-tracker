@@ -10,11 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-@Component
-@RequiredArgsConstructor
 /**
  * Обрабатывает входящие Telegram-обновления и отправляет ответы пользователю.
  */
+@Component
+@RequiredArgsConstructor
 public class TelegramUpdateProcessor {
 
     /**

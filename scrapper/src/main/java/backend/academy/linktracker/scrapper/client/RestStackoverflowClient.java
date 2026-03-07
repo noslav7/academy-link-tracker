@@ -9,18 +9,36 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
 
+/**
+ * HTTP-клиент получения метаданных вопросов из Stack Overflow API.
+ */
 @Component
 public class RestStackoverflowClient implements StackoverflowClient {
 
+    /**
+     * Клиент HTTP-запросов к Stack Overflow API.
+     */
     private final RestClient restClient;
+    /**
+     * Настройки подключения к Stack Overflow API.
+     */
     private final StackoverflowProperties properties;
 
+    /**
+     * Создает REST-клиент Stack Overflow API.
+     *
+     * @param restClient HTTP-клиент Stack Overflow
+     * @param properties настройки подключения
+     */
     public RestStackoverflowClient(
             @Qualifier("stackoverflowRestClient") RestClient restClient, StackoverflowProperties properties) {
         this.restClient = restClient;
         this.properties = properties;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public Instant fetchQuestionUpdatedAt(long questionId) {
         LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
@@ -52,8 +70,18 @@ public class RestStackoverflowClient implements StackoverflowClient {
         }
     }
 
+    /**
+     * DTO ответа Stack Overflow API.
+     *
+     * @param items список элементов ответа
+     */
     private record StackoverflowResponse(List<StackoverflowItem> items) {}
 
+    /**
+     * DTO элемента ответа Stack Overflow API.
+     *
+     * @param lastActivityDate время последней активности в epoch seconds
+     */
     private record StackoverflowItem(
             @JsonProperty("last_activity_date") Long lastActivityDate) {}
 }
