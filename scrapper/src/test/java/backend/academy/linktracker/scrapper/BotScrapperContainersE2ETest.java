@@ -31,8 +31,6 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
-import org.junit.jupiter.api.condition.OS;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -44,8 +42,13 @@ class BotScrapperContainersE2ETest {
 
     private static final Network NETWORK = Network.newNetwork();
     private static final Path PROJECT_ROOT = resolveProjectRoot();
-    private static final String BOT_IMAGE = "link-tracker-bot-it:test";
-    private static final String SCRAPPER_IMAGE = "link-tracker-scrapper-it:test";
+    /**
+     * Явно указываем registry-qualified имена, чтобы Testcontainers в CI
+     * не подменял локально собранные образы через TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX.
+     */
+    private static final String BOT_IMAGE = "localhost/link-tracker-bot-it:test";
+
+    private static final String SCRAPPER_IMAGE = "localhost/link-tracker-scrapper-it:test";
 
     static {
         buildDockerImage(BOT_IMAGE, PROJECT_ROOT.resolve("bot/Dockerfile"));
@@ -151,7 +154,6 @@ class BotScrapperContainersE2ETest {
     }
 
     @Test
-    @DisabledOnOs(OS.WINDOWS)
     void givenUpdatedGithubLinkWhenSchedulerRunsInContainersThenBotReceivesExactNotificationRequest() throws Exception {
         // Проверяет e2e-контракт: обновление ссылки в scrapper приводит к точному запросу sendMessage в bot.
         configureWiremock();
