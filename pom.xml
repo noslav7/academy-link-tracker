@@ -302,8 +302,11 @@
                         <printFailingErrors>true</printFailingErrors>
                         <linkXRef>false</linkXRef>
                         <outputDirectory>${project.reporting.outputDirectory}/pmd</outputDirectory>
+                        <excludeRoots>
+                            <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>
+                        </excludeRoots>
                         <rulesets>
-                            <ruleset>pmd.xml</ruleset>
+                            <ruleset>${maven.multiModuleProjectDirectory}/pmd.xml</ruleset>
                         </rulesets>
                     </configuration>
                     <dependencies>

@@ -66,5 +66,5 @@ public class RestGithubClient implements GithubClient {
      * @param updatedAt время обновления репозитория
      */
     private record GithubRepositoryResponse(
-            @JsonProperty("updated_at") java.time.Instant updatedAt) {}
+            @JsonProperty("updated_at") Instant updatedAt) {}
 }
