@@ -232,10 +232,22 @@
                 <artifactId>protobuf-maven-plugin</artifactId>
                 <executions>
                     <execution>
+                        <id>compile-proto</id>
                         <goals>
                             <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <temporaryProtoFileDirectory>${project.build.directory}/protoc-dependencies-compile-${maven.build.timestamp}</temporaryProtoFileDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>compile-grpc</id>
+                        <goals>
                             <goal>compile-custom</goal>
                         </goals>
+                        <configuration>
+                            <temporaryProtoFileDirectory>${project.build.directory}/protoc-dependencies-grpc-${maven.build.timestamp}</temporaryProtoFileDirectory>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

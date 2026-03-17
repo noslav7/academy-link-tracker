@@ -23,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.wiremock.spring.EnableWireMock;
 
 @SpringBootTest(
+        classes = {ScrapperApplication.class, TestcontainersConfiguration.class},
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "app.github.base-url=${wiremock.server.baseUrl}/github",

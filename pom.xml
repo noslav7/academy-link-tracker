@@ -40,6 +40,7 @@
 
     <properties>
         <revision>0.0.1</revision>
+        <maven.build.timestamp.format>yyyyMMddHHmmss</maven.build.timestamp.format>
 
         <java.version>25</java.version>
         <maven.version>3.9.12</maven.version>

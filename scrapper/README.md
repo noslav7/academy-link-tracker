@@ -27,6 +27,12 @@
 В корне репозитория создайте `scrapper/.env` (или общий `.env`) и добавьте:
 
 ```properties
+DATASOURCE_URL=jdbc:postgresql://localhost:5432/link_tracker
+DATASOURCE_USERNAME=postgres
+DATASOURCE_PASSWORD=postgres
+ACCESS_TYPE=SQL
+LIQUIBASE_ENABLED=true
+
 BOT_BASE_URL=http://localhost:8080
 BOT_TRANSPORT=HTTP
 SCRAPPER_SCHEDULER_INTERVAL=30s
@@ -44,6 +50,17 @@ BOT_TRANSPORT=GRPC
 BOT_GRPC_HOST=localhost
 BOT_GRPC_PORT=9090
 ```
+
+### Поднять Postgres + миграции локально
+
+Из корня репозитория:
+
+```powershell
+docker compose up -d postgresql liquibase-migrations
+```
+
+Миграции лежат в `migrations/` и применяются через Liquibase.
+Для смены типа доступа к БД используйте `ACCESS_TYPE=SQL` или `ACCESS_TYPE=ORM`.
 
 ## Запуск
 

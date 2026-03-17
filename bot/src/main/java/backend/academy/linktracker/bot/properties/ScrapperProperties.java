@@ -25,7 +25,7 @@ public class ScrapperProperties {
      */
     @NotEmpty
     @URL
-    private String baseUrl;
+    private String baseUrl = "http://localhost:8081";
 
     /**
      * Транспорт взаимодействия с scrapper.

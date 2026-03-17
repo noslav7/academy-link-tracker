@@ -8,12 +8,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import org.springframework.stereotype.Repository;
 
 /**
  * In-memory реализация репозитория отслеживаемых ссылок.
  */
-@Repository
 public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
 
     /**
@@ -102,12 +100,32 @@ public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
         return List.copyOf(links.values());
     }
 
+    @Override
+    public List<TrackedLink> findAllByChatId(long chatId, int limit, int offset) {
+        if (limit <= 0 || offset < 0) {
+            return List.of();
+        }
+        return findAllByChatId(chatId).stream().skip(offset).limit(limit).toList();
+    }
+
     /**
      * {@inheritDoc}
      */
     @Override
     public Set<Long> findAllChatIds() {
         return Set.copyOf(linksByChatId.keySet());
+    }
+
+    @Override
+    public List<TrackedLink> findAllTrackedLinks(int limit, int offset) {
+        if (limit <= 0 || offset < 0) {
+            return List.of();
+        }
+        return linksByChatId.values().stream()
+                .flatMap(links -> links.values().stream())
+                .skip(offset)
+                .limit(limit)
+                .toList();
     }
 
     /**

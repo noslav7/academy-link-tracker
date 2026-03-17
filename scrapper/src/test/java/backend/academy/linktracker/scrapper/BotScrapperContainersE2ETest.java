@@ -33,6 +33,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -57,6 +58,16 @@ class BotScrapperContainersE2ETest {
 
     @SuppressWarnings("resource")
     @Container
+    private static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17")
+            .withNetwork(NETWORK)
+            .withNetworkAliases("postgres")
+            .withDatabaseName("link_tracker")
+            .withUsername("postgres")
+            .withPassword("postgres")
+            .waitingFor(Wait.forListeningPort());
+
+    @SuppressWarnings("resource")
+    @Container
     private static final GenericContainer<?> wiremock = new GenericContainer<>("wiremock/wiremock:3.13.1")
             .withNetwork(NETWORK)
             .withNetworkAliases("wiremock")
@@ -69,12 +80,15 @@ class BotScrapperContainersE2ETest {
             .withNetwork(NETWORK)
             .withNetworkAliases("bot")
             .withExposedPorts(8080)
+            .dependsOn(wiremock)
             .withEnv("TELEGRAM_TOKEN", "test-token")
             .withEnv("APP_TELEGRAM_URL", "http://wiremock:8080/bot")
+            .withEnv("SCRAPPER_BASE_URL", "http://scrapper:8081")
+            .withEnv("SCRAPPER_TRANSPORT", "HTTP")
             .withEnv("APP_TELEGRAM_POLLING_ENABLED", "false")
             .withEnv("APP_TELEGRAM_SET_MY_COMMANDS_ON_STARTUP", "false")
             .withEnv("BOT_GRPC_SERVER_ENABLED", "false")
-            .waitingFor(Wait.forListeningPort());
+            .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8080));
 
     @SuppressWarnings("resource")
     @Container
@@ -82,6 +96,7 @@ class BotScrapperContainersE2ETest {
             .withNetwork(NETWORK)
             .withNetworkAliases("scrapper")
             .withExposedPorts(8081)
+            .dependsOn(postgres, bot, wiremock)
             .withEnv("GITHUB_BASE_URL", "http://wiremock:8080/github")
             .withEnv("STACKOVERFLOW_BASE_URL", "http://wiremock:8080/so")
             .withEnv("APP_BOT_BASE_URL", "http://bot:8080")
@@ -91,7 +106,11 @@ class BotScrapperContainersE2ETest {
             .withEnv("BOT_TRANSPORT", "HTTP")
             .withEnv("SCRAPPER_SCHEDULER_INTERVAL", "500ms")
             .withEnv("SCRAPPER_GRPC_SERVER_ENABLED", "false")
-            .waitingFor(Wait.forListeningPort());
+            .withEnv("DATASOURCE_URL", "jdbc:postgresql://postgres:5432/link_tracker")
+            .withEnv("DATASOURCE_USERNAME", "postgres")
+            .withEnv("DATASOURCE_PASSWORD", "postgres")
+            .withEnv("LIQUIBASE_ENABLED", "true")
+            .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8081));
 
     private static Path resolveProjectRoot() {
         String multiModuleRoot = System.getProperty("maven.multiModuleProjectDirectory");

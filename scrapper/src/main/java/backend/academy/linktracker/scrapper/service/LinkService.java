@@ -8,6 +8,7 @@ import backend.academy.linktracker.scrapper.exception.LinkAlreadyTrackedExceptio
 import backend.academy.linktracker.scrapper.exception.LinkNotFoundException;
 import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,10 @@ public class LinkService {
      * Максимальная длина ссылки, принимаемой сервисом.
      */
     private static final int MAX_LINK_LENGTH = 2048;
+    /**
+     * Размер страницы при фоновой выборке ссылок.
+     */
+    private static final int TRACKED_LINKS_PAGE_SIZE = 200;
 
     /**
      * Репозиторий хранения чатов и ссылок.
@@ -103,9 +108,20 @@ public class LinkService {
      * @return список доменных сущностей отслеживаемых ссылок
      */
     public List<TrackedLink> allTrackedLinks() {
-        return repository.findAllChatIds().stream()
-                .flatMap(chatId -> repository.findAllByChatId(chatId).stream())
-                .toList();
+        List<TrackedLink> result = new ArrayList<>();
+        int offset = 0;
+        while (true) {
+            List<TrackedLink> page = repository.findAllTrackedLinks(TRACKED_LINKS_PAGE_SIZE, offset);
+            if (page.isEmpty()) {
+                break;
+            }
+            result.addAll(page);
+            if (page.size() < TRACKED_LINKS_PAGE_SIZE) {
+                break;
+            }
+            offset += page.size();
+        }
+        return result;
     }
 
     /**

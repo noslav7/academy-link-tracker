@@ -72,11 +72,30 @@ public interface TrackedLinkRepository {
     List<TrackedLink> findAllByChatId(long chatId);
 
     /**
+     * Возвращает ссылки чата постранично.
+     *
+     * @param chatId идентификатор чата
+     * @param limit размер страницы
+     * @param offset смещение
+     * @return страница ссылок
+     */
+    List<TrackedLink> findAllByChatId(long chatId, int limit, int offset);
+
+    /**
      * Возвращает идентификаторы всех чатов.
      *
      * @return множество chatId
      */
     Set<Long> findAllChatIds();
+
+    /**
+     * Возвращает все отслеживаемые ссылки постранично.
+     *
+     * @param limit размер страницы
+     * @param offset смещение
+     * @return страница ссылок
+     */
+    List<TrackedLink> findAllTrackedLinks(int limit, int offset);
 
     /**
      * Обновляет сохраненную ссылку.
