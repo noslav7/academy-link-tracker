@@ -10,6 +10,8 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,14 +20,32 @@ import org.springframework.stereotype.Component;
 @Component
 public class DatabaseMigrationRunner {
 
+    /**
+     * Логгер компонента.
+     */
+    private static final Logger log = LoggerFactory.getLogger(DatabaseMigrationRunner.class);
+    /**
+     * Путь к changelog-файлу Liquibase.
+     */
     private static final String CHANGELOG_PATH = "migrations/master.xml";
 
+    /**
+     * Источник подключений к БД.
+     */
     private final DataSource dataSource;
 
+    /**
+     * Создает раннер миграций.
+     *
+     * @param dataSource источник подключений к БД
+     */
     public DatabaseMigrationRunner(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
+    /**
+     * Выполняет миграции при старте приложения.
+     */
     @PostConstruct
     public void migrate() {
         try (Connection connection = dataSource.getConnection()) {
@@ -35,6 +55,10 @@ public class DatabaseMigrationRunner {
                 liquibase.update(new Contexts(), new LabelExpression());
             }
         } catch (Exception exception) {
+            log.atError()
+                    .setCause(exception)
+                    .addKeyValue("changelogPath", CHANGELOG_PATH)
+                    .log("Failed to apply database migrations during startup");
             throw new IllegalStateException("Failed to apply database migrations", exception);
         }
     }

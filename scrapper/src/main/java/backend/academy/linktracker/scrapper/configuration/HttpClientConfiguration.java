@@ -6,6 +6,7 @@ import backend.academy.linktracker.scrapper.client.RestBotNotificationsClient;
 import backend.academy.linktracker.scrapper.properties.BotClientProperties;
 import backend.academy.linktracker.scrapper.properties.GithubProperties;
 import backend.academy.linktracker.scrapper.properties.StackoverflowProperties;
+import backend.academy.linktracker.scrapper.properties.TransportMode;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -51,7 +52,11 @@ public class HttpClientConfiguration {
      * @return реализация отправки уведомлений по REST
      */
     @Bean
-    @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = "HTTP", matchIfMissing = true)
+    @ConditionalOnProperty(
+            prefix = "app.bot",
+            name = "transport",
+            havingValue = TransportMode.HTTP_VALUE,
+            matchIfMissing = true)
     BotNotificationsClient restBotNotificationsClient(RestClient botRestClient) {
         return new RestBotNotificationsClient(botRestClient);
     }
@@ -63,7 +68,7 @@ public class HttpClientConfiguration {
      * @return реализация отправки уведомлений по gRPC
      */
     @Bean
-    @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = "GRPC")
+    @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = TransportMode.GRPC_VALUE)
     BotNotificationsClient grpcBotNotificationsClient(ManagedChannel botGrpcChannel) {
         return new GrpcBotNotificationsClient(botGrpcChannel);
     }

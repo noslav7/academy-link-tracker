@@ -5,7 +5,6 @@ import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.model.Message;
 import com.pengrad.telegrambot.model.Update;
 import com.pengrad.telegrambot.request.SendMessage;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Component;
  * Обрабатывает входящие Telegram-обновления и отправляет ответы пользователю.
  */
 @Component
-@RequiredArgsConstructor
 public class TelegramUpdateProcessor {
 
     /**
@@ -30,6 +28,17 @@ public class TelegramUpdateProcessor {
      * Диспетчер для маршрутизации команд к обработчикам.
      */
     private final BotCommandDispatcher commandDispatcher;
+
+    /**
+     * Создает процессор входящих Telegram-обновлений.
+     *
+     * @param telegramBot клиент Telegram API
+     * @param commandDispatcher диспетчер команд бота
+     */
+    public TelegramUpdateProcessor(TelegramBot telegramBot, BotCommandDispatcher commandDispatcher) {
+        this.telegramBot = telegramBot;
+        this.commandDispatcher = commandDispatcher;
+    }
 
     /**
      * Извлекает команду из входящего обновления, обрабатывает ее и отправляет ответ.

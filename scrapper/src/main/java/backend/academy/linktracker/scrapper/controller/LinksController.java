@@ -23,11 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class LinksController {
 
     /**
-     * Имя обязательного HTTP-заголовка с идентификатором чата.
-     */
-    private static final String CHAT_HEADER = "Tg-Chat-Id";
-
-    /**
      * Сервис управления ссылками.
      */
     private final LinkService linkService;
@@ -48,7 +43,7 @@ public class LinksController {
      * @return список ссылок и их количество
      */
     @GetMapping
-    public ResponseEntity<ListLinksResponse> list(@RequestHeader(CHAT_HEADER) long chatId) {
+    public ResponseEntity<ListLinksResponse> list(@RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId) {
         List<LinkResponse> links = linkService.list(chatId);
         return ResponseEntity.ok(new ListLinksResponse(links, links.size()));
     }
@@ -62,7 +57,7 @@ public class LinksController {
      */
     @PostMapping
     public ResponseEntity<LinkResponse> add(
-            @RequestHeader(CHAT_HEADER) long chatId, @RequestBody AddLinkRequest request) {
+            @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @RequestBody AddLinkRequest request) {
         return ResponseEntity.ok(linkService.add(chatId, request));
     }
 
@@ -75,7 +70,7 @@ public class LinksController {
      */
     @DeleteMapping
     public ResponseEntity<LinkResponse> remove(
-            @RequestHeader(CHAT_HEADER) long chatId, @RequestBody RemoveLinkRequest request) {
+            @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @RequestBody RemoveLinkRequest request) {
         return ResponseEntity.ok(linkService.remove(chatId, request.link()));
     }
 }

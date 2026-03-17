@@ -10,9 +10,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * In-memory реализация репозитория отслеживаемых ссылок.
+ * In-memory реализация репозитория отслеживаемых ссылок для тестов.
  */
-public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
+public class InMemoryTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepository
+        implements TrackedLinkRepository {
 
     /**
      * Хранилище ссылок по chatId и URL.
@@ -100,9 +101,12 @@ public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
         return List.copyOf(links.values());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<TrackedLink> findAllByChatId(long chatId, int limit, int offset) {
-        if (limit <= 0 || offset < 0) {
+        if (hasInvalidPaging(limit, offset)) {
             return List.of();
         }
         return findAllByChatId(chatId).stream().skip(offset).limit(limit).toList();
@@ -116,9 +120,12 @@ public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
         return Set.copyOf(linksByChatId.keySet());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<TrackedLink> findAllTrackedLinks(int limit, int offset) {
-        if (limit <= 0 || offset < 0) {
+        if (hasInvalidPaging(limit, offset)) {
             return List.of();
         }
         return linksByChatId.values().stream()
@@ -138,11 +145,17 @@ public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
                 .put(trackedLink.url(), trackedLink);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<String> findTagsByChatIdAndUrl(long chatId, String url) {
         return findByChatIdAndUrl(chatId, url).map(TrackedLink::tags).orElse(List.of());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean addTag(long chatId, String url, String tag) {
         Optional<TrackedLink> existing = findByChatIdAndUrl(chatId, url);
@@ -166,6 +179,9 @@ public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
         return true;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean updateTag(long chatId, String url, String oldTag, String newTag) {
         Optional<TrackedLink> existing = findByChatIdAndUrl(chatId, url);
@@ -190,6 +206,9 @@ public class InMemoryTrackedLinkRepository implements TrackedLinkRepository {
         return true;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean deleteTag(long chatId, String url, String tag) {
         Optional<TrackedLink> existing = findByChatIdAndUrl(chatId, url);

@@ -67,13 +67,21 @@ public class ScrapperGrpcServerLifecycle implements ApplicationRunner {
             return;
         }
 
-        server = ServerBuilder.forPort(grpcServerProperties.getPort())
-                .addService(new ScrapperGrpcService(chatService, linkService))
-                .build();
-        server.start();
-        log.atInfo()
-                .addKeyValue("grpcServerPort", grpcServerProperties.getPort())
-                .log("Scrapper gRPC server started");
+        try {
+            server = ServerBuilder.forPort(grpcServerProperties.getPort())
+                    .addService(new ScrapperGrpcService(chatService, linkService))
+                    .build();
+            server.start();
+            log.atInfo()
+                    .addKeyValue("grpcServerPort", grpcServerProperties.getPort())
+                    .log("Scrapper gRPC server started");
+        } catch (IOException exception) {
+            log.atError()
+                    .setCause(exception)
+                    .addKeyValue("grpcServerPort", grpcServerProperties.getPort())
+                    .log("Failed to start scrapper gRPC server");
+            throw exception;
+        }
     }
 
     /**

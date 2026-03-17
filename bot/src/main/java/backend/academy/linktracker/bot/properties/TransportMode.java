@@ -11,5 +11,14 @@ public enum TransportMode {
     /**
      * gRPC транспорт.
      */
-    GRPC
+    GRPC;
+
+    /**
+     * Символьное значение HTTP режима для property-конфигурации.
+     */
+    public static final String HTTP_VALUE = "HTTP";
+    /**
+     * Символьное значение gRPC режима для property-конфигурации.
+     */
+    public static final String GRPC_VALUE = "GRPC";
 }

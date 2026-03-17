@@ -12,6 +12,7 @@ import backend.academy.linktracker.scrapper.client.GithubClient;
 import backend.academy.linktracker.scrapper.client.StackoverflowClient;
 import backend.academy.linktracker.scrapper.repository.InMemoryTrackedLinkRepository;
 import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
+import backend.academy.linktracker.scrapper.service.ChatLinkAccessValidator;
 import backend.academy.linktracker.scrapper.service.ChatService;
 import backend.academy.linktracker.scrapper.service.GithubLinkMetadataResolver;
 import backend.academy.linktracker.scrapper.service.LinkFormatMetadataResolverFactory;
@@ -41,11 +42,12 @@ class ScrapperGrpcServiceTest {
         GithubClient githubClient = (owner, repository) -> Instant.parse("2026-02-25T00:00:00Z");
         StackoverflowClient stackoverflowClient = questionId -> Instant.parse("2026-02-25T00:00:00Z");
         TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
-        LinkService linkService = new LinkService(
-                repository,
+        LinkMetadataResolver linkMetadataResolver =
                 new LinkMetadataResolver(new LinkFormatMetadataResolverFactory(List.of(
                         new GithubLinkMetadataResolver(githubClient),
-                        new StackoverflowLinkMetadataResolver(stackoverflowClient)))));
+                        new StackoverflowLinkMetadataResolver(stackoverflowClient))));
+        LinkService linkService =
+                new LinkService(repository, linkMetadataResolver, new ChatLinkAccessValidator(repository));
         ChatService chatService = new ChatService(repository);
         String serverName = InProcessServerBuilder.generateName();
         server = InProcessServerBuilder.forName(serverName)

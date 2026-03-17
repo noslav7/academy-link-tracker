@@ -24,7 +24,11 @@ public class LinkUpdatesScheduler {
     /**
      * Сервис чтения/обновления ссылок.
      */
-    private final LinkService linkService;
+    private final TrackedLinkMaintenanceService trackedLinkMaintenanceService;
+    /**
+     * Резолвер времени последнего обновления ссылки.
+     */
+    private final LinkMetadataResolver linkMetadataResolver;
     /**
      * Клиент отправки уведомлений в bot.
      */
@@ -37,15 +41,18 @@ public class LinkUpdatesScheduler {
     /**
      * Создает планировщик проверки ссылок.
      *
-     * @param linkService сервис ссылок
+     * @param trackedLinkMaintenanceService сервис чтения/обновления отслеживаемых ссылок
+     * @param linkMetadataResolver резолвер времени последнего обновления ссылки
      * @param botNotificationsClient клиент отправки уведомлений
      * @param schedulerProperties настройки интервала
      */
     public LinkUpdatesScheduler(
-            LinkService linkService,
+            TrackedLinkMaintenanceService trackedLinkMaintenanceService,
+            LinkMetadataResolver linkMetadataResolver,
             BotNotificationsClient botNotificationsClient,
             SchedulerProperties schedulerProperties) {
-        this.linkService = linkService;
+        this.trackedLinkMaintenanceService = trackedLinkMaintenanceService;
+        this.linkMetadataResolver = linkMetadataResolver;
         this.botNotificationsClient = botNotificationsClient;
         this.schedulerProperties = schedulerProperties;
     }
@@ -55,22 +62,24 @@ public class LinkUpdatesScheduler {
      */
     @Scheduled(fixedDelayString = "#{@schedulerProperties.interval.toMillis()}")
     public void checkUpdates() {
-        for (TrackedLink trackedLink : linkService.allTrackedLinks()) {
-            Instant currentUpdatedAt = linkService.resolveLastUpdated(trackedLink.url());
+        for (TrackedLink trackedLink : trackedLinkMaintenanceService.allTrackedLinks()) {
+            Instant currentUpdatedAt = linkMetadataResolver.resolveLastUpdated(trackedLink.url());
             if (currentUpdatedAt.isAfter(trackedLink.lastUpdatedAt())) {
                 botNotificationsClient.sendUpdate(new LinkUpdate(
                         trackedLink.id(),
                         trackedLink.url(),
                         "Обнаружено обновление",
                         java.util.List.of(trackedLink.chatId())));
-                linkService.updateTrackedLink(trackedLink.withLastCheck(Instant.now(), currentUpdatedAt));
+                trackedLinkMaintenanceService.updateTrackedLink(
+                        trackedLink.withLastCheck(Instant.now(), currentUpdatedAt));
                 log.atInfo()
                         .addKeyValue("chatId", trackedLink.chatId())
                         .addKeyValue("linkId", trackedLink.id())
                         .addKeyValue("url", trackedLink.url())
                         .log("Link update notification sent");
             } else {
-                linkService.updateTrackedLink(trackedLink.withLastCheck(Instant.now(), trackedLink.lastUpdatedAt()));
+                trackedLinkMaintenanceService.updateTrackedLink(
+                        trackedLink.withLastCheck(Instant.now(), trackedLink.lastUpdatedAt()));
             }
         }
 

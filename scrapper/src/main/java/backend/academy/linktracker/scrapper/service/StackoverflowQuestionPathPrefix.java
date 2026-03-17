@@ -51,6 +51,9 @@ enum StackoverflowQuestionPathPrefix {
      * @return найденное enum-значение или пустой результат
      */
     static Optional<StackoverflowQuestionPathPrefix> fromSymbol(String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return Optional.empty();
+        }
         return Optional.ofNullable(BY_SYMBOL.get(symbol));
     }
 }

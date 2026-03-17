@@ -60,13 +60,21 @@ public class BotGrpcServerLifecycle implements ApplicationRunner {
             return;
         }
 
-        server = ServerBuilder.forPort(grpcServerProperties.getPort())
-                .addService(new BotUpdatesGrpcService(updateNotificationService))
-                .build();
-        server.start();
-        log.atInfo()
-                .addKeyValue("grpcServerPort", grpcServerProperties.getPort())
-                .log("Bot gRPC server started");
+        try {
+            server = ServerBuilder.forPort(grpcServerProperties.getPort())
+                    .addService(new BotUpdatesGrpcService(updateNotificationService))
+                    .build();
+            server.start();
+            log.atInfo()
+                    .addKeyValue("grpcServerPort", grpcServerProperties.getPort())
+                    .log("Bot gRPC server started");
+        } catch (IOException exception) {
+            log.atError()
+                    .setCause(exception)
+                    .addKeyValue("grpcServerPort", grpcServerProperties.getPort())
+                    .log("Failed to start bot gRPC server");
+            throw exception;
+        }
     }
 
     /**

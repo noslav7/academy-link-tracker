@@ -1,6 +1,7 @@
 package backend.academy.linktracker.scrapper.repository.sql;
 
 import backend.academy.linktracker.scrapper.domain.TrackedLink;
+import backend.academy.linktracker.scrapper.repository.AbstractPagingAwareTrackedLinkRepository;
 import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -25,7 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Repository
 @ConditionalOnProperty(prefix = "app.database", name = "access-type", havingValue = "SQL", matchIfMissing = true)
-public class SqlTrackedLinkRepository implements TrackedLinkRepository {
+public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepository
+        implements TrackedLinkRepository {
 
     private static final RowMapper<LinkRow> LINK_ROW_MAPPER = SqlTrackedLinkRepository::mapLinkRow;
 
@@ -104,7 +106,7 @@ public class SqlTrackedLinkRepository implements TrackedLinkRepository {
 
     @Override
     public List<TrackedLink> findAllByChatId(long chatId, int limit, int offset) {
-        if (limit <= 0 || offset < 0) {
+        if (hasInvalidPaging(limit, offset)) {
             return List.of();
         }
         List<LinkRow> rows = jdbcTemplate.query("""
@@ -125,7 +127,7 @@ public class SqlTrackedLinkRepository implements TrackedLinkRepository {
 
     @Override
     public List<TrackedLink> findAllTrackedLinks(int limit, int offset) {
-        if (limit <= 0 || offset < 0) {
+        if (hasInvalidPaging(limit, offset)) {
             return List.of();
         }
         List<LinkRow> rows = jdbcTemplate.query("""

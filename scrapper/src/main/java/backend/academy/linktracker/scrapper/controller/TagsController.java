@@ -23,8 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/tags")
 public class TagsController {
 
-    private static final String CHAT_HEADER = "Tg-Chat-Id";
-
     private final TagService tagService;
 
     public TagsController(TagService tagService) {
@@ -33,24 +31,27 @@ public class TagsController {
 
     @GetMapping
     public ResponseEntity<ListTagsResponse> list(
-            @RequestHeader(CHAT_HEADER) long chatId, @RequestParam("link") String link) {
+            @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @RequestParam("link") String link) {
         return ResponseEntity.ok(tagService.list(chatId, link));
     }
 
     @PostMapping
-    public ResponseEntity<Void> add(@RequestHeader(CHAT_HEADER) long chatId, @RequestBody AddTagRequest request) {
+    public ResponseEntity<Void> add(
+            @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @RequestBody AddTagRequest request) {
         tagService.add(chatId, request);
         return ResponseEntity.ok().build();
     }
 
     @PutMapping
-    public ResponseEntity<Void> update(@RequestHeader(CHAT_HEADER) long chatId, @RequestBody UpdateTagRequest request) {
+    public ResponseEntity<Void> update(
+            @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @RequestBody UpdateTagRequest request) {
         tagService.update(chatId, request);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> remove(@RequestHeader(CHAT_HEADER) long chatId, @RequestBody RemoveTagRequest request) {
+    public ResponseEntity<Void> remove(
+            @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @RequestBody RemoveTagRequest request) {
         tagService.delete(chatId, request);
         return ResponseEntity.ok().build();
     }

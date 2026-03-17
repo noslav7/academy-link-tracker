@@ -27,11 +27,13 @@ class LinkUpdatesSchedulerTest {
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
 
         TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
-        LinkService linkService = new LinkService(
-                repository,
+        LinkMetadataResolver linkMetadataResolver =
                 new LinkMetadataResolver(new LinkFormatMetadataResolverFactory(List.of(
                         new GithubLinkMetadataResolver(githubClient),
-                        new StackoverflowLinkMetadataResolver(stackoverflowClient)))));
+                        new StackoverflowLinkMetadataResolver(stackoverflowClient))));
+        ChatLinkAccessValidator accessValidator = new ChatLinkAccessValidator(repository);
+        LinkService linkService = new LinkService(repository, linkMetadataResolver, accessValidator);
+        TrackedLinkMaintenanceService trackedLinkMaintenanceService = new TrackedLinkMaintenanceService(repository);
         ChatService chatService = new ChatService(repository);
         chatService.register(42L);
         chatService.register(77L);
@@ -40,8 +42,8 @@ class LinkUpdatesSchedulerTest {
         CapturingBotNotificationsClient notificationsClient = new CapturingBotNotificationsClient();
         SchedulerProperties schedulerProperties = new SchedulerProperties();
         schedulerProperties.setInterval(Duration.ofSeconds(30));
-        LinkUpdatesScheduler scheduler =
-                new LinkUpdatesScheduler(linkService, notificationsClient, schedulerProperties);
+        LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(
+                trackedLinkMaintenanceService, linkMetadataResolver, notificationsClient, schedulerProperties);
 
         githubUpdatedAt.set(Instant.parse("2026-02-26T00:00:00Z"));
         scheduler.checkUpdates();
@@ -58,11 +60,13 @@ class LinkUpdatesSchedulerTest {
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
 
         TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
-        LinkService linkService = new LinkService(
-                repository,
+        LinkMetadataResolver linkMetadataResolver =
                 new LinkMetadataResolver(new LinkFormatMetadataResolverFactory(List.of(
                         new GithubLinkMetadataResolver(githubClient),
-                        new StackoverflowLinkMetadataResolver(stackoverflowClient)))));
+                        new StackoverflowLinkMetadataResolver(stackoverflowClient))));
+        ChatLinkAccessValidator accessValidator = new ChatLinkAccessValidator(repository);
+        LinkService linkService = new LinkService(repository, linkMetadataResolver, accessValidator);
+        TrackedLinkMaintenanceService trackedLinkMaintenanceService = new TrackedLinkMaintenanceService(repository);
         ChatService chatService = new ChatService(repository);
         chatService.register(42L);
         linkService.add(42L, new AddLinkRequest("https://github.com/user/repo", List.of("work"), List.of()));
@@ -70,8 +74,8 @@ class LinkUpdatesSchedulerTest {
         CapturingBotNotificationsClient notificationsClient = new CapturingBotNotificationsClient();
         SchedulerProperties schedulerProperties = new SchedulerProperties();
         schedulerProperties.setInterval(Duration.ofSeconds(30));
-        LinkUpdatesScheduler scheduler =
-                new LinkUpdatesScheduler(linkService, notificationsClient, schedulerProperties);
+        LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(
+                trackedLinkMaintenanceService, linkMetadataResolver, notificationsClient, schedulerProperties);
 
         scheduler.checkUpdates();
 

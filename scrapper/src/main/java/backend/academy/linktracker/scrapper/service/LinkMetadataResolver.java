@@ -31,7 +31,8 @@ public class LinkMetadataResolver {
      * @return время последнего обновления ресурса
      */
     public Instant resolveLastUpdated(String link) {
-        URI uri = URI.create(link);
+        String normalizedLink = RequestFieldNormalizer.normalizeLink(link);
+        URI uri = URI.create(normalizedLink);
         LinkFormatMetadataResolver resolver = resolverFactory.getResolver(uri);
         return resolver.resolveLastUpdated(uri);
     }

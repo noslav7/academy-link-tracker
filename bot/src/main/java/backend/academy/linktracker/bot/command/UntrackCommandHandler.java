@@ -3,7 +3,7 @@ package backend.academy.linktracker.bot.command;
 import backend.academy.linktracker.bot.client.LinkNotFoundException;
 import backend.academy.linktracker.bot.client.ScrapperClient;
 import backend.academy.linktracker.bot.client.ScrapperClientException;
-import java.net.URI;
+import backend.academy.linktracker.bot.service.TrackDialogInputParser;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,15 +16,21 @@ public class UntrackCommandHandler extends AbstractBotCommandHandler {
      * Клиент удаления подписок в scrapper.
      */
     private final ScrapperClient scrapperClient;
+    /**
+     * Компонент валидации пользовательского URL-ввода.
+     */
+    private final TrackDialogInputParser inputParser;
 
     /**
      * Создает обработчик команды {@code /untrack}.
      *
      * @param scrapperClient клиент scrapper-сервиса
+     * @param inputParser компонент валидации URL
      */
-    public UntrackCommandHandler(ScrapperClient scrapperClient) {
+    public UntrackCommandHandler(ScrapperClient scrapperClient, TrackDialogInputParser inputParser) {
         super("/untrack", "прекратить отслеживание ссылки");
         this.scrapperClient = scrapperClient;
+        this.inputParser = inputParser;
     }
 
     /**
@@ -33,7 +39,7 @@ public class UntrackCommandHandler extends AbstractBotCommandHandler {
     @Override
     public String handle(long chatId, String messageText) {
         String[] tokens = messageText.trim().split("\\s+", 2);
-        if (tokens.length < 2 || !isValidUrl(tokens[1])) {
+        if (tokens.length < 2 || !inputParser.isValidUrl(tokens[1])) {
             return BotMessages.UNTRACK_USAGE;
         }
 
@@ -44,21 +50,6 @@ public class UntrackCommandHandler extends AbstractBotCommandHandler {
             return BotMessages.UNTRACK_NOT_FOUND;
         } catch (ScrapperClientException ex) {
             return BotMessages.UNTRACK_FAILED;
-        }
-    }
-
-    /**
-     * Проверяет корректность URL ссылки.
-     *
-     * @param value строковое значение ссылки
-     * @return {@code true}, если ссылка валидна
-     */
-    private static boolean isValidUrl(String value) {
-        try {
-            URI uri = URI.create(value.trim());
-            return uri.getScheme() != null && uri.getHost() != null;
-        } catch (RuntimeException ex) {
-            return false;
         }
     }
 }

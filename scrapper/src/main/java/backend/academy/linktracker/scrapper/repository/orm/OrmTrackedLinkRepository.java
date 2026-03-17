@@ -1,6 +1,7 @@
 package backend.academy.linktracker.scrapper.repository.orm;
 
 import backend.academy.linktracker.scrapper.domain.TrackedLink;
+import backend.academy.linktracker.scrapper.repository.AbstractPagingAwareTrackedLinkRepository;
 import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
 import backend.academy.linktracker.scrapper.repository.orm.entity.ChatEntity;
 import backend.academy.linktracker.scrapper.repository.orm.entity.TrackedLinkEntity;
@@ -22,7 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Repository
 @ConditionalOnProperty(prefix = "app.database", name = "access-type", havingValue = "ORM")
-public class OrmTrackedLinkRepository implements TrackedLinkRepository {
+public class OrmTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepository
+        implements TrackedLinkRepository {
 
     private final ChatJpaRepository chatJpaRepository;
     private final TrackedLinkJpaRepository trackedLinkJpaRepository;
@@ -103,7 +105,7 @@ public class OrmTrackedLinkRepository implements TrackedLinkRepository {
     @Override
     @Transactional(readOnly = true)
     public List<TrackedLink> findAllByChatId(long chatId, int limit, int offset) {
-        if (limit <= 0 || offset < 0) {
+        if (hasInvalidPaging(limit, offset)) {
             return List.of();
         }
         int page = offset / limit;
@@ -112,13 +114,7 @@ public class OrmTrackedLinkRepository implements TrackedLinkRepository {
                 trackedLinkJpaRepository.findByChatChatIdOrderById(chatId, PageRequest.of(page, limit)).stream()
                         .map(this::toDomain)
                         .toList();
-        if (intraOffset == 0) {
-            return links;
-        }
-        if (intraOffset >= links.size()) {
-            return List.of();
-        }
-        return links.subList(intraOffset, links.size());
+        return applyIntraPageOffset(links, intraOffset);
     }
 
     @Override
@@ -130,7 +126,7 @@ public class OrmTrackedLinkRepository implements TrackedLinkRepository {
     @Override
     @Transactional(readOnly = true)
     public List<TrackedLink> findAllTrackedLinks(int limit, int offset) {
-        if (limit <= 0 || offset < 0) {
+        if (hasInvalidPaging(limit, offset)) {
             return List.of();
         }
         int page = offset / limit;
@@ -138,13 +134,7 @@ public class OrmTrackedLinkRepository implements TrackedLinkRepository {
         List<TrackedLink> links = trackedLinkJpaRepository.findAllByOrderById(PageRequest.of(page, limit)).stream()
                 .map(this::toDomain)
                 .toList();
-        if (intraOffset == 0) {
-            return links;
-        }
-        if (intraOffset >= links.size()) {
-            return List.of();
-        }
-        return links.subList(intraOffset, links.size());
+        return applyIntraPageOffset(links, intraOffset);
     }
 
     @Override
@@ -229,5 +219,15 @@ public class OrmTrackedLinkRepository implements TrackedLinkRepository {
                         .toList(),
                 entity.getLastCheckedAt(),
                 entity.getLastUpdatedAt());
+    }
+
+    private List<TrackedLink> applyIntraPageOffset(List<TrackedLink> links, int intraOffset) {
+        if (intraOffset == 0) {
+            return links;
+        }
+        if (intraOffset >= links.size()) {
+            return List.of();
+        }
+        return links.subList(intraOffset, links.size());
     }
 }

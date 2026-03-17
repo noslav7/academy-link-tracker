@@ -4,6 +4,7 @@ import backend.academy.linktracker.bot.client.GrpcScrapperClient;
 import backend.academy.linktracker.bot.client.RestScrapperClient;
 import backend.academy.linktracker.bot.client.ScrapperClient;
 import backend.academy.linktracker.bot.properties.ScrapperProperties;
+import backend.academy.linktracker.bot.properties.TransportMode;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -49,7 +50,11 @@ public class ScrapperClientConfiguration {
      * @return HTTP-клиент scrapper
      */
     @Bean
-    @ConditionalOnProperty(prefix = "app.scrapper", name = "transport", havingValue = "HTTP", matchIfMissing = true)
+    @ConditionalOnProperty(
+            prefix = "app.scrapper",
+            name = "transport",
+            havingValue = TransportMode.HTTP_VALUE,
+            matchIfMissing = true)
     ScrapperClient restModeScrapperClient(RestClient scrapperRestClient) {
         return new RestScrapperClient(scrapperRestClient);
     }
@@ -61,7 +66,7 @@ public class ScrapperClientConfiguration {
      * @return gRPC-клиент scrapper
      */
     @Bean
-    @ConditionalOnProperty(prefix = "app.scrapper", name = "transport", havingValue = "GRPC")
+    @ConditionalOnProperty(prefix = "app.scrapper", name = "transport", havingValue = TransportMode.GRPC_VALUE)
     ScrapperClient grpcModeScrapperClient(ManagedChannel scrapperGrpcChannel) {
         return new GrpcScrapperClient(scrapperGrpcChannel);
     }
