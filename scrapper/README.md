@@ -87,6 +87,10 @@ Unix/macOS:
 - `GET /links` + заголовок `Tg-Chat-Id` — получить список ссылок чата.
 - `POST /links` + заголовок `Tg-Chat-Id` — добавить ссылку.
 - `DELETE /links` + заголовок `Tg-Chat-Id` — удалить ссылку.
+- `GET /tags?link=...` + заголовок `Tg-Chat-Id` — получить теги конкретной подписки.
+- `POST /tags` + заголовок `Tg-Chat-Id` — добавить тег к подписке.
+- `PUT /tags` + заголовок `Tg-Chat-Id` — переименовать тег подписки.
+- `DELETE /tags` + заголовок `Tg-Chat-Id` — удалить тег у подписки.
 
 Пример тела `POST /links`:
 
@@ -103,6 +107,15 @@ Unix/macOS:
 ```json
 {
   "link": "https://github.com/octocat/Hello-World"
+}
+```
+
+Пример тела `POST /tags`:
+
+```json
+{
+  "link": "https://github.com/octocat/Hello-World",
+  "tag": "important"
 }
 ```
 

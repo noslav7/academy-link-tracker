@@ -88,4 +88,27 @@ class OrmTrackedLinkRepositoryIntegrationTest {
         assertTrue(repository.deleteChat(13L));
         assertFalse(repository.chatExists(13L));
     }
+
+    @Test
+    void givenTrackedLinkWhenTagCrudOperationsThenStateIsUpdated() {
+        assertTrue(repository.registerChat(14L));
+        repository.save(
+                14L,
+                "https://example.com/post/2",
+                List.of("initial"),
+                List.of(),
+                Instant.parse("2026-03-01T00:00:00Z"));
+
+        assertEquals(List.of("initial"), repository.findTagsByChatIdAndUrl(14L, "https://example.com/post/2"));
+
+        assertTrue(repository.addTag(14L, "https://example.com/post/2", "urgent"));
+        assertFalse(repository.addTag(14L, "https://example.com/post/2", "urgent"));
+
+        assertTrue(repository.updateTag(14L, "https://example.com/post/2", "urgent", "high-priority"));
+        assertFalse(repository.updateTag(14L, "https://example.com/post/2", "unknown", "new-tag"));
+
+        assertTrue(repository.deleteTag(14L, "https://example.com/post/2", "high-priority"));
+        assertFalse(repository.deleteTag(14L, "https://example.com/post/2", "high-priority"));
+        assertEquals(List.of("initial"), repository.findTagsByChatIdAndUrl(14L, "https://example.com/post/2"));
+    }
 }

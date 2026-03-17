@@ -5,6 +5,8 @@ import backend.academy.linktracker.scrapper.exception.ChatAlreadyRegisteredExcep
 import backend.academy.linktracker.scrapper.exception.ChatNotFoundException;
 import backend.academy.linktracker.scrapper.exception.LinkAlreadyTrackedException;
 import backend.academy.linktracker.scrapper.exception.LinkNotFoundException;
+import backend.academy.linktracker.scrapper.exception.TagAlreadyExistsException;
+import backend.academy.linktracker.scrapper.exception.TagNotFoundException;
 import backend.academy.linktracker.scrapper.exception.UnsupportedLinkException;
 import java.util.Arrays;
 import org.springframework.http.HttpStatus;
@@ -27,6 +29,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler({
         ChatNotFoundException.class,
         LinkNotFoundException.class,
+        TagNotFoundException.class,
     })
     public ResponseEntity<ApiErrorResponse> handleNotFound(RuntimeException ex) {
         return build(HttpStatus.NOT_FOUND, ex);
@@ -41,6 +44,7 @@ public class ApiExceptionHandler {
     @ExceptionHandler({
         LinkAlreadyTrackedException.class,
         ChatAlreadyRegisteredException.class,
+        TagAlreadyExistsException.class,
     })
     public ResponseEntity<ApiErrorResponse> handleConflict(RuntimeException ex) {
         return build(HttpStatus.CONFLICT, ex);

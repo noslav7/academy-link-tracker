@@ -85,4 +85,23 @@ class SqlTrackedLinkRepositoryIntegrationTest {
         assertTrue(repository.deleteChat(3L));
         assertFalse(repository.chatExists(3L));
     }
+
+    @Test
+    void givenTrackedLinkWhenTagCrudOperationsThenStateIsUpdated() {
+        assertTrue(repository.registerChat(4L));
+        repository.save(
+                4L, "https://example.com/post/1", List.of("initial"), List.of(), Instant.parse("2026-03-01T00:00:00Z"));
+
+        assertEquals(List.of("initial"), repository.findTagsByChatIdAndUrl(4L, "https://example.com/post/1"));
+
+        assertTrue(repository.addTag(4L, "https://example.com/post/1", "urgent"));
+        assertFalse(repository.addTag(4L, "https://example.com/post/1", "urgent"));
+
+        assertTrue(repository.updateTag(4L, "https://example.com/post/1", "urgent", "high-priority"));
+        assertFalse(repository.updateTag(4L, "https://example.com/post/1", "unknown", "new-tag"));
+
+        assertTrue(repository.deleteTag(4L, "https://example.com/post/1", "high-priority"));
+        assertFalse(repository.deleteTag(4L, "https://example.com/post/1", "high-priority"));
+        assertEquals(List.of("initial"), repository.findTagsByChatIdAndUrl(4L, "https://example.com/post/1"));
+    }
 }

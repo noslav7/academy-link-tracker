@@ -103,4 +103,44 @@ public interface TrackedLinkRepository {
      * @param trackedLink обновленная ссылка
      */
     void updateTrackedLink(TrackedLink trackedLink);
+
+    /**
+     * Возвращает теги подписки по URL ссылки.
+     *
+     * @param chatId идентификатор чата
+     * @param url URL ссылки
+     * @return список тегов
+     */
+    List<String> findTagsByChatIdAndUrl(long chatId, String url);
+
+    /**
+     * Добавляет тег к существующей подписке.
+     *
+     * @param chatId идентификатор чата
+     * @param url URL ссылки
+     * @param tag значение тега
+     * @return {@code true}, если тег добавлен
+     */
+    boolean addTag(long chatId, String url, String tag);
+
+    /**
+     * Обновляет значение тега у существующей подписки.
+     *
+     * @param chatId идентификатор чата
+     * @param url URL ссылки
+     * @param oldTag текущее значение тега
+     * @param newTag новое значение тега
+     * @return {@code true}, если тег обновлен
+     */
+    boolean updateTag(long chatId, String url, String oldTag, String newTag);
+
+    /**
+     * Удаляет тег у существующей подписки.
+     *
+     * @param chatId идентификатор чата
+     * @param url URL ссылки
+     * @param tag значение тега
+     * @return {@code true}, если тег удален
+     */
+    boolean deleteTag(long chatId, String url, String tag);
 }

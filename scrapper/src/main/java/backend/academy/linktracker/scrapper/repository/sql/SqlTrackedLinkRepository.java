@@ -151,6 +151,70 @@ public class SqlTrackedLinkRepository implements TrackedLinkRepository {
                 trackedLink.id());
     }
 
+    @Override
+    public List<String> findTagsByChatIdAndUrl(long chatId, String url) {
+        Long trackedLinkId = trackedLinkId(chatId, url);
+        if (trackedLinkId == null) {
+            return List.of();
+        }
+        return jdbcTemplate.query(
+                "select tag from tracked_link_tags where tracked_link_id = ? order by tag",
+                (rs, rowNum) -> rs.getString("tag"),
+                trackedLinkId);
+    }
+
+    @Override
+    @Transactional
+    public boolean addTag(long chatId, String url, String tag) {
+        Long trackedLinkId = trackedLinkId(chatId, url);
+        if (trackedLinkId == null) {
+            return false;
+        }
+        return jdbcTemplate.update(
+                        "insert into tracked_link_tags(tracked_link_id, tag) values (?, ?) on conflict do nothing",
+                        trackedLinkId,
+                        tag)
+                > 0;
+    }
+
+    @Override
+    @Transactional
+    public boolean updateTag(long chatId, String url, String oldTag, String newTag) {
+        Long trackedLinkId = trackedLinkId(chatId, url);
+        if (trackedLinkId == null) {
+            return false;
+        }
+        if (oldTag.equals(newTag)) {
+            return true;
+        }
+        if (jdbcTemplate.queryForObject(
+                        "select exists(select 1 from tracked_link_tags where tracked_link_id = ? and tag = ?)",
+                        Boolean.class,
+                        trackedLinkId,
+                        newTag)
+                == Boolean.TRUE) {
+            return false;
+        }
+        return jdbcTemplate.update(
+                        "update tracked_link_tags set tag = ? where tracked_link_id = ? and tag = ?",
+                        newTag,
+                        trackedLinkId,
+                        oldTag)
+                > 0;
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteTag(long chatId, String url, String tag) {
+        Long trackedLinkId = trackedLinkId(chatId, url);
+        if (trackedLinkId == null) {
+            return false;
+        }
+        return jdbcTemplate.update(
+                        "delete from tracked_link_tags where tracked_link_id = ? and tag = ?", trackedLinkId, tag)
+                > 0;
+    }
+
     private List<TrackedLink> toTrackedLinks(List<LinkRow> rows) {
         if (rows.isEmpty()) {
             return List.of();
@@ -217,6 +281,15 @@ public class SqlTrackedLinkRepository implements TrackedLinkRepository {
                     ps.setLong(1, trackedLinkId);
                     ps.setString(2, value);
                 });
+    }
+
+    private Long trackedLinkId(long chatId, String url) {
+        List<Long> ids = jdbcTemplate.query(
+                "select id from tracked_links where chat_id = ? and url = ?",
+                (rs, rowNum) -> rs.getLong("id"),
+                chatId,
+                url);
+        return ids.isEmpty() ? null : ids.getFirst();
     }
 
     private static LinkRow mapLinkRow(ResultSet rs, int rowNum) throws SQLException {
