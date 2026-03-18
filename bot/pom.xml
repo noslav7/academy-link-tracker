@@ -237,6 +237,8 @@
                             <goal>compile</goal>
                         </goals>
                         <configuration>
+                            <outputDirectory>${project.build.directory}/generated-sources/protobuf/java</outputDirectory>
+                            <clearOutputDirectory>false</clearOutputDirectory>
                             <temporaryProtoFileDirectory>${project.build.directory}/protoc-dependencies-compile-${maven.build.timestamp}</temporaryProtoFileDirectory>
                         </configuration>
                     </execution>
@@ -246,6 +248,8 @@
                             <goal>compile-custom</goal>
                         </goals>
                         <configuration>
+                            <outputDirectory>${project.build.directory}/generated-sources/protobuf/grpc-java</outputDirectory>
+                            <clearOutputDirectory>false</clearOutputDirectory>
                             <temporaryProtoFileDirectory>${project.build.directory}/protoc-dependencies-grpc-${maven.build.timestamp}</temporaryProtoFileDirectory>
                         </configuration>
                     </execution>
