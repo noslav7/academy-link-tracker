@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 /**
  * Конфигурация клиента Telegram Bot API.
@@ -32,7 +33,7 @@ public class TelegramConfiguration {
     public TelegramBot telegramBot(
             TelegramProperties properties,
             BotCommandDispatcher commandDispatcher,
-            TelegramUpdateProcessor updateProcessor) {
+            @Lazy TelegramUpdateProcessor updateProcessor) {
         var builder = new TelegramBot.Builder(properties.getToken())
                 .apiUrl(properties.getUrl())
                 .updateListenerSleep(properties.getUpdateListenerSleep().toMillis());
