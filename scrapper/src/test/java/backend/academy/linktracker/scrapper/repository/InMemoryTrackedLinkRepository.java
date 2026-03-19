@@ -158,25 +158,24 @@ public class InMemoryTrackedLinkRepository extends AbstractPagingAwareTrackedLin
      */
     @Override
     public boolean addTag(long chatId, String url, String tag) {
-        Optional<TrackedLink> existing = findByChatIdAndUrl(chatId, url);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        TrackedLink trackedLink = existing.get();
-        if (trackedLink.tags().contains(tag)) {
-            return false;
-        }
-        List<String> updatedTags = new java.util.ArrayList<>(trackedLink.tags());
-        updatedTags.add(tag);
-        updateTrackedLink(new TrackedLink(
-                trackedLink.id(),
-                trackedLink.chatId(),
-                trackedLink.url(),
-                List.copyOf(updatedTags),
-                trackedLink.filters(),
-                trackedLink.lastCheckedAt(),
-                trackedLink.lastUpdatedAt()));
-        return true;
+        return findByChatIdAndUrl(chatId, url)
+                .map(trackedLink -> {
+                    if (trackedLink.tags().contains(tag)) {
+                        return false;
+                    }
+                    List<String> updatedTags = new java.util.ArrayList<>(trackedLink.tags());
+                    updatedTags.add(tag);
+                    updateTrackedLink(new TrackedLink(
+                            trackedLink.id(),
+                            trackedLink.chatId(),
+                            trackedLink.url(),
+                            List.copyOf(updatedTags),
+                            trackedLink.filters(),
+                            trackedLink.lastCheckedAt(),
+                            trackedLink.lastUpdatedAt()));
+                    return true;
+                })
+                .orElse(false);
     }
 
     /**
@@ -184,26 +183,26 @@ public class InMemoryTrackedLinkRepository extends AbstractPagingAwareTrackedLin
      */
     @Override
     public boolean updateTag(long chatId, String url, String oldTag, String newTag) {
-        Optional<TrackedLink> existing = findByChatIdAndUrl(chatId, url);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        TrackedLink trackedLink = existing.get();
-        if (!trackedLink.tags().contains(oldTag) || trackedLink.tags().contains(newTag)) {
-            return false;
-        }
-        List<String> updatedTags = trackedLink.tags().stream()
-                .map(tag -> tag.equals(oldTag) ? newTag : tag)
-                .toList();
-        updateTrackedLink(new TrackedLink(
-                trackedLink.id(),
-                trackedLink.chatId(),
-                trackedLink.url(),
-                List.copyOf(updatedTags),
-                trackedLink.filters(),
-                trackedLink.lastCheckedAt(),
-                trackedLink.lastUpdatedAt()));
-        return true;
+        return findByChatIdAndUrl(chatId, url)
+                .map(trackedLink -> {
+                    if (!trackedLink.tags().contains(oldTag)
+                            || trackedLink.tags().contains(newTag)) {
+                        return false;
+                    }
+                    List<String> updatedTags = trackedLink.tags().stream()
+                            .map(tag -> tag.equals(oldTag) ? newTag : tag)
+                            .toList();
+                    updateTrackedLink(new TrackedLink(
+                            trackedLink.id(),
+                            trackedLink.chatId(),
+                            trackedLink.url(),
+                            List.copyOf(updatedTags),
+                            trackedLink.filters(),
+                            trackedLink.lastCheckedAt(),
+                            trackedLink.lastUpdatedAt()));
+                    return true;
+                })
+                .orElse(false);
     }
 
     /**
@@ -211,25 +210,24 @@ public class InMemoryTrackedLinkRepository extends AbstractPagingAwareTrackedLin
      */
     @Override
     public boolean deleteTag(long chatId, String url, String tag) {
-        Optional<TrackedLink> existing = findByChatIdAndUrl(chatId, url);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        TrackedLink trackedLink = existing.get();
-        if (!trackedLink.tags().contains(tag)) {
-            return false;
-        }
-        List<String> updatedTags = trackedLink.tags().stream()
-                .filter(existingTag -> !existingTag.equals(tag))
-                .toList();
-        updateTrackedLink(new TrackedLink(
-                trackedLink.id(),
-                trackedLink.chatId(),
-                trackedLink.url(),
-                List.copyOf(updatedTags),
-                trackedLink.filters(),
-                trackedLink.lastCheckedAt(),
-                trackedLink.lastUpdatedAt()));
-        return true;
+        return findByChatIdAndUrl(chatId, url)
+                .map(trackedLink -> {
+                    if (!trackedLink.tags().contains(tag)) {
+                        return false;
+                    }
+                    List<String> updatedTags = trackedLink.tags().stream()
+                            .filter(existingTag -> !existingTag.equals(tag))
+                            .toList();
+                    updateTrackedLink(new TrackedLink(
+                            trackedLink.id(),
+                            trackedLink.chatId(),
+                            trackedLink.url(),
+                            List.copyOf(updatedTags),
+                            trackedLink.filters(),
+                            trackedLink.lastCheckedAt(),
+                            trackedLink.lastUpdatedAt()));
+                    return true;
+                })
+                .orElse(false);
     }
 }

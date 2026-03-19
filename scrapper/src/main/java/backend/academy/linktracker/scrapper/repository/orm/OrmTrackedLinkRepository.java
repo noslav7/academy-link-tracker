@@ -88,12 +88,13 @@ public class OrmTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
     @Override
     @Transactional
     public boolean deleteByChatIdAndUrl(long chatId, String url) {
-        Optional<TrackedLinkEntity> existing = trackedLinkJpaRepository.findByChatChatIdAndUrl(chatId, url);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        trackedLinkJpaRepository.delete(existing.get());
-        return true;
+        return trackedLinkJpaRepository
+                .findByChatChatIdAndUrl(chatId, url)
+                .map(entity -> {
+                    trackedLinkJpaRepository.delete(entity);
+                    return true;
+                })
+                .orElse(false);
     }
 
     @Override
@@ -161,51 +162,50 @@ public class OrmTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
     @Override
     @Transactional
     public boolean addTag(long chatId, String url, String tag) {
-        Optional<TrackedLinkEntity> existing = trackedLinkJpaRepository.findByChatChatIdAndUrl(chatId, url);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        TrackedLinkEntity entity = existing.get();
-        if (entity.getTags().stream()
-                .anyMatch(existingTag -> existingTag.getTag().equals(tag))) {
-            return false;
-        }
-        entity.getTags().add(new TrackedLinkTagEntity(entity, tag));
-        return true;
+        return trackedLinkJpaRepository
+                .findByChatChatIdAndUrl(chatId, url)
+                .map(entity -> {
+                    if (entity.getTags().stream()
+                            .anyMatch(existingTag -> existingTag.getTag().equals(tag))) {
+                        return false;
+                    }
+                    entity.getTags().add(new TrackedLinkTagEntity(entity, tag));
+                    return true;
+                })
+                .orElse(false);
     }
 
     @Override
     @Transactional
     public boolean updateTag(long chatId, String url, String oldTag, String newTag) {
-        Optional<TrackedLinkEntity> existing = trackedLinkJpaRepository.findByChatChatIdAndUrl(chatId, url);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        TrackedLinkEntity entity = existing.get();
-        boolean newTagExists =
-                entity.getTags().stream().anyMatch(tag -> tag.getTag().equals(newTag));
-        if (newTagExists) {
-            return false;
-        }
+        return trackedLinkJpaRepository
+                .findByChatChatIdAndUrl(chatId, url)
+                .map(entity -> {
+                    boolean newTagExists = entity.getTags().stream()
+                            .anyMatch(tagEntity -> tagEntity.getTag().equals(newTag));
+                    if (newTagExists) {
+                        return false;
+                    }
 
-        for (int index = 0; index < entity.getTags().size(); index++) {
-            if (entity.getTags().get(index).getTag().equals(oldTag)) {
-                entity.getTags().set(index, new TrackedLinkTagEntity(entity, newTag));
-                return true;
-            }
-        }
-        return false;
+                    for (int index = 0; index < entity.getTags().size(); index++) {
+                        if (entity.getTags().get(index).getTag().equals(oldTag)) {
+                            entity.getTags().set(index, new TrackedLinkTagEntity(entity, newTag));
+                            return true;
+                        }
+                    }
+                    return false;
+                })
+                .orElse(false);
     }
 
     @Override
     @Transactional
     public boolean deleteTag(long chatId, String url, String tag) {
-        Optional<TrackedLinkEntity> existing = trackedLinkJpaRepository.findByChatChatIdAndUrl(chatId, url);
-        if (existing.isEmpty()) {
-            return false;
-        }
-        TrackedLinkEntity entity = existing.get();
-        return entity.getTags().removeIf(existingTag -> existingTag.getTag().equals(tag));
+        return trackedLinkJpaRepository
+                .findByChatChatIdAndUrl(chatId, url)
+                .map(entity -> entity.getTags()
+                        .removeIf(existingTag -> existingTag.getTag().equals(tag)))
+                .orElse(false);
     }
 
     private TrackedLink toDomain(TrackedLinkEntity entity) {

@@ -30,6 +30,16 @@ public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
         implements TrackedLinkRepository {
 
     private static final RowMapper<LinkRow> LINK_ROW_MAPPER = SqlTrackedLinkRepository::mapLinkRow;
+    private static final String INSERT_TRACKED_LINK_TAG = """
+            insert into tracked_link_tags(tracked_link_id, tag)
+            values (?, ?)
+            on conflict do nothing
+            """;
+    private static final String INSERT_TRACKED_LINK_FILTER = """
+            insert into tracked_link_filters(tracked_link_id, filter_value)
+            values (?, ?)
+            on conflict do nothing
+            """;
 
     private final JdbcTemplate jdbcTemplate;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
@@ -189,12 +199,12 @@ public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
         if (oldTag.equals(newTag)) {
             return true;
         }
-        if (jdbcTemplate.queryForObject(
-                        "select exists(select 1 from tracked_link_tags where tracked_link_id = ? and tag = ?)",
-                        Boolean.class,
-                        trackedLinkId,
-                        newTag)
-                == Boolean.TRUE) {
+        Boolean newTagExists = jdbcTemplate.queryForObject(
+                "select exists(select 1 from tracked_link_tags where tracked_link_id = ? and tag = ?)",
+                Boolean.class,
+                trackedLinkId,
+                newTag);
+        if (Boolean.TRUE.equals(newTagExists)) {
             return false;
         }
         return jdbcTemplate.update(
@@ -275,14 +285,16 @@ public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
         if (values == null || values.isEmpty()) {
             return;
         }
-        jdbcTemplate.batchUpdate(
-                "insert into " + table + "(tracked_link_id, " + valueColumn + ") values (?, ?) on conflict do nothing",
-                values,
-                values.size(),
-                (ps, value) -> {
-                    ps.setLong(1, trackedLinkId);
-                    ps.setString(2, value);
-                });
+        String insertSql =
+                switch (table + ":" + valueColumn) {
+                    case "tracked_link_tags:tag" -> INSERT_TRACKED_LINK_TAG;
+                    case "tracked_link_filters:filter_value" -> INSERT_TRACKED_LINK_FILTER;
+                    default -> throw new IllegalArgumentException("Unsupported table/value column pair");
+                };
+        jdbcTemplate.batchUpdate(insertSql, values, values.size(), (ps, value) -> {
+            ps.setLong(1, trackedLinkId);
+            ps.setString(2, value);
+        });
     }
 
     private Long trackedLinkId(long chatId, String url) {
@@ -294,6 +306,8 @@ public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
         return ids.isEmpty() ? null : ids.getFirst();
     }
 
+    // `rowNum` требуется сигнатурой RowMapper, но в этом маппере не используется.
+    @SuppressWarnings("PMD.UnusedFormalParameter")
     private static LinkRow mapLinkRow(ResultSet rs, int rowNum) throws SQLException {
         return new LinkRow(
                 rs.getLong("id"),
