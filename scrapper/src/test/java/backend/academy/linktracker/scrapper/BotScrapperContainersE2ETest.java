@@ -52,8 +52,8 @@ class BotScrapperContainersE2ETest {
     private static final String SCRAPPER_IMAGE = "localhost/link-tracker-scrapper-it:test";
 
     static {
-        buildDockerImage(BOT_IMAGE, PROJECT_ROOT.resolve("bot/Dockerfile"));
-        buildDockerImage(SCRAPPER_IMAGE, PROJECT_ROOT.resolve("scrapper/Dockerfile"));
+        buildDockerImage(BOT_IMAGE, PROJECT_ROOT.resolve("bot/Dockerfile.it"));
+        buildDockerImage(SCRAPPER_IMAGE, PROJECT_ROOT.resolve("scrapper/Dockerfile.it"));
     }
 
     @SuppressWarnings("resource")
@@ -225,8 +225,7 @@ class BotScrapperContainersE2ETest {
 
     private void configureWiremock() {
         WireMock.configureFor(wiremock.getHost(), wiremock.getMappedPort(8080));
-        WireMock.resetAllRequests();
-        WireMock.resetAllScenarios();
+        WireMock.reset();
     }
 
     private void stubGithubUpdatedAt(String updatedAt, int priority) {

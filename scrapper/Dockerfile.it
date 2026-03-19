@@ -1,0 +1,5 @@
+FROM eclipse-temurin:25-jre
+WORKDIR /app
+COPY scrapper/target/scrapper-*.jar /app/app.jar
+EXPOSE 8081
+ENTRYPOINT ["java","-jar","/app/app.jar"]
