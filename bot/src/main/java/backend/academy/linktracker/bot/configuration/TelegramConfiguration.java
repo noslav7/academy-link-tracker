@@ -10,14 +10,13 @@ import com.pengrad.telegrambot.model.BotCommand;
 import com.pengrad.telegrambot.request.SetMyCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-@Configuration
 /**
  * Конфигурация клиента Telegram Bot API.
  */
+@Configuration
 public class TelegramConfiguration {
     private static final Logger log = LoggerFactory.getLogger(TelegramConfiguration.class);
 
@@ -26,10 +25,14 @@ public class TelegramConfiguration {
      *
      * @param properties параметры подключения к Telegram API
      * @param commandDispatcher источник зарегистрированных команд приложения
+     * @param updateProcessor обработчик входящих обновлений Telegram
      * @return настроенный клиент Telegram
      */
     @Bean(destroyMethod = "removeGetUpdatesListener")
-    public TelegramBot telegramBot(TelegramProperties properties, BotCommandDispatcher commandDispatcher) {
+    public TelegramBot telegramBot(
+            TelegramProperties properties,
+            BotCommandDispatcher commandDispatcher,
+            TelegramUpdateProcessor updateProcessor) {
         var builder = new TelegramBot.Builder(properties.getToken())
                 .apiUrl(properties.getUrl())
                 .updateListenerSleep(properties.getUpdateListenerSleep().toMillis());
@@ -40,33 +43,18 @@ public class TelegramConfiguration {
 
         TelegramBot telegramBot = builder.build();
         registerCommandsOnStartup(telegramBot, properties, commandDispatcher);
+        if (!properties.isPollingEnabled()) {
+            log.atInfo().addKeyValue("pollingEnabled", false).log("Telegram polling is disabled by configuration");
+            return telegramBot;
+        }
+
+        telegramBot.setUpdatesListener(updates -> {
+            updates.forEach(updateProcessor::process);
+            return UpdatesListener.CONFIRMED_UPDATES_ALL;
+        });
+
+        log.atInfo().addKeyValue("pollingEnabled", true).log("Telegram polling listener is started");
         return telegramBot;
-    }
-
-    /**
-     * Регистрирует и запускает Telegram polling после создания всех singleton-бинов.
-     *
-     * @param telegramBot клиент Telegram API
-     * @param properties параметры работы Telegram-клиента
-     * @param updateProcessor обработчик входящих обновлений Telegram
-     * @return инициализатор polling-слушателя на этапе завершения инициализации контекста
-     */
-    @Bean
-    public SmartInitializingSingleton telegramPollingInitializer(
-            TelegramBot telegramBot, TelegramProperties properties, TelegramUpdateProcessor updateProcessor) {
-        return () -> {
-            if (!properties.isPollingEnabled()) {
-                log.atInfo().addKeyValue("pollingEnabled", false).log("Telegram polling is disabled by configuration");
-                return;
-            }
-
-            telegramBot.setUpdatesListener(updates -> {
-                updates.forEach(updateProcessor::process);
-                return UpdatesListener.CONFIRMED_UPDATES_ALL;
-            });
-
-            log.atInfo().addKeyValue("pollingEnabled", true).log("Telegram polling listener is started");
-        };
     }
 
     /**
