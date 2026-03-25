@@ -15,6 +15,9 @@
 - Запуск `scrapper` выполняется вручную (локально или в контейнере).
 - После запуска проверка ссылок работает автоматически по scheduler.
 - Интервал проверки задается параметром `SCRAPPER_SCHEDULER_INTERVAL` (по умолчанию `30s`).
+- Ссылки загружаются пакетами (batch), размер пакета — `SCRAPPER_SCHEDULER_BATCH_SIZE` (по умолчанию `100`, допустимо 50–500).
+- Внутри каждого пакета ссылки обрабатываются параллельно — `SCRAPPER_SCHEDULER_THREAD_COUNT` потоков (по умолчанию `4`).
+- По итогам каждого запуска формируется отчёт: `runId`, `processedCount`, `successCount`, `failedCount`.
 
 ## Требования
 
@@ -36,6 +39,8 @@ LIQUIBASE_ENABLED=true
 BOT_BASE_URL=http://localhost:8080
 BOT_TRANSPORT=HTTP
 SCRAPPER_SCHEDULER_INTERVAL=30s
+SCRAPPER_SCHEDULER_BATCH_SIZE=100
+SCRAPPER_SCHEDULER_THREAD_COUNT=4
 
 # Опционально:
 GITHUB_TOKEN=

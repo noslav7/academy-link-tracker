@@ -44,16 +44,18 @@ public class GithubLinkMetadataResolver extends AbstractHostBasedLinkMetadataRes
         this.githubClient = githubClient;
     }
 
-    /**
-     * Получает время последнего обновления репозитория GitHub.
-     *
-     * @param uri ссылка в формате URI
-     * @return время последнего обновления репозитория
-     */
     @Override
     public Instant resolveLastUpdated(URI uri) {
         List<String> segments = extractPathSegments(uri);
         return githubClient.fetchRepositoryUpdatedAt(
                 segments.get(OWNER_SEGMENT_INDEX), segments.get(REPOSITORY_SEGMENT_INDEX));
+    }
+
+    @Override
+    public String describeUpdate(URI uri) {
+        List<String> segments = extractPathSegments(uri);
+        String owner = segments.get(OWNER_SEGMENT_INDEX);
+        String repo = segments.get(REPOSITORY_SEGMENT_INDEX);
+        return "Обновление в репозитории %s/%s (возможно: новый PR или Issue)".formatted(owner, repo);
     }
 }

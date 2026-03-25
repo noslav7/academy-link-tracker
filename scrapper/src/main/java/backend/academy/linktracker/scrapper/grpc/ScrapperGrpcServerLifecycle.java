@@ -15,6 +15,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Управляет жизненным циклом gRPC-сервера scrapper-сервиса.
+ *
+ * <p>Используется {@link ApplicationRunner} вместо конструктора/PostConstruct,
+ * поскольку gRPC-сервер открывает сетевой порт и начинает принимать запросы —
+ * это допустимо только после полной инициализации контекста Spring,
+ * чтобы входящие вызовы не попадали на частично инициализированные бины.
  */
 @Component
 public class ScrapperGrpcServerLifecycle implements ApplicationRunner {

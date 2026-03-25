@@ -22,4 +22,14 @@ public interface LinkFormatMetadataResolver {
      * @return время последнего обновления
      */
     Instant resolveLastUpdated(URI uri);
+
+    /**
+     * Возвращает человекочитаемое описание обновления для данного URI.
+     *
+     * @param uri ссылка в формате URI
+     * @return описание обнаруженного обновления
+     */
+    default String describeUpdate(URI uri) {
+        return "Обнаружено обновление";
+    }
 }

@@ -9,6 +9,7 @@ import backend.academy.linktracker.scrapper.exception.TagNotFoundException;
 import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Сервис CRUD-операций управления тегами подписок.
@@ -44,9 +45,7 @@ public class TagService {
      * @return список тегов и их количество
      */
     public ListTagsResponse list(long chatId, String link) {
-        accessValidator.ensureChatExists(chatId);
-        String normalizedLink = RequestFieldNormalizer.normalizeLink(link);
-        accessValidator.ensureLinkExists(chatId, normalizedLink);
+        String normalizedLink = accessValidator.ensureLinkAccessAndNormalize(chatId, link);
         List<String> tags = repository.findTagsByChatIdAndUrl(chatId, normalizedLink);
         return new ListTagsResponse(tags, tags.size());
     }
@@ -57,10 +56,9 @@ public class TagService {
      * @param chatId идентификатор чата
      * @param request запрос добавления тега
      */
+    @Transactional
     public void add(long chatId, AddTagRequest request) {
-        accessValidator.ensureChatExists(chatId);
-        String normalizedLink = RequestFieldNormalizer.normalizeLink(request.link());
-        accessValidator.ensureLinkExists(chatId, normalizedLink);
+        String normalizedLink = accessValidator.ensureLinkAccessAndNormalize(chatId, request.link());
         String normalizedTag = RequestFieldNormalizer.normalizeTag(request.tag());
         if (!repository.addTag(chatId, normalizedLink, normalizedTag)) {
             throw new TagAlreadyExistsException(normalizedTag);
@@ -73,10 +71,9 @@ public class TagService {
      * @param chatId идентификатор чата
      * @param request запрос обновления тега
      */
+    @Transactional
     public void update(long chatId, UpdateTagRequest request) {
-        accessValidator.ensureChatExists(chatId);
-        String normalizedLink = RequestFieldNormalizer.normalizeLink(request.link());
-        accessValidator.ensureLinkExists(chatId, normalizedLink);
+        String normalizedLink = accessValidator.ensureLinkAccessAndNormalize(chatId, request.link());
         String normalizedOldTag = RequestFieldNormalizer.normalizeTag(request.oldTag());
         String normalizedNewTag = RequestFieldNormalizer.normalizeTag(request.newTag());
         if (!repository.updateTag(chatId, normalizedLink, normalizedOldTag, normalizedNewTag)) {
@@ -93,10 +90,9 @@ public class TagService {
      * @param chatId идентификатор чата
      * @param request запрос удаления тега
      */
+    @Transactional
     public void delete(long chatId, RemoveTagRequest request) {
-        accessValidator.ensureChatExists(chatId);
-        String normalizedLink = RequestFieldNormalizer.normalizeLink(request.link());
-        accessValidator.ensureLinkExists(chatId, normalizedLink);
+        String normalizedLink = accessValidator.ensureLinkAccessAndNormalize(chatId, request.link());
         String normalizedTag = RequestFieldNormalizer.normalizeTag(request.tag());
         if (!repository.deleteTag(chatId, normalizedLink, normalizedTag)) {
             throw new TagNotFoundException(normalizedTag);

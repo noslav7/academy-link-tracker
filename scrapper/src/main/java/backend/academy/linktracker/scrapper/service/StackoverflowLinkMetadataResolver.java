@@ -51,27 +51,25 @@ public class StackoverflowLinkMetadataResolver extends AbstractHostBasedLinkMeta
         return extractQuestionId(pathSegments) != null;
     }
 
-    /**
-     * Получает время последнего обновления вопроса StackOverflow.
-     *
-     * @param uri ссылка в формате URI
-     * @return время последнего обновления вопроса
-     */
     @Override
     public Instant resolveLastUpdated(URI uri) {
+        return stackoverflowClient.fetchQuestionUpdatedAt(requireQuestionId(uri));
+    }
+
+    @Override
+    public String describeUpdate(URI uri) {
+        return "Обновление вопроса #%d на StackOverflow (возможно: новый ответ или комментарий)"
+                .formatted(requireQuestionId(uri));
+    }
+
+    private long requireQuestionId(URI uri) {
         Long questionId = extractQuestionId(extractPathSegments(uri));
         if (questionId == null) {
             throw new IllegalStateException("Unsupported StackOverflow URI: " + uri);
         }
-        return stackoverflowClient.fetchQuestionUpdatedAt(questionId);
+        return questionId;
     }
 
-    /**
-     * Извлекает идентификатор вопроса из сегментов URL-пути.
-     *
-     * @param segments сегменты пути URI
-     * @return идентификатор вопроса или {@code null}, если путь невалиден
-     */
     private static Long extractQuestionId(List<String> segments) {
         if (segments.size() < MIN_SEGMENTS_COUNT) {
             return null;

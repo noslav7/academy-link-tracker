@@ -41,10 +41,24 @@ public class ChatLinkAccessValidator {
      * Проверяет, что подписка на ссылку существует, и возвращает ее.
      *
      * @param chatId идентификатор чата
-     * @param link URL отслеживаемой ссылки
+     * @param link URL отслеживаемой ссылки (уже нормализованный)
      * @return найденная подписка
      */
     public TrackedLink ensureLinkExists(long chatId, String link) {
         return repository.findByChatIdAndUrl(chatId, link).orElseThrow(() -> new LinkNotFoundException(link));
+    }
+
+    /**
+     * Проверяет доступ к чату и подписке, нормализует ссылку.
+     *
+     * @param chatId идентификатор чата
+     * @param rawLink ненормализованный URL ссылки
+     * @return нормализованная ссылка
+     */
+    public String ensureLinkAccessAndNormalize(long chatId, String rawLink) {
+        ensureChatExists(chatId);
+        String normalizedLink = RequestFieldNormalizer.normalizeLink(rawLink);
+        ensureLinkExists(chatId, normalizedLink);
+        return normalizedLink;
     }
 }

@@ -8,6 +8,7 @@ import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Сервис управления отслеживаемыми ссылками для Telegram-чатов.
@@ -51,6 +52,7 @@ public class LinkService {
      * @param request данные ссылки, тегов и фильтров
      * @return добавленная ссылка в формате API-ответа
      */
+    @Transactional
     public LinkResponse add(long chatId, AddLinkRequest request) {
         accessValidator.ensureChatExists(chatId);
 
@@ -76,6 +78,7 @@ public class LinkService {
      * @param link ссылка для удаления
      * @return удаленная ссылка в формате API-ответа
      */
+    @Transactional
     public LinkResponse remove(long chatId, String link) {
         accessValidator.ensureChatExists(chatId);
         String normalizedLink = RequestFieldNormalizer.normalizeLink(link);

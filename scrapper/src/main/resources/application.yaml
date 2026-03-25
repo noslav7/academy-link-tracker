@@ -35,6 +35,8 @@ app:
     grpc-port: ${BOT_GRPC_PORT:9090}
   scheduler:
     interval: ${SCRAPPER_SCHEDULER_INTERVAL:30s}
+    batch-size: ${SCRAPPER_SCHEDULER_BATCH_SIZE:100}
+    thread-count: ${SCRAPPER_SCHEDULER_THREAD_COUNT:4}
   grpc:
     server:
       enabled: ${SCRAPPER_GRPC_SERVER_ENABLED:false}

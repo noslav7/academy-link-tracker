@@ -31,9 +31,22 @@ public class LinkMetadataResolver {
      * @return время последнего обновления ресурса
      */
     public Instant resolveLastUpdated(String link) {
-        String normalizedLink = RequestFieldNormalizer.normalizeLink(link);
-        URI uri = URI.create(normalizedLink);
-        LinkFormatMetadataResolver resolver = resolverFactory.getResolver(uri);
-        return resolver.resolveLastUpdated(uri);
+        URI uri = toNormalizedUri(link);
+        return resolverFactory.getResolver(uri).resolveLastUpdated(uri);
+    }
+
+    /**
+     * Возвращает человекочитаемое описание обновления ссылки.
+     *
+     * @param link строковое представление ссылки
+     * @return описание обнаруженного обновления
+     */
+    public String resolveUpdateDescription(String link) {
+        URI uri = toNormalizedUri(link);
+        return resolverFactory.getResolver(uri).describeUpdate(uri);
+    }
+
+    private URI toNormalizedUri(String link) {
+        return URI.create(RequestFieldNormalizer.normalizeLink(link));
     }
 }

@@ -23,14 +23,7 @@ final class RequestFieldNormalizer {
      * @return нормализованная ссылка
      */
     static String normalizeLink(String rawLink) {
-        if (rawLink == null || rawLink.isBlank()) {
-            throw new IllegalArgumentException("link is required");
-        }
-        String normalized = rawLink.trim();
-        if (normalized.length() > MAX_LINK_LENGTH) {
-            throw new IllegalArgumentException("link length exceeds " + MAX_LINK_LENGTH + " characters");
-        }
-        return normalized;
+        return normalizeField(rawLink, "link", MAX_LINK_LENGTH);
     }
 
     /**
@@ -40,13 +33,17 @@ final class RequestFieldNormalizer {
      * @return нормализованный тег
      */
     static String normalizeTag(String rawTag) {
-        if (rawTag == null || rawTag.isBlank()) {
-            throw new IllegalArgumentException("tag is required");
+        return normalizeField(rawTag, "tag", MAX_TAG_LENGTH);
+    }
+
+    private static String normalizeField(String value, String fieldName, int maxLength) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(fieldName + " is required");
         }
-        String normalizedTag = rawTag.trim();
-        if (normalizedTag.length() > MAX_TAG_LENGTH) {
-            throw new IllegalArgumentException("tag length exceeds " + MAX_TAG_LENGTH + " characters");
+        String normalized = value.trim();
+        if (normalized.length() > maxLength) {
+            throw new IllegalArgumentException(fieldName + " length exceeds " + maxLength + " characters");
         }
-        return normalizedTag;
+        return normalized;
     }
 }

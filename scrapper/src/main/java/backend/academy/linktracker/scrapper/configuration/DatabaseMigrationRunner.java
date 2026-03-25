@@ -1,6 +1,5 @@
 package backend.academy.linktracker.scrapper.configuration;
 
-import jakarta.annotation.PostConstruct;
 import java.sql.Connection;
 import javax.sql.DataSource;
 import liquibase.Contexts;
@@ -20,34 +19,16 @@ import org.springframework.stereotype.Component;
 @Component
 public class DatabaseMigrationRunner {
 
-    /**
-     * Логгер компонента.
-     */
     private static final Logger log = LoggerFactory.getLogger(DatabaseMigrationRunner.class);
-    /**
-     * Путь к changelog-файлу Liquibase.
-     */
     private static final String CHANGELOG_PATH = "migrations/master.xml";
 
     /**
-     * Источник подключений к БД.
-     */
-    private final DataSource dataSource;
-
-    /**
-     * Создает раннер миграций.
+     * Создает раннер миграций и немедленно выполняет их.
+     * Зависит только от {@code dataSource} — конструктор является минимально достаточным lifecycle-механизмом.
      *
      * @param dataSource источник подключений к БД
      */
     public DatabaseMigrationRunner(DataSource dataSource) {
-        this.dataSource = dataSource;
-    }
-
-    /**
-     * Выполняет миграции при старте приложения.
-     */
-    @PostConstruct
-    public void migrate() {
         try (Connection connection = dataSource.getConnection()) {
             Database database =
                     DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));

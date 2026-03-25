@@ -1,8 +1,8 @@
 package backend.academy.linktracker.scrapper.service;
 
 import backend.academy.linktracker.scrapper.domain.TrackedLink;
+import backend.academy.linktracker.scrapper.properties.SchedulerProperties;
 import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
-import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -12,45 +12,22 @@ import org.springframework.stereotype.Service;
 @Service
 public class TrackedLinkMaintenanceService {
 
-    /**
-     * Размер страницы при фоновой выборке отслеживаемых ссылок.
-     */
-    private static final int TRACKED_LINKS_PAGE_SIZE = 200;
-
-    /**
-     * Репозиторий хранения отслеживаемых ссылок.
-     */
     private final TrackedLinkRepository repository;
+    private final SchedulerProperties schedulerProperties;
 
-    /**
-     * Создает сервис фонового обслуживания отслеживаемых ссылок.
-     *
-     * @param repository репозиторий хранения ссылок
-     */
-    public TrackedLinkMaintenanceService(TrackedLinkRepository repository) {
+    public TrackedLinkMaintenanceService(TrackedLinkRepository repository, SchedulerProperties schedulerProperties) {
         this.repository = repository;
+        this.schedulerProperties = schedulerProperties;
     }
 
     /**
-     * Возвращает все отслеживаемые ссылки из всех чатов постранично.
+     * Возвращает один батч ссылок из БД для обработки планировщиком.
      *
-     * @return список всех отслеживаемых ссылок
+     * @param offset смещение от начала выборки
+     * @return список ссылок размером не более {@code batchSize}
      */
-    public List<TrackedLink> allTrackedLinks() {
-        List<TrackedLink> result = new ArrayList<>();
-        int offset = 0;
-        while (true) {
-            List<TrackedLink> page = repository.findAllTrackedLinks(TRACKED_LINKS_PAGE_SIZE, offset);
-            if (page.isEmpty()) {
-                break;
-            }
-            result.addAll(page);
-            if (page.size() < TRACKED_LINKS_PAGE_SIZE) {
-                break;
-            }
-            offset += page.size();
-        }
-        return result;
+    public List<TrackedLink> fetchBatch(int offset) {
+        return repository.findAllTrackedLinks(schedulerProperties.getBatchSize(), offset);
     }
 
     /**
