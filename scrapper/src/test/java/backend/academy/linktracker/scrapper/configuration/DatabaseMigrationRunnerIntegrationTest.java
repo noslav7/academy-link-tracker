@@ -24,7 +24,6 @@ class DatabaseMigrationRunnerIntegrationTest {
             .withPassword("postgres");
 
     private JdbcTemplate jdbcTemplate;
-    private DatabaseMigrationRunner migrationRunner;
 
     @BeforeEach
     void setUp() {
@@ -35,17 +34,16 @@ class DatabaseMigrationRunnerIntegrationTest {
         dataSource.setPassword(POSTGRES.getPassword());
 
         jdbcTemplate = new JdbcTemplate(dataSource);
-        migrationRunner = new DatabaseMigrationRunner(dataSource);
 
         jdbcTemplate.execute("drop schema if exists public cascade");
         jdbcTemplate.execute("create schema public");
+
+        new DatabaseMigrationRunner(dataSource);
     }
 
     // Проверяет, что миграции применяются к чистой БД и фиксируются в databasechangelog.
     @Test
     void givenCleanDatabaseWhenMigrateThenSchemaIsCreated() {
-        migrationRunner.migrate();
-
         assertAll(
                 () -> assertTrue(tableExists("chats")),
                 () -> assertTrue(tableExists("tracked_links")),

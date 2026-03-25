@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class UpdateNotificationService {
 
+    private static final int MAX_PREVIEW_LENGTH = 200;
+    private static final String PREVIEW_PREFIX = "\n\nПревью: ";
+
     /**
      * Логгер компонента.
      */
@@ -42,16 +45,30 @@ public class UpdateNotificationService {
             return;
         }
 
+        String notificationText = buildNotificationText(update);
+
         for (Long chatId : update.tgChatIds()) {
             if (chatId == null) {
                 continue;
             }
-            telegramBot.execute(new SendMessage(chatId, BotMessages.UPDATE_NOTIFICATION));
+            telegramBot.execute(new SendMessage(String.valueOf(chatId), notificationText));
             log.atInfo()
                     .addKeyValue("chatId", chatId)
                     .addKeyValue("linkId", update.id())
                     .addKeyValue("url", update.url())
                     .log("Sent update notification");
         }
+    }
+
+    private static String buildNotificationText(LinkUpdate update) {
+        if (update.description() == null || update.description().isBlank()) {
+            return BotMessages.UPDATE_NOTIFICATION;
+        }
+        if (update.description().length() <= MAX_PREVIEW_LENGTH) {
+            return BotMessages.UPDATE_NOTIFICATION;
+        }
+        return BotMessages.UPDATE_NOTIFICATION
+                + PREVIEW_PREFIX
+                + update.description().substring(0, MAX_PREVIEW_LENGTH);
     }
 }
