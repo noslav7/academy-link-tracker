@@ -1,6 +1,7 @@
 package backend.academy.linktracker.bot.grpc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertAll;
 
 import backend.academy.linktracker.bot.client.dto.LinkUpdate;
 import backend.academy.linktracker.bot.service.UpdateNotificationService;
@@ -49,9 +50,10 @@ class BotUpdatesGrpcServiceTest {
 
         grpcService.sendUpdate(request, observer);
 
-        assertEquals(1, observer.onNextMessages.size());
-        assertEquals(0, observer.errorCount);
-        assertEquals(1, observer.completedCount);
+        assertAll(
+                () -> assertEquals(1, observer.onNextMessages.size()),
+                () -> assertEquals(0, observer.errorCount),
+                () -> assertEquals(1, observer.completedCount));
     }
 
     private static final class CapturingUpdateNotificationService extends UpdateNotificationService {

@@ -4,12 +4,14 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import backend.academy.linktracker.scrapper.client.GithubClient.GithubIssueOrPullRequestUpdate;
+import backend.academy.linktracker.scrapper.client.StackoverflowClient.StackoverflowAnswerOrCommentUpdate;
 import backend.academy.linktracker.scrapper.properties.GithubProperties;
 import backend.academy.linktracker.scrapper.properties.StackoverflowProperties;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import java.time.Instant;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -99,6 +101,7 @@ class RestExternalClientsErrorHandlingTest {
 
     @Test
     void givenGithubClientWhenLatestIssueApiReturnsValidBodyThenReturnsStructuredDetails() {
+        // Проверяет полный контракт маппинга последнего Issue/PR из GitHub API.
         wireMockServer.stubFor(get(urlEqualTo("/github/repos/user/repo/issues?state=all&sort=created&direction=desc&per_page=1"))
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -115,14 +118,19 @@ class RestExternalClientsErrorHandlingTest {
 
         var result = githubClient.fetchLatestIssueOrPullRequest("user", "repo");
 
-        assertTrue(result.isPresent());
-        assertEquals("Fix flaky test", result.get().title());
-        assertEquals("octocat", result.get().authorLogin());
-        assertTrue(result.get().issue());
+        assertEquals(
+                Optional.of(new GithubIssueOrPullRequestUpdate(
+                        true,
+                        "Fix flaky test",
+                        "octocat",
+                        Instant.parse("2026-03-02T00:00:00Z"),
+                        "Description")),
+                result);
     }
 
     @Test
     void givenStackoverflowClientWhenLatestActivityApisReturnValidBodyThenReturnsNewestEvent() {
+        // Проверяет полный контракт выбора и маппинга самого нового события StackOverflow.
         wireMockServer.stubFor(get(urlEqualTo("/so/questions/123?site=stackoverflow&filter=withbody"))
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -149,9 +157,13 @@ class RestExternalClientsErrorHandlingTest {
 
         var result = stackoverflowClient.fetchLatestAnswerOrCommentUpdate(123L);
 
-        assertTrue(result.isPresent());
-        assertEquals("How to test scheduler?", result.get().questionTitle());
-        assertTrue(result.get().answer());
-        assertEquals("alice", result.get().authorDisplayName());
+        assertEquals(
+                Optional.of(new StackoverflowAnswerOrCommentUpdate(
+                        "How to test scheduler?",
+                        true,
+                        "alice",
+                        Instant.parse("2026-03-02T00:00:00Z"),
+                        "answer body")),
+                result);
     }
 }

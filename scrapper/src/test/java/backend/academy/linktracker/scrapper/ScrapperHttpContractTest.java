@@ -5,7 +5,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -32,6 +32,7 @@ import org.wiremock.spring.EnableWireMock;
             "app.scheduler.interval=365d"
         })
 @EnableWireMock
+@Tag("integration")
 class ScrapperHttpContractTest {
 
     @LocalServerPort
@@ -146,9 +147,7 @@ class ScrapperHttpContractTest {
     }
 
     private JsonNode parseJson(String body) throws IOException {
-        JsonNode node = objectMapper.readTree(body);
-        assertNotNull(node);
-        return node;
+        return objectMapper.readTree(body);
     }
 
     private HttpResponse<String> postLink(long chatId, String link) throws IOException, InterruptedException {

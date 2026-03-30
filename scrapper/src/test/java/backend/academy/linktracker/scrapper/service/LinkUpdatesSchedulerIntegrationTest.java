@@ -71,6 +71,7 @@ class LinkUpdatesSchedulerIntegrationTest {
 
     @Test
     void givenGithubLinkWhenRepositoryUpdatedThenBotReceivesGithubSpecificDescription() throws Exception {
+        // Проверяет интеграционный контракт: обновление GitHub формирует точное доменное описание для bot.
         stubBotNotificationsAlwaysOk();
         stubGithubUpdatedAt("octocat", "hello-world", "2026-03-01T00:00:00Z", 10);
         stubGithubLatestIssueOrPr(
@@ -108,6 +109,7 @@ class LinkUpdatesSchedulerIntegrationTest {
 
     @Test
     void givenStackoverflowLinkWhenQuestionUpdatedThenBotReceivesStackoverflowSpecificDescription() throws Exception {
+        // Проверяет интеграционный контракт: обновление StackOverflow формирует точное доменное описание для bot.
         stubBotNotificationsAlwaysOk();
         stubStackoverflowUpdatedAt(123L, 1_772_323_200L, 10);
         stubStackoverflowQuestionTitle(123L, "How to build resilient schedulers?", 10);
@@ -149,6 +151,7 @@ class LinkUpdatesSchedulerIntegrationTest {
 
     @Test
     void givenBatchOfLinksWhenSchedulerRunsThenAllLinksAreProcessedAndNotified() throws Exception {
+        // Проверяет, что пакетная обработка scheduler отправляет уведомления по всем обновленным ссылкам.
         stubBotNotificationsAlwaysOk();
         long chatId = 503L;
         chatService.register(chatId);
@@ -183,6 +186,7 @@ class LinkUpdatesSchedulerIntegrationTest {
 
     @Test
     void givenPartiallyFailingBatchWhenSchedulerRunsThenFailureIsIsolatedAndErrorReportIsSent() throws Exception {
+        // Проверяет изоляцию ошибки в пакете: успешные ссылки доставляются, а сбой отражается в системном отчете.
         stubFor(post(urlEqualTo("/bot/updates"))
                 .withRequestBody(matchingJsonPath("$.url", equalTo("https://github.com/octocat/bad-repo")))
                 .willReturn(aResponse().withStatus(503).withBody("bot unavailable")));
@@ -230,6 +234,7 @@ class LinkUpdatesSchedulerIntegrationTest {
 
     @Test
     void givenSubscribeWithTagsAndFiltersWhenSavingThenAllEntitiesArePersisted() {
+        // Проверяет сохранение связанной модели подписки: чат, ссылка, теги и фильтры.
         long chatId = 505L;
         String link = "https://github.com/octocat/entities-repo";
         stubGithubUpdatedAt("octocat", "entities-repo", "2026-03-01T00:00:00Z", 1);

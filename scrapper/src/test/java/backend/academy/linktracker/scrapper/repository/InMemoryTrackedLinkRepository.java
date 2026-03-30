@@ -71,7 +71,7 @@ public class InMemoryTrackedLinkRepository extends AbstractPagingAwareTrackedLin
                 url,
                 List.copyOf(tags),
                 List.copyOf(filters),
-                Instant.now(),
+                updatedAt,
                 updatedAt);
         linksByChatId.computeIfAbsent(chatId, key -> new ConcurrentHashMap<>()).put(url, trackedLink);
         return trackedLink;

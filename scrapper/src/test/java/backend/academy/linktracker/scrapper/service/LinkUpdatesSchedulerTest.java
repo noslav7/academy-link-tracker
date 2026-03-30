@@ -15,13 +15,17 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class LinkUpdatesSchedulerTest {
 
     @Test
     void givenUpdatedLinkWhenSchedulerRunsThenOnlySubscribersReceiveNotification() {
+        // Проверяет базовый сценарий: обновление ссылки рассылается только подписанному чату.
         AtomicReference<Instant> githubUpdatedAt = new AtomicReference<>(Instant.parse("2026-02-25T00:00:00Z"));
         GithubClient githubClient = (owner, repository) -> githubUpdatedAt.get();
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
@@ -57,6 +61,7 @@ class LinkUpdatesSchedulerTest {
 
     @Test
     void givenLinkWasNotUpdatedWhenSchedulerRunsThenNoNotificationIsSent() {
+        // Проверяет, что без обновления ссылки планировщик не отправляет уведомление.
         AtomicReference<Instant> githubUpdatedAt = new AtomicReference<>(Instant.parse("2026-02-25T00:00:00Z"));
         GithubClient githubClient = (owner, repository) -> githubUpdatedAt.get();
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
@@ -89,13 +94,18 @@ class LinkUpdatesSchedulerTest {
 
     @Test
     void givenFailingLinkWhenSchedulerRunsThenOtherLinksStillProcessed() {
-        java.util.concurrent.atomic.AtomicBoolean failOnBadRepo = new java.util.concurrent.atomic.AtomicBoolean(false);
-        GithubClient githubClient = (owner, repo) -> {
-            if (failOnBadRepo.get() && "bad-repo".equals(repo)) {
-                throw new RuntimeException("API error");
-            }
-            return Instant.parse("2026-02-25T00:00:00Z");
-        };
+        // Проверяет изоляцию ошибки одной ссылки и публикацию системного error-отчета.
+        var responsesByRepo = new java.util.concurrent.atomic.AtomicReference<>(Map.<String, Supplier<Instant>>of(
+                "good-repo", () -> Instant.parse("2026-02-25T00:00:00Z"),
+                "bad-repo", () -> Instant.parse("2026-02-25T00:00:00Z")));
+        Map<String, Supplier<Instant>> failureResponses = Map.<String, Supplier<Instant>>of(
+                "good-repo", () -> Instant.parse("2026-02-25T00:00:00Z"),
+                "bad-repo", () -> {
+                    throw new RuntimeException("API error");
+                });
+        GithubClient githubClient = (owner, repo) -> responsesByRepo.get()
+                .getOrDefault(repo, () -> Instant.parse("2026-02-25T00:00:00Z"))
+                .get();
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
 
         TrackedLinkRepository repository = new InMemoryTrackedLinkRepository();
@@ -112,8 +122,7 @@ class LinkUpdatesSchedulerTest {
         chatService.register(42L);
         linkService.add(42L, new AddLinkRequest("https://github.com/user/good-repo", List.of(), List.of()));
         linkService.add(42L, new AddLinkRequest("https://github.com/user/bad-repo", List.of(), List.of()));
-
-        failOnBadRepo.set(true);
+        responsesByRepo.set(failureResponses);
 
         CapturingMessageSender messageSender = new CapturingMessageSender();
         LinkUpdateChecker linkUpdateChecker =
@@ -129,7 +138,22 @@ class LinkUpdatesSchedulerTest {
                 .toList();
 
         assertEquals(1, errorReports.size());
-        assertTrue(errorReports.getFirst().description().contains("bad-repo"));
+        LinkUpdate errorReport = errorReports.getFirst();
+        assertEquals("system://scheduler-error-report", errorReport.url());
+        assertEquals(List.of(42L), errorReport.tgChatIds());
+
+        String actualDescription = errorReport.description();
+        var runIdMatcher = Pattern.compile("⚠ Отчёт планировщика \\(runId: ([^)]+)\\)\n").matcher(actualDescription);
+        assertTrue(runIdMatcher.find());
+
+        String expectedDescription = """
+                ⚠ Отчёт планировщика (runId: %s)
+                Обработано: 2, успешно: 1, с ошибками: 1
+
+                Неуспешные ссылки:
+                • https://github.com/user/bad-repo — API error
+                """.formatted(runIdMatcher.group(1));
+        assertEquals(expectedDescription, actualDescription);
     }
 
     private static SchedulerProperties createSchedulerProperties() {
