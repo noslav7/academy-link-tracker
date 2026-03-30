@@ -73,6 +73,15 @@ class LinkUpdatesSchedulerIntegrationTest {
     void givenGithubLinkWhenRepositoryUpdatedThenBotReceivesGithubSpecificDescription() throws Exception {
         stubBotNotificationsAlwaysOk();
         stubGithubUpdatedAt("octocat", "hello-world", "2026-03-01T00:00:00Z", 10);
+        stubGithubLatestIssueOrPr(
+                "octocat",
+                "hello-world",
+                "Fix scheduler race",
+                "dev-user",
+                "2026-03-02T00:15:00Z",
+                "A".repeat(260),
+                true,
+                10);
 
         long chatId = 501L;
         registerAndTrack(chatId, "https://github.com/octocat/hello-world", List.of(), List.of());
@@ -87,7 +96,13 @@ class LinkUpdatesSchedulerIntegrationTest {
                         "https://github.com/octocat/hello-world",
                         updates.getFirst().path("url").asText()),
                 () -> assertEquals(
-                        "Обновление в репозитории octocat/hello-world (возможно: новый PR или Issue)",
+                        """
+                        GitHub: новый Issue в octocat/hello-world
+                        Название: Fix scheduler race
+                        Пользователь: dev-user
+                        Время создания: 2026-03-02T00:15:00Z
+                        Превью описания: %s
+                        """.formatted("A".repeat(200)),
                         updates.getFirst().path("description").asText()));
     }
 
@@ -95,6 +110,19 @@ class LinkUpdatesSchedulerIntegrationTest {
     void givenStackoverflowLinkWhenQuestionUpdatedThenBotReceivesStackoverflowSpecificDescription() throws Exception {
         stubBotNotificationsAlwaysOk();
         stubStackoverflowUpdatedAt(123L, 1_772_323_200L, 10);
+        stubStackoverflowQuestionTitle(123L, "How to build resilient schedulers?", 10);
+        stubStackoverflowLatestAnswer(
+                123L,
+                1_772_409_600L,
+                "alice",
+                "<p>%s</p>".formatted("B".repeat(260)),
+                10);
+        stubStackoverflowLatestComment(
+                123L,
+                1_772_300_000L,
+                "bob",
+                "<p>Older comment</p>",
+                10);
 
         long chatId = 502L;
         registerAndTrack(chatId, "https://stackoverflow.com/questions/123/example-question", List.of(), List.of());
@@ -109,7 +137,13 @@ class LinkUpdatesSchedulerIntegrationTest {
                         "https://stackoverflow.com/questions/123/example-question",
                         updates.getFirst().path("url").asText()),
                 () -> assertEquals(
-                        "Обновление вопроса #123 на StackOverflow (возможно: новый ответ или комментарий)",
+                        """
+                        StackOverflow: новый ответ
+                        Тема вопроса: How to build resilient schedulers?
+                        Пользователь: alice
+                        Время создания: 2026-03-02T00:00:00Z
+                        Превью: %s
+                        """.formatted("B".repeat(200)),
                         updates.getFirst().path("description").asText()));
     }
 
@@ -244,12 +278,79 @@ class LinkUpdatesSchedulerIntegrationTest {
                         .withBody("{\"updated_at\":\"%s\"}".formatted(updatedAtIso))));
     }
 
+    private void stubGithubLatestIssueOrPr(
+            String owner,
+            String repository,
+            String title,
+            String author,
+            String createdAtIso,
+            String body,
+            boolean issue,
+            int priority) {
+        String pullRequest = issue ? "null" : "{}";
+        stubFor(get(urlEqualTo("/github/repos/%s/%s/issues?state=all&sort=created&direction=desc&per_page=1"
+                        .formatted(owner, repository)))
+                .atPriority(priority)
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [
+                                  {
+                                    "title": "%s",
+                                    "body": "%s",
+                                    "user": {"login": "%s"},
+                                    "created_at": "%s",
+                                    "pull_request": %s
+                                  }
+                                ]
+                                """
+                                .formatted(title, body, author, createdAtIso, pullRequest))));
+    }
+
     private void stubStackoverflowUpdatedAt(long questionId, long lastActivityEpochSeconds, int priority) {
         stubFor(get(urlEqualTo("/so/questions/%d?site=stackoverflow".formatted(questionId)))
                 .atPriority(priority)
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"items\":[{\"last_activity_date\":%d}]}".formatted(lastActivityEpochSeconds))));
+    }
+
+    private void stubStackoverflowQuestionTitle(long questionId, String title, int priority) {
+        stubFor(get(urlEqualTo("/so/questions/%d?site=stackoverflow&filter=withbody".formatted(questionId)))
+                .atPriority(priority)
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"items":[{"title":"%s"}]}
+                                """.formatted(title))));
+    }
+
+    private void stubStackoverflowLatestAnswer(
+            long questionId, long creationDate, String author, String body, int priority) {
+        stubFor(get(urlEqualTo(
+                        "/so/questions/%d/answers?site=stackoverflow&order=desc&sort=creation&filter=withbody&pagesize=1"
+                                .formatted(questionId)))
+                .atPriority(priority)
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"items":[{"creation_date":%d,"body":"%s","owner":{"display_name":"%s"}}]}
+                                """
+                                .formatted(creationDate, body, author))));
+    }
+
+    private void stubStackoverflowLatestComment(
+            long questionId, long creationDate, String author, String body, int priority) {
+        stubFor(get(urlEqualTo(
+                        "/so/questions/%d/comments?site=stackoverflow&order=desc&sort=creation&filter=withbody&pagesize=1"
+                                .formatted(questionId)))
+                .atPriority(priority)
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"items":[{"creation_date":%d,"body":"%s","owner":{"display_name":"%s"}}]}
+                                """
+                                .formatted(creationDate, body, author))));
     }
 
     private List<JsonNode> capturedBotUpdates() {

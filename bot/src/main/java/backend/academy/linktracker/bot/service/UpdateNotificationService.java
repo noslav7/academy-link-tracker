@@ -13,9 +13,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class UpdateNotificationService {
-
-    private static final int MAX_PREVIEW_LENGTH = 200;
-    private static final String PREVIEW_PREFIX = "\n\nПревью: ";
+    private static final String DETAILS_PREFIX = "\n\n";
 
     /**
      * Логгер компонента.
@@ -64,11 +62,6 @@ public class UpdateNotificationService {
         if (update.description() == null || update.description().isBlank()) {
             return BotMessages.UPDATE_NOTIFICATION;
         }
-        if (update.description().length() <= MAX_PREVIEW_LENGTH) {
-            return BotMessages.UPDATE_NOTIFICATION;
-        }
-        return BotMessages.UPDATE_NOTIFICATION
-                + PREVIEW_PREFIX
-                + update.description().substring(0, MAX_PREVIEW_LENGTH);
+        return BotMessages.UPDATE_NOTIFICATION + DETAILS_PREFIX + update.description();
     }
 }

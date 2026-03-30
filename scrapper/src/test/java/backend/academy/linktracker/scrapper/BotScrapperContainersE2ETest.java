@@ -174,7 +174,7 @@ class BotScrapperContainersE2ETest {
 
     @Test
     void givenUpdatedGithubLinkWhenSchedulerRunsInContainersThenBotReceivesExactNotificationRequest() throws Exception {
-        // Проверяет e2e-контракт: обновление ссылки в scrapper приводит к точному запросу sendMessage в bot.
+        // Проверяет e2e-контракт: bot получает базовое уведомление и доменно-специфичные детали обновления.
         configureWiremock();
         stubFor(post(urlMatching("/bot[^/]+/sendMessage")).willReturn(okJson("{\"ok\":true}")));
         stubGithubUpdatedAt("2026-02-25T00:00:00Z", 10);
@@ -183,7 +183,13 @@ class BotScrapperContainersE2ETest {
         stubGithubUpdatedAt("2026-02-26T00:00:00Z", 1);
 
         await().atMost(90, SECONDS)
-                .untilAsserted(() -> verifySendMessage(42L, "Обнаружено обновление по отслеживаемой ссылке."));
+                .untilAsserted(() -> verifySendMessage(
+                        42L,
+                        """
+                        Обнаружено обновление по отслеживаемой ссылке.
+
+                        Обновление в репозитории octocat/Hello-World (возможно: новый PR или Issue)"""
+                                .stripTrailing()));
     }
 
     @Test

@@ -3,6 +3,8 @@ package backend.academy.linktracker.scrapper.client;
 import backend.academy.linktracker.scrapper.properties.GithubProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -61,10 +63,65 @@ public class RestGithubClient implements GithubClient {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Optional<GithubIssueOrPullRequestUpdate> fetchLatestIssueOrPullRequest(String owner, String repository) {
+        try {
+            List<GithubIssueResponse> items = restClient
+                    .get()
+                    .uri(
+                            "/repos/{owner}/{repository}/issues?state=all&sort=created&direction=desc&per_page=1",
+                            owner,
+                            repository)
+                    .headers(headers -> {
+                        if (properties.getToken() != null
+                                && !properties.getToken().isBlank()) {
+                            headers.setBearerAuth(properties.getToken());
+                        }
+                    })
+                    .retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<List<GithubIssueResponse>>() {});
+
+            if (items == null || items.isEmpty()) {
+                return Optional.empty();
+            }
+            GithubIssueResponse first = items.getFirst();
+            if (first == null || first.title() == null || first.createdAt() == null) {
+                return Optional.empty();
+            }
+
+            String authorLogin = first.user() == null || first.user().login() == null
+                    ? "unknown"
+                    : first.user().login();
+            String body = first.body() == null ? "" : first.body();
+            boolean issue = first.pullRequest() == null;
+
+            return Optional.of(new GithubIssueOrPullRequestUpdate(
+                    issue,
+                    first.title(),
+                    authorLogin,
+                    first.createdAt(),
+                    body));
+        } catch (RuntimeException ex) {
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Внутренний DTO ответа GitHub API.
      *
      * @param updatedAt время обновления репозитория
      */
     private record GithubRepositoryResponse(
             @JsonProperty("updated_at") Instant updatedAt) {}
+
+    private record GithubIssueResponse(
+            String title,
+            String body,
+            GithubUser user,
+            @JsonProperty("created_at") Instant createdAt,
+            @JsonProperty("pull_request") Object pullRequest) {}
+
+    private record GithubUser(String login) {}
 }

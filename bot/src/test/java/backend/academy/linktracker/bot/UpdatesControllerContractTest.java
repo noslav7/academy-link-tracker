@@ -91,9 +91,9 @@ class UpdatesControllerContractTest {
     }
 
     @Test
-    void givenLongDescriptionWhenPostUpdatesThenTelegramTextContainsPreviewTrimmedTo200Chars()
+    void givenDescriptionWhenPostUpdatesThenTelegramTextContainsDescriptionAsIs()
             throws IOException, InterruptedException {
-        // Проверяет, что длинное описание обновления отправляется как превью не длиннее 200 символов.
+        // Проверяет, что описание обновления передается в Telegram без дополнительного обрезания.
         stubTelegramSendMessage();
         String longDescription = "x".repeat(260);
 
@@ -112,14 +112,14 @@ class UpdatesControllerContractTest {
                 HttpResponse.BodyHandlers.ofString());
 
         String sentText = extractSingleTelegramMessageText();
-        String expectedPrefix = BotMessages.UPDATE_NOTIFICATION + "\n\nПревью: ";
-        assertEquals(expectedPrefix + "x".repeat(200), sentText);
+        String expectedPrefix = BotMessages.UPDATE_NOTIFICATION + "\n\n";
+        assertEquals(expectedPrefix + longDescription, sentText);
     }
 
     @Test
     void givenDescriptionLengthExactly200WhenPostUpdatesThenTelegramTextEqualsBaseNotification()
             throws IOException, InterruptedException {
-        // Проверяет граничный кейс: при длине description=200 превью не добавляется.
+        // Проверяет, что при непустом description бот отправляет базовое сообщение вместе с деталями.
         stubTelegramSendMessage();
         String description = "y".repeat(200);
 
@@ -138,13 +138,13 @@ class UpdatesControllerContractTest {
                 HttpResponse.BodyHandlers.ofString());
 
         String sentText = extractSingleTelegramMessageText();
-        assertEquals(BotMessages.UPDATE_NOTIFICATION, sentText);
+        assertEquals(BotMessages.UPDATE_NOTIFICATION + "\n\n" + description, sentText);
     }
 
     @Test
     void givenDescriptionLength201WhenPostUpdatesThenTelegramTextContainsPreviewOfExactly200Chars()
             throws IOException, InterruptedException {
-        // Проверяет граничный кейс: при длине description=201 превью обрезается ровно до 200.
+        // Проверяет, что даже длинное description отправляется в Telegram без усечения.
         stubTelegramSendMessage();
         String description = "z".repeat(201);
 
@@ -163,7 +163,7 @@ class UpdatesControllerContractTest {
                 HttpResponse.BodyHandlers.ofString());
 
         String sentText = extractSingleTelegramMessageText();
-        assertEquals(BotMessages.UPDATE_NOTIFICATION + "\n\nПревью: " + "z".repeat(200), sentText);
+        assertEquals(BotMessages.UPDATE_NOTIFICATION + "\n\n" + description, sentText);
     }
 
     private void stubTelegramSendMessage() {

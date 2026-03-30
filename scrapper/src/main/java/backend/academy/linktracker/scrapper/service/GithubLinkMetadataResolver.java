@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class GithubLinkMetadataResolver extends AbstractHostBasedLinkMetadataResolver {
+    private static final int MAX_PREVIEW_LENGTH = 200;
 
     /**
      * Часть имени хоста, указывающая на GitHub.
@@ -56,6 +57,35 @@ public class GithubLinkMetadataResolver extends AbstractHostBasedLinkMetadataRes
         List<String> segments = extractPathSegments(uri);
         String owner = segments.get(OWNER_SEGMENT_INDEX);
         String repo = segments.get(REPOSITORY_SEGMENT_INDEX);
-        return "Обновление в репозитории %s/%s (возможно: новый PR или Issue)".formatted(owner, repo);
+        return githubClient
+                .fetchLatestIssueOrPullRequest(owner, repo)
+                .map(update -> """
+                        GitHub: новый %s в %s/%s
+                        Название: %s
+                        Пользователь: %s
+                        Время создания: %s
+                        Превью описания: %s
+                        """
+                        .formatted(
+                                update.issue() ? "Issue" : "PR",
+                                owner,
+                                repo,
+                                safe(update.title()),
+                                safe(update.authorLogin()),
+                                update.createdAt(),
+                                toPreview(update.body())))
+                .orElse("Обновление в репозитории %s/%s (возможно: новый PR или Issue)".formatted(owner, repo));
+    }
+
+    private static String toPreview(String body) {
+        String normalized = safe(body).trim();
+        if (normalized.isEmpty()) {
+            return "(пусто)";
+        }
+        return normalized.substring(0, Math.min(MAX_PREVIEW_LENGTH, normalized.length()));
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
     }
 }

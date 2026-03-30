@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class StackoverflowLinkMetadataResolver extends AbstractHostBasedLinkMetadataResolver {
+    private static final int MAX_PREVIEW_LENGTH = 200;
 
     /**
      * Часть имени хоста, указывающая на StackOverflow.
@@ -58,8 +59,24 @@ public class StackoverflowLinkMetadataResolver extends AbstractHostBasedLinkMeta
 
     @Override
     public String describeUpdate(URI uri) {
-        return "Обновление вопроса #%d на StackOverflow (возможно: новый ответ или комментарий)"
-                .formatted(requireQuestionId(uri));
+        long questionId = requireQuestionId(uri);
+        return stackoverflowClient
+                .fetchLatestAnswerOrCommentUpdate(questionId)
+                .map(update -> """
+                        StackOverflow: новый %s
+                        Тема вопроса: %s
+                        Пользователь: %s
+                        Время создания: %s
+                        Превью: %s
+                        """
+                        .formatted(
+                                update.answer() ? "ответ" : "комментарий",
+                                safe(update.questionTitle()),
+                                safe(update.authorDisplayName()),
+                                update.createdAt(),
+                                toPreview(update.body())))
+                .orElse("Обновление вопроса #%d на StackOverflow (возможно: новый ответ или комментарий)"
+                        .formatted(questionId));
     }
 
     private long requireQuestionId(URI uri) {
@@ -83,5 +100,21 @@ public class StackoverflowLinkMetadataResolver extends AbstractHostBasedLinkMeta
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private static String toPreview(String body) {
+        String plainText = stripHtml(safe(body)).trim();
+        if (plainText.isEmpty()) {
+            return "(пусто)";
+        }
+        return plainText.substring(0, Math.min(MAX_PREVIEW_LENGTH, plainText.length()));
+    }
+
+    private static String stripHtml(String value) {
+        return value.replaceAll("<[^>]*>", "");
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
     }
 }

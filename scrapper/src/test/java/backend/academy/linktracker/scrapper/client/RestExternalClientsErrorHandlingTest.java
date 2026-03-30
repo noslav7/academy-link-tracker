@@ -4,6 +4,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.scrapper.properties.GithubProperties;
 import backend.academy.linktracker.scrapper.properties.StackoverflowProperties;
@@ -94,5 +95,63 @@ class RestExternalClientsErrorHandlingTest {
         Instant updatedAt = stackoverflowClient.fetchQuestionUpdatedAt(123L);
 
         assertEquals(Instant.EPOCH, updatedAt);
+    }
+
+    @Test
+    void givenGithubClientWhenLatestIssueApiReturnsValidBodyThenReturnsStructuredDetails() {
+        wireMockServer.stubFor(get(urlEqualTo("/github/repos/user/repo/issues?state=all&sort=created&direction=desc&per_page=1"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{
+                                  "title":"Fix flaky test",
+                                  "body":"Description",
+                                  "user":{"login":"octocat"},
+                                  "created_at":"2026-03-02T00:00:00Z",
+                                  "pull_request":null
+                                }]
+                                """)));
+
+        var result = githubClient.fetchLatestIssueOrPullRequest("user", "repo");
+
+        assertTrue(result.isPresent());
+        assertEquals("Fix flaky test", result.get().title());
+        assertEquals("octocat", result.get().authorLogin());
+        assertTrue(result.get().issue());
+    }
+
+    @Test
+    void givenStackoverflowClientWhenLatestActivityApisReturnValidBodyThenReturnsNewestEvent() {
+        wireMockServer.stubFor(get(urlEqualTo("/so/questions/123?site=stackoverflow&filter=withbody"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"items":[{"title":"How to test scheduler?"}]}
+                                """)));
+        wireMockServer.stubFor(get(urlEqualTo(
+                        "/so/questions/123/answers?site=stackoverflow&order=desc&sort=creation&filter=withbody&pagesize=1"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"items":[{"creation_date":1772409600,"body":"answer body","owner":{"display_name":"alice"}}]}
+                                """)));
+        wireMockServer.stubFor(get(urlEqualTo(
+                        "/so/questions/123/comments?site=stackoverflow&order=desc&sort=creation&filter=withbody&pagesize=1"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"items":[{"creation_date":1772300000,"body":"comment body","owner":{"display_name":"bob"}}]}
+                                """)));
+
+        var result = stackoverflowClient.fetchLatestAnswerOrCommentUpdate(123L);
+
+        assertTrue(result.isPresent());
+        assertEquals("How to test scheduler?", result.get().questionTitle());
+        assertTrue(result.get().answer());
+        assertEquals("alice", result.get().authorDisplayName());
     }
 }
