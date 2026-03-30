@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -44,12 +45,7 @@ public class RestGithubClient implements GithubClient {
             GithubRepositoryResponse response = restClient
                     .get()
                     .uri("/repos/{owner}/{repository}", owner, repository)
-                    .headers(headers -> {
-                        if (properties.getToken() != null
-                                && !properties.getToken().isBlank()) {
-                            headers.setBearerAuth(properties.getToken());
-                        }
-                    })
+                    .headers(this::applyAuthHeader)
                     .retrieve()
                     .body(GithubRepositoryResponse.class);
 
@@ -74,12 +70,7 @@ public class RestGithubClient implements GithubClient {
                             "/repos/{owner}/{repository}/issues?state=all&sort=created&direction=desc&per_page=1",
                             owner,
                             repository)
-                    .headers(headers -> {
-                        if (properties.getToken() != null
-                                && !properties.getToken().isBlank()) {
-                            headers.setBearerAuth(properties.getToken());
-                        }
-                    })
+                    .headers(this::applyAuthHeader)
                     .retrieve()
                     .body(new org.springframework.core.ParameterizedTypeReference<List<GithubIssueResponse>>() {});
 
@@ -124,4 +115,15 @@ public class RestGithubClient implements GithubClient {
             @JsonProperty("pull_request") Object pullRequest) {}
 
     private record GithubUser(String login) {}
+
+    /**
+     * Добавляет Bearer-токен в заголовки запроса, если токен задан в конфигурации.
+     *
+     * @param headers HTTP-заголовки запроса
+     */
+    private void applyAuthHeader(HttpHeaders headers) {
+        if (properties.getToken() != null && !properties.getToken().isBlank()) {
+            headers.setBearerAuth(properties.getToken());
+        }
+    }
 }

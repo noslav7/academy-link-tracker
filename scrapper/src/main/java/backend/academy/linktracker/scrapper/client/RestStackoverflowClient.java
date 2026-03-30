@@ -15,6 +15,9 @@ import org.springframework.web.client.RestClient;
  */
 @Component
 public class RestStackoverflowClient implements StackoverflowClient {
+    /**
+     * Значение параметра {@code site} для StackOverflow API.
+     */
     private static final String SITE = "stackoverflow";
 
     /**
@@ -88,8 +91,8 @@ public class RestStackoverflowClient implements StackoverflowClient {
             StackoverflowItem question = questionResponse.items().getFirst();
             String questionTitle = question.title() == null ? "Без названия" : question.title();
 
-            Optional<StackoverflowEvent> latestAnswer = fetchLatestAnswer(questionId);
-            Optional<StackoverflowEvent> latestComment = fetchLatestComment(questionId);
+            Optional<StackoverflowEvent> latestAnswer = fetchLatestEvent(questionId, "/questions/{id}/answers", true);
+            Optional<StackoverflowEvent> latestComment = fetchLatestEvent(questionId, "/questions/{id}/comments", false);
 
             Optional<StackoverflowEvent> latestEvent = selectLatest(latestAnswer, latestComment);
             if (latestEvent.isEmpty()) {
@@ -107,16 +110,25 @@ public class RestStackoverflowClient implements StackoverflowClient {
         }
     }
 
-    private Optional<StackoverflowEvent> fetchLatestAnswer(long questionId) {
+    /**
+     * Загружает последнее событие (ответ или комментарий) по указанному endpoint.
+     *
+     * @param questionId идентификатор вопроса
+     * @param path путь API для получения события
+     * @param answerEvent {@code true}, если обрабатывается событие-ответ; иначе комментарий
+     * @return найденное событие или пустой результат
+     */
+    private Optional<StackoverflowEvent> fetchLatestEvent(long questionId, String path, boolean answerEvent) {
         LinkedMultiValueMap<String, String> params = defaultParams();
         params.add("order", "desc");
         params.add("sort", "creation");
         params.add("filter", "withbody");
         params.add("pagesize", "1");
+
         StackoverflowResponse response = restClient
                 .get()
                 .uri(uriBuilder -> uriBuilder
-                        .path("/questions/{id}/answers")
+                        .path(path)
                         .queryParams(params)
                         .build(questionId))
                 .retrieve()
@@ -130,7 +142,7 @@ public class RestStackoverflowClient implements StackoverflowClient {
             return Optional.empty();
         }
         return Optional.of(new StackoverflowEvent(
-                true,
+                answerEvent,
                 item.owner() != null && item.owner().displayName() != null
                         ? item.owner().displayName()
                         : "unknown",
@@ -138,37 +150,13 @@ public class RestStackoverflowClient implements StackoverflowClient {
                 item.body() == null ? "" : item.body()));
     }
 
-    private Optional<StackoverflowEvent> fetchLatestComment(long questionId) {
-        LinkedMultiValueMap<String, String> params = defaultParams();
-        params.add("order", "desc");
-        params.add("sort", "creation");
-        params.add("filter", "withbody");
-        params.add("pagesize", "1");
-        StackoverflowResponse response = restClient
-                .get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/questions/{id}/comments")
-                        .queryParams(params)
-                        .build(questionId))
-                .retrieve()
-                .body(StackoverflowResponse.class);
-
-        if (response == null || response.items() == null || response.items().isEmpty()) {
-            return Optional.empty();
-        }
-        StackoverflowItem item = response.items().getFirst();
-        if (item.creationDate() == null) {
-            return Optional.empty();
-        }
-        return Optional.of(new StackoverflowEvent(
-                false,
-                item.owner() != null && item.owner().displayName() != null
-                        ? item.owner().displayName()
-                        : "unknown",
-                Instant.ofEpochSecond(item.creationDate()),
-                item.body() == null ? "" : item.body()));
-    }
-
+    /**
+     * Выбирает более позднее событие из пары «последний ответ / последний комментарий».
+     *
+     * @param answer последнее событие-ответ
+     * @param comment последнее событие-комментарий
+     * @return наиболее позднее событие из переданных
+     */
     private static Optional<StackoverflowEvent> selectLatest(
             Optional<StackoverflowEvent> answer, Optional<StackoverflowEvent> comment) {
         if (answer.isEmpty()) {
@@ -180,6 +168,11 @@ public class RestStackoverflowClient implements StackoverflowClient {
         return answer.get().createdAt().isAfter(comment.get().createdAt()) ? answer : comment;
     }
 
+    /**
+     * Собирает базовые query-параметры для запросов к StackOverflow API.
+     *
+     * @return набор параметров с обязательным {@code site} и опциональными ключами доступа
+     */
     private LinkedMultiValueMap<String, String> defaultParams() {
         LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("site", SITE);

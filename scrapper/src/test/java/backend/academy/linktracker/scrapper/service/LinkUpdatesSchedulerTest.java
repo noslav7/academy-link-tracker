@@ -44,8 +44,9 @@ class LinkUpdatesSchedulerTest {
         CapturingMessageSender messageSender = new CapturingMessageSender();
         LinkUpdateChecker linkUpdateChecker =
                 new LinkUpdateChecker(linkMetadataResolver, messageSender, trackedLinkMaintenanceService);
+        SchedulerRunReporter runReporter = new SchedulerRunReporter(messageSender);
         LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(
-                trackedLinkMaintenanceService, linkUpdateChecker, messageSender, schedulerProperties);
+                trackedLinkMaintenanceService, linkUpdateChecker, runReporter, schedulerProperties);
 
         githubUpdatedAt.set(Instant.parse("2026-02-26T00:00:00Z"));
         scheduler.checkUpdates();
@@ -77,8 +78,9 @@ class LinkUpdatesSchedulerTest {
         CapturingMessageSender messageSender = new CapturingMessageSender();
         LinkUpdateChecker linkUpdateChecker =
                 new LinkUpdateChecker(linkMetadataResolver, messageSender, trackedLinkMaintenanceService);
+        SchedulerRunReporter runReporter = new SchedulerRunReporter(messageSender);
         LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(
-                trackedLinkMaintenanceService, linkUpdateChecker, messageSender, schedulerProperties);
+                trackedLinkMaintenanceService, linkUpdateChecker, runReporter, schedulerProperties);
 
         scheduler.checkUpdates();
 
@@ -116,8 +118,9 @@ class LinkUpdatesSchedulerTest {
         CapturingMessageSender messageSender = new CapturingMessageSender();
         LinkUpdateChecker linkUpdateChecker =
                 new LinkUpdateChecker(linkMetadataResolver, messageSender, trackedLinkMaintenanceService);
+        SchedulerRunReporter runReporter = new SchedulerRunReporter(messageSender);
         LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(
-                trackedLinkMaintenanceService, linkUpdateChecker, messageSender, schedulerProperties);
+                trackedLinkMaintenanceService, linkUpdateChecker, runReporter, schedulerProperties);
 
         scheduler.checkUpdates();
 

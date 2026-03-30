@@ -61,13 +61,10 @@ public class LinkService {
             throw new LinkAlreadyTrackedException(normalizedLink);
         });
 
+        List<String> normalizedTags = RequestFieldNormalizer.normalizeTags(request.tags());
+        List<String> normalizedFilters = RequestFieldNormalizer.normalizeFilters(request.filters());
         Instant lastUpdated = linkMetadataResolver.resolveLastUpdated(normalizedLink);
-        TrackedLink saved = repository.save(
-                chatId,
-                normalizedLink,
-                request.tags() == null ? List.of() : request.tags(),
-                request.filters() == null ? List.of() : request.filters(),
-                lastUpdated);
+        TrackedLink saved = repository.save(chatId, normalizedLink, normalizedTags, normalizedFilters, lastUpdated);
         return toResponse(saved);
     }
 

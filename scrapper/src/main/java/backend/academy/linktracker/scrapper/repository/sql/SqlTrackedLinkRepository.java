@@ -40,6 +40,9 @@ public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
             values (?, ?)
             on conflict do nothing
             """;
+    private static final Map<String, String> INSERT_SQL_BY_TABLE_AND_COLUMN = Map.of(
+            "tracked_link_tags:tag", INSERT_TRACKED_LINK_TAG,
+            "tracked_link_filters:filter_value", INSERT_TRACKED_LINK_FILTER);
 
     private final JdbcTemplate jdbcTemplate;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
@@ -285,12 +288,11 @@ public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
         if (values == null || values.isEmpty()) {
             return;
         }
-        String insertSql =
-                switch (table + ":" + valueColumn) {
-                    case "tracked_link_tags:tag" -> INSERT_TRACKED_LINK_TAG;
-                    case "tracked_link_filters:filter_value" -> INSERT_TRACKED_LINK_FILTER;
-                    default -> throw new IllegalArgumentException("Unsupported table/value column pair");
-                };
+        String tableAndColumn = table + ":" + valueColumn;
+        String insertSql = INSERT_SQL_BY_TABLE_AND_COLUMN.get(tableAndColumn);
+        if (insertSql == null) {
+            throw new IllegalArgumentException("Unsupported table/value column pair");
+        }
         jdbcTemplate.batchUpdate(insertSql, values, values.size(), (ps, value) -> {
             ps.setLong(1, trackedLinkId);
             ps.setString(2, value);

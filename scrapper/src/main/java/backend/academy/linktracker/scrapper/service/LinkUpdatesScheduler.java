@@ -1,7 +1,6 @@
 package backend.academy.linktracker.scrapper.service;
 
 import backend.academy.linktracker.scrapper.domain.TrackedLink;
-import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.SchedulerProperties;
 import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
@@ -14,6 +13,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -25,12 +25,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class LinkUpdatesScheduler {
 
+    /**
+     * Логгер планировщика.
+     */
     private static final Logger log = LoggerFactory.getLogger(LinkUpdatesScheduler.class);
 
+    /**
+     * Сервис пакетной загрузки и обновления ссылок.
+     */
     private final TrackedLinkMaintenanceService maintenanceService;
+    /**
+     * Компонент проверки одной ссылки на наличие обновлений.
+     */
     private final LinkUpdateChecker linkUpdateChecker;
-    private final MessageSender messageSender;
+    /**
+     * Компонент публикации итогов прогона планировщика.
+     */
+    private final SchedulerRunReporter runReporter;
+    /**
+     * Параметры запуска планировщика.
+     */
     private final SchedulerProperties schedulerProperties;
+    /**
+     * Пул потоков для параллельной обработки ссылок.
+     */
     private final ExecutorService executorService;
 
     /**
@@ -38,17 +56,18 @@ public class LinkUpdatesScheduler {
      *
      * @param maintenanceService сервис чтения/обновления ссылок в БД
      * @param linkUpdateChecker  компонент проверки одной ссылки на обновление
-     * @param messageSender      отправитель уведомлений (для error-отчётов)
+     * @param runReporter        компонент формирования и отправки итогового отчета запуска
      * @param schedulerProperties настройки планировщика
      */
+    @Autowired
     public LinkUpdatesScheduler(
             TrackedLinkMaintenanceService maintenanceService,
             LinkUpdateChecker linkUpdateChecker,
-            MessageSender messageSender,
+            SchedulerRunReporter runReporter,
             SchedulerProperties schedulerProperties) {
         this.maintenanceService = maintenanceService;
         this.linkUpdateChecker = linkUpdateChecker;
-        this.messageSender = messageSender;
+        this.runReporter = runReporter;
         this.schedulerProperties = schedulerProperties;
         this.executorService = Executors.newFixedThreadPool(schedulerProperties.getThreadCount());
     }
@@ -57,7 +76,7 @@ public class LinkUpdatesScheduler {
      * Останавливает пул потоков при завершении приложения.
      */
     @PreDestroy
-    void shutdownPool() {
+    private void shutdownPool() {
         executorService.shutdownNow();
     }
 
@@ -69,7 +88,7 @@ public class LinkUpdatesScheduler {
         String runId = UUID.randomUUID().toString().substring(0, 8);
         AtomicInteger processedCount = new AtomicInteger();
         AtomicInteger successCount = new AtomicInteger();
-        List<FailedLink> failedLinks = Collections.synchronizedList(new ArrayList<>());
+        List<SchedulerFailedLink> failedLinks = Collections.synchronizedList(new ArrayList<>());
 
         int offset = 0;
         while (true) {
@@ -86,18 +105,22 @@ public class LinkUpdatesScheduler {
             offset += batch.size();
         }
 
-        logRunReport(runId, processedCount.get(), successCount.get(), failedLinks);
-
-        if (!failedLinks.isEmpty()) {
-            sendErrorNotification(runId, processedCount.get(), successCount.get(), failedLinks);
-        }
+        runReporter.report(runId, processedCount.get(), successCount.get(), failedLinks);
     }
 
+    /**
+     * Обрабатывает текущий пакет ссылок параллельно в пределах заданного числа потоков.
+     *
+     * @param batch пакет ссылок
+     * @param processedCount счётчик обработанных ссылок
+     * @param successCount счётчик успешно обработанных ссылок
+     * @param failedLinks список ссылок с ошибками обработки
+     */
     private void processBatchInParallel(
             List<TrackedLink> batch,
             AtomicInteger processedCount,
             AtomicInteger successCount,
-            List<FailedLink> failedLinks) {
+            List<SchedulerFailedLink> failedLinks) {
 
         int threadCount = schedulerProperties.getThreadCount();
         List<List<TrackedLink>> chunks = partitionList(batch, threadCount);
@@ -111,7 +134,7 @@ public class LinkUpdatesScheduler {
                         linkUpdateChecker.check(link);
                         successCount.incrementAndGet();
                     } catch (Exception ex) {
-                        failedLinks.add(new FailedLink(link.url(), link.chatId(), ex.getMessage()));
+                        failedLinks.add(new SchedulerFailedLink(link.url(), link.chatId(), ex.getMessage()));
                         log.atWarn()
                                 .addKeyValue("url", link.url())
                                 .addKeyValue("chatId", link.chatId())
@@ -131,39 +154,14 @@ public class LinkUpdatesScheduler {
         }
     }
 
-    private void logRunReport(String runId, int processed, int success, List<FailedLink> failed) {
-        log.atInfo()
-                .addKeyValue("runId", runId)
-                .addKeyValue("processedCount", processed)
-                .addKeyValue("successCount", success)
-                .addKeyValue("failedCount", failed.size())
-                .log("Scheduler run completed");
-
-        for (FailedLink fl : failed) {
-            log.atWarn()
-                    .addKeyValue("runId", runId)
-                    .addKeyValue("url", fl.url())
-                    .addKeyValue("chatId", fl.chatId())
-                    .addKeyValue("reason", fl.reason())
-                    .log("Failed link in run report");
-        }
-    }
-
-    private void sendErrorNotification(String runId, int processed, int success, List<FailedLink> failedLinks) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("⚠ Отчёт планировщика (runId: %s)%n".formatted(runId));
-        sb.append("Обработано: %d, успешно: %d, с ошибками: %d%n%n".formatted(processed, success, failedLinks.size()));
-        sb.append("Неуспешные ссылки:\n");
-        for (FailedLink fl : failedLinks) {
-            sb.append("• %s — %s%n".formatted(fl.url(), fl.reason()));
-        }
-
-        List<Long> affectedChatIds =
-                failedLinks.stream().map(FailedLink::chatId).distinct().toList();
-
-        messageSender.send(new LinkUpdate(0, "system://scheduler-error-report", sb.toString(), affectedChatIds));
-    }
-
+    /**
+     * Разбивает список на ограниченное число непрерывных подсписков.
+     *
+     * @param list исходный список
+     * @param partitions желаемое число частей
+     * @param <T> тип элементов списка
+     * @return список подсписков для параллельной обработки
+     */
     private static <T> List<List<T>> partitionList(List<T> list, int partitions) {
         if (list.isEmpty() || partitions <= 0) {
             return List.of();
@@ -176,6 +174,4 @@ public class LinkUpdatesScheduler {
         }
         return result;
     }
-
-    private record FailedLink(String url, long chatId, String reason) {}
 }

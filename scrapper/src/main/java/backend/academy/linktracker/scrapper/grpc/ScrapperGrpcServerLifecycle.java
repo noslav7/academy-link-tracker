@@ -93,7 +93,7 @@ public class ScrapperGrpcServerLifecycle implements ApplicationRunner {
      * Останавливает gRPC-сервер при завершении приложения.
      */
     @PreDestroy
-    public void stop() {
+    private void stop() {
         if (server != null) {
             server.shutdown();
         }

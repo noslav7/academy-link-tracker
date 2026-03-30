@@ -14,6 +14,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Управляет запуском и остановкой gRPC-сервера bot-сервиса.
+ *
+ * <p>Используется {@link ApplicationRunner} вместо конструктора/PostConstruct,
+ * поскольку gRPC-сервер открывает сетевой порт и начинает принимать запросы —
+ * это допустимо только после полной инициализации контекста Spring,
+ * чтобы входящие вызовы не попадали на частично инициализированные бины.
  */
 @Component
 public class BotGrpcServerLifecycle implements ApplicationRunner {
@@ -81,7 +86,7 @@ public class BotGrpcServerLifecycle implements ApplicationRunner {
      * Останавливает gRPC-сервер при завершении приложения.
      */
     @PreDestroy
-    public void stop() {
+    private void stop() {
         if (server != null) {
             server.shutdown();
         }

@@ -8,6 +8,7 @@ import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.BotCommand;
 import com.pengrad.telegrambot.request.SetMyCommands;
+import com.pengrad.telegrambot.response.BaseResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
@@ -79,7 +80,16 @@ public class TelegramConfiguration {
                 commandDispatcher.commands().stream().map(this::toBotCommand).toArray(BotCommand[]::new);
 
         try {
-            telegramBot.execute(new SetMyCommands(commands));
+            BaseResponse response = telegramBot.execute(new SetMyCommands(commands));
+            if (response == null || !response.isOk()) {
+                log.atError()
+                        .addKeyValue("commandsCount", commands.length)
+                        .addKeyValue("telegramResponseOk", response != null && response.isOk())
+                        .addKeyValue("telegramErrorCode", response == null ? null : response.errorCode())
+                        .addKeyValue("telegramDescription", response == null ? null : response.description())
+                        .log("Failed to register telegram commands");
+                throw new IllegalStateException("Failed to register telegram commands: telegram api returned non-ok");
+            }
             log.atInfo()
                     .addKeyValue("setMyCommandsOnStartup", true)
                     .addKeyValue("commandsCount", commands.length)

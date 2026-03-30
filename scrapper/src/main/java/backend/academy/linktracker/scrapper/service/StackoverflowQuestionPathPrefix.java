@@ -40,7 +40,7 @@ enum StackoverflowQuestionPathPrefix {
      *
      * @return символьный префикс в URL-пути
      */
-    String symbol() {
+    private String symbol() {
         return symbol;
     }
 
