@@ -100,8 +100,11 @@ class TelegramBotIntegrationTest implements WithAssertions {
     }
 
     private void stubSingleUpdateFlow() {
+        String scenarioName = "Updates Listener " + System.nanoTime();
+        String deliveredState = "Updates Received";
+
         stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
-                .inScenario("Updates Listener")
+                .inScenario(scenarioName)
                 .whenScenarioStateIs(STARTED)
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -131,11 +134,11 @@ class TelegramBotIntegrationTest implements WithAssertions {
                                   ]
                                 }
                                 """))
-                .willSetStateTo("Updates Received"));
+                .willSetStateTo(deliveredState));
 
         stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
-                .inScenario("Updates Listener")
-                .whenScenarioStateIs("Updates Received")
+                .inScenario(scenarioName)
+                .whenScenarioStateIs(deliveredState)
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

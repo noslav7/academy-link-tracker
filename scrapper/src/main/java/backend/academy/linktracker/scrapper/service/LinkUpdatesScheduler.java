@@ -151,11 +151,11 @@ public class LinkUpdatesScheduler {
 
     private void sendErrorNotification(String runId, int processed, int success, List<FailedLink> failedLinks) {
         StringBuilder sb = new StringBuilder();
-        sb.append("⚠ Отчёт планировщика (runId: %s)\n".formatted(runId));
-        sb.append("Обработано: %d, успешно: %d, с ошибками: %d\n\n".formatted(processed, success, failedLinks.size()));
+        sb.append("⚠ Отчёт планировщика (runId: %s)%n".formatted(runId));
+        sb.append("Обработано: %d, успешно: %d, с ошибками: %d%n%n".formatted(processed, success, failedLinks.size()));
         sb.append("Неуспешные ссылки:\n");
         for (FailedLink fl : failedLinks) {
-            sb.append("• %s — %s\n".formatted(fl.url(), fl.reason()));
+            sb.append("• %s — %s%n".formatted(fl.url(), fl.reason()));
         }
 
         List<Long> affectedChatIds =

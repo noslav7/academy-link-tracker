@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
  * Программный запуск миграций Liquibase при старте приложения.
  */
 @Component
-public class DatabaseMigrationRunner {
+public final class DatabaseMigrationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DatabaseMigrationRunner.class);
     private static final String CHANGELOG_PATH = "migrations/master.xml";
