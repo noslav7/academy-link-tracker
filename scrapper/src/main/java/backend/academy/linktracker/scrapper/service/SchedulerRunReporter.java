@@ -79,19 +79,23 @@ public class SchedulerRunReporter {
      * @param success количество успешных ссылок
      * @param failedLinks список ссылок с ошибками
      */
-    private void sendErrorNotification(String runId, int processed, int success, List<SchedulerFailedLink> failedLinks) {
+    private void sendErrorNotification(
+            String runId, int processed, int success, List<SchedulerFailedLink> failedLinks) {
         StringBuilder description = new StringBuilder();
-        description.append("⚠ Отчёт планировщика (runId: %s)\n".formatted(runId));
-        description.append("Обработано: %d, успешно: %d, с ошибками: %d\n\n".formatted(processed, success, failedLinks.size()));
-        description.append("Неуспешные ссылки:\n");
+        description.append("⚠ Отчёт планировщика (runId: %s)%n".formatted(runId));
+        description.append(
+                "Обработано: %d, успешно: %d, с ошибками: %d%n%n".formatted(processed, success, failedLinks.size()));
+        description.append("Неуспешные ссылки:%n".formatted());
 
         for (SchedulerFailedLink failedLink : failedLinks) {
-            description.append("• %s — %s\n".formatted(failedLink.url(), failedLink.reason()));
+            description.append("• %s — %s%n".formatted(failedLink.url(), failedLink.reason()));
         }
 
         List<Long> affectedChatIds =
                 failedLinks.stream().map(SchedulerFailedLink::chatId).distinct().toList();
+        String normalizedDescription = description.toString().replace("\r\n", "\n");
 
-        messageSender.send(new LinkUpdate(0, "system://scheduler-error-report", description.toString(), affectedChatIds));
+        messageSender.send(
+                new LinkUpdate(0, "system://scheduler-error-report", normalizedDescription, affectedChatIds));
     }
 }

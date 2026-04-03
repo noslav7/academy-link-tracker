@@ -88,12 +88,8 @@ public class RestGithubClient implements GithubClient {
             String body = first.body() == null ? "" : first.body();
             boolean issue = first.pullRequest() == null;
 
-            return Optional.of(new GithubIssueOrPullRequestUpdate(
-                    issue,
-                    first.title(),
-                    authorLogin,
-                    first.createdAt(),
-                    body));
+            return Optional.of(
+                    new GithubIssueOrPullRequestUpdate(issue, first.title(), authorLogin, first.createdAt(), body));
         } catch (RuntimeException ex) {
             return Optional.empty();
         }

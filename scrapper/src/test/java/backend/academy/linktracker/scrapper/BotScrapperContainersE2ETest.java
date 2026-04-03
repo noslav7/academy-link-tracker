@@ -184,14 +184,10 @@ class BotScrapperContainersE2ETest {
         // Force metadata change after link registration to avoid race conditions.
         stubGithubUpdatedAt("2026-02-26T00:00:00Z", 1);
 
-        await().atMost(90, SECONDS)
-                .untilAsserted(() -> verifySendMessage(
-                        42L,
-                        """
+        await().atMost(90, SECONDS).untilAsserted(() -> verifySendMessage(42L, """
                         Обнаружено обновление по отслеживаемой ссылке.
 
-                        Обновление в репозитории octocat/Hello-World (возможно: новый PR или Issue)"""
-                                .stripTrailing()));
+                        Обновление в репозитории octocat/Hello-World (возможно: новый PR или Issue)""".stripTrailing()));
     }
 
     @Test

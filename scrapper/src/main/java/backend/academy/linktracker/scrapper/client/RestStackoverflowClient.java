@@ -85,26 +85,25 @@ public class RestStackoverflowClient implements StackoverflowClient {
                     .retrieve()
                     .body(StackoverflowResponse.class);
 
-            if (questionResponse == null || questionResponse.items() == null || questionResponse.items().isEmpty()) {
+            if (questionResponse == null
+                    || questionResponse.items() == null
+                    || questionResponse.items().isEmpty()) {
                 return Optional.empty();
             }
             StackoverflowItem question = questionResponse.items().getFirst();
             String questionTitle = question.title() == null ? "Без названия" : question.title();
 
             Optional<StackoverflowEvent> latestAnswer = fetchLatestEvent(questionId, "/questions/{id}/answers", true);
-            Optional<StackoverflowEvent> latestComment = fetchLatestEvent(questionId, "/questions/{id}/comments", false);
+            Optional<StackoverflowEvent> latestComment =
+                    fetchLatestEvent(questionId, "/questions/{id}/comments", false);
 
             Optional<StackoverflowEvent> latestEvent = selectLatest(latestAnswer, latestComment);
             if (latestEvent.isEmpty()) {
                 return Optional.empty();
             }
-            StackoverflowEvent event = latestEvent.get();
+            StackoverflowEvent event = latestEvent.orElseThrow();
             return Optional.of(new StackoverflowAnswerOrCommentUpdate(
-                    questionTitle,
-                    event.answer(),
-                    event.authorDisplayName(),
-                    event.createdAt(),
-                    event.body()));
+                    questionTitle, event.answer(), event.authorDisplayName(), event.createdAt(), event.body()));
         } catch (RuntimeException ex) {
             return Optional.empty();
         }
@@ -127,10 +126,7 @@ public class RestStackoverflowClient implements StackoverflowClient {
 
         StackoverflowResponse response = restClient
                 .get()
-                .uri(uriBuilder -> uriBuilder
-                        .path(path)
-                        .queryParams(params)
-                        .build(questionId))
+                .uri(uriBuilder -> uriBuilder.path(path).queryParams(params).build(questionId))
                 .retrieve()
                 .body(StackoverflowResponse.class);
 
@@ -165,7 +161,9 @@ public class RestStackoverflowClient implements StackoverflowClient {
         if (comment.isEmpty()) {
             return answer;
         }
-        return answer.get().createdAt().isAfter(comment.get().createdAt()) ? answer : comment;
+        StackoverflowEvent answerEvent = answer.orElseThrow();
+        StackoverflowEvent commentEvent = comment.orElseThrow();
+        return answerEvent.createdAt().isAfter(commentEvent.createdAt()) ? answer : comment;
     }
 
     /**
@@ -204,7 +202,8 @@ public class RestStackoverflowClient implements StackoverflowClient {
             String body,
             StackoverflowOwner owner) {}
 
-    private record StackoverflowOwner(@JsonProperty("display_name") String displayName) {}
+    private record StackoverflowOwner(
+            @JsonProperty("display_name") String displayName) {}
 
     private record StackoverflowEvent(boolean answer, String authorDisplayName, Instant createdAt, String body) {}
 }

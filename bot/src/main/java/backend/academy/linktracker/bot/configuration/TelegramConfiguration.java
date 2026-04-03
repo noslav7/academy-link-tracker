@@ -81,12 +81,12 @@ public class TelegramConfiguration {
 
         try {
             BaseResponse response = telegramBot.execute(new SetMyCommands(commands));
-            if (response == null || !response.isOk()) {
+            if (!response.isOk()) {
                 log.atError()
                         .addKeyValue("commandsCount", commands.length)
-                        .addKeyValue("telegramResponseOk", response != null && response.isOk())
-                        .addKeyValue("telegramErrorCode", response == null ? null : response.errorCode())
-                        .addKeyValue("telegramDescription", response == null ? null : response.description())
+                        .addKeyValue("telegramResponseOk", response.isOk())
+                        .addKeyValue("telegramErrorCode", response.errorCode())
+                        .addKeyValue("telegramDescription", response.description())
                         .log("Failed to register telegram commands");
                 throw new IllegalStateException("Failed to register telegram commands: telegram api returned non-ok");
             }

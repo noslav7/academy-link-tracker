@@ -40,10 +40,6 @@ public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
             values (?, ?)
             on conflict do nothing
             """;
-    private static final Map<String, String> INSERT_SQL_BY_TABLE_AND_COLUMN = Map.of(
-            "tracked_link_tags:tag", INSERT_TRACKED_LINK_TAG,
-            "tracked_link_filters:filter_value", INSERT_TRACKED_LINK_FILTER);
-
     private final JdbcTemplate jdbcTemplate;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
@@ -289,14 +285,21 @@ public class SqlTrackedLinkRepository extends AbstractPagingAwareTrackedLinkRepo
             return;
         }
         String tableAndColumn = table + ":" + valueColumn;
-        String insertSql = INSERT_SQL_BY_TABLE_AND_COLUMN.get(tableAndColumn);
-        if (insertSql == null) {
-            throw new IllegalArgumentException("Unsupported table/value column pair");
+        if ("tracked_link_tags:tag".equals(tableAndColumn)) {
+            jdbcTemplate.batchUpdate(INSERT_TRACKED_LINK_TAG, values, values.size(), (ps, value) -> {
+                ps.setLong(1, trackedLinkId);
+                ps.setString(2, value);
+            });
+            return;
         }
-        jdbcTemplate.batchUpdate(insertSql, values, values.size(), (ps, value) -> {
-            ps.setLong(1, trackedLinkId);
-            ps.setString(2, value);
-        });
+        if ("tracked_link_filters:filter_value".equals(tableAndColumn)) {
+            jdbcTemplate.batchUpdate(INSERT_TRACKED_LINK_FILTER, values, values.size(), (ps, value) -> {
+                ps.setLong(1, trackedLinkId);
+                ps.setString(2, value);
+            });
+            return;
+        }
+        throw new IllegalArgumentException("Unsupported table/value column pair");
     }
 
     private Long trackedLinkId(long chatId, String url) {

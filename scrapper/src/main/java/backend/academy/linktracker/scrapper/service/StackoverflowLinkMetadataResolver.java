@@ -62,19 +62,18 @@ public class StackoverflowLinkMetadataResolver extends AbstractHostBasedLinkMeta
         long questionId = requireQuestionId(uri);
         return stackoverflowClient
                 .fetchLatestAnswerOrCommentUpdate(questionId)
-                .map(update -> """
-                        StackOverflow: новый %s
-                        Тема вопроса: %s
-                        Пользователь: %s
-                        Время создания: %s
-                        Превью: %s
-                        """
+                .map(update -> ("StackOverflow: новый %s%n"
+                                + "Тема вопроса: %s%n"
+                                + "Пользователь: %s%n"
+                                + "Время создания: %s%n"
+                                + "Превью: %s%n")
                         .formatted(
                                 update.answer() ? "ответ" : "комментарий",
                                 safe(update.questionTitle()),
                                 safe(update.authorDisplayName()),
                                 update.createdAt(),
-                                toPreview(update.body())))
+                                toPreview(update.body()))
+                        .replace("\r\n", "\n"))
                 .orElse("Обновление вопроса #%d на StackOverflow (возможно: новый ответ или комментарий)"
                         .formatted(questionId));
     }

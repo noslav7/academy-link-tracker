@@ -77,6 +77,8 @@ final class RequestFieldNormalizer {
         if (values == null || values.isEmpty()) {
             return List.of();
         }
-        return values.stream().map(value -> normalizeField(value, fieldName, maxLength)).toList();
+        return values.stream()
+                .map(value -> normalizeField(value, fieldName, maxLength))
+                .toList();
     }
 }

@@ -59,13 +59,11 @@ public class GithubLinkMetadataResolver extends AbstractHostBasedLinkMetadataRes
         String repo = segments.get(REPOSITORY_SEGMENT_INDEX);
         return githubClient
                 .fetchLatestIssueOrPullRequest(owner, repo)
-                .map(update -> """
-                        GitHub: новый %s в %s/%s
-                        Название: %s
-                        Пользователь: %s
-                        Время создания: %s
-                        Превью описания: %s
-                        """
+                .map(update -> ("GitHub: новый %s в %s/%s%n"
+                                + "Название: %s%n"
+                                + "Пользователь: %s%n"
+                                + "Время создания: %s%n"
+                                + "Превью описания: %s%n")
                         .formatted(
                                 update.issue() ? "Issue" : "PR",
                                 owner,
@@ -73,7 +71,8 @@ public class GithubLinkMetadataResolver extends AbstractHostBasedLinkMetadataRes
                                 safe(update.title()),
                                 safe(update.authorLogin()),
                                 update.createdAt(),
-                                toPreview(update.body())))
+                                toPreview(update.body()))
+                        .replace("\r\n", "\n"))
                 .orElse("Обновление в репозитории %s/%s (возможно: новый PR или Issue)".formatted(owner, repo));
     }
 

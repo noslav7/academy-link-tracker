@@ -1,7 +1,7 @@
 package backend.academy.linktracker.bot.grpc;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import backend.academy.linktracker.bot.client.dto.LinkUpdate;
 import backend.academy.linktracker.bot.service.UpdateNotificationService;

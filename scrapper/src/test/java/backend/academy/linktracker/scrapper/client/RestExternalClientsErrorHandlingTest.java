@@ -102,11 +102,12 @@ class RestExternalClientsErrorHandlingTest {
     @Test
     void givenGithubClientWhenLatestIssueApiReturnsValidBodyThenReturnsStructuredDetails() {
         // Проверяет полный контракт маппинга последнего Issue/PR из GitHub API.
-        wireMockServer.stubFor(get(urlEqualTo("/github/repos/user/repo/issues?state=all&sort=created&direction=desc&per_page=1"))
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
+        wireMockServer.stubFor(
+                get(urlEqualTo("/github/repos/user/repo/issues?state=all&sort=created&direction=desc&per_page=1"))
+                        .willReturn(aResponse()
+                                .withStatus(200)
+                                .withHeader("Content-Type", "application/json")
+                                .withBody("""
                                 [{
                                   "title":"Fix flaky test",
                                   "body":"Description",
@@ -120,11 +121,7 @@ class RestExternalClientsErrorHandlingTest {
 
         assertEquals(
                 Optional.of(new GithubIssueOrPullRequestUpdate(
-                        true,
-                        "Fix flaky test",
-                        "octocat",
-                        Instant.parse("2026-03-02T00:00:00Z"),
-                        "Description")),
+                        true, "Fix flaky test", "octocat", Instant.parse("2026-03-02T00:00:00Z"), "Description")),
                 result);
     }
 
@@ -159,11 +156,7 @@ class RestExternalClientsErrorHandlingTest {
 
         assertEquals(
                 Optional.of(new StackoverflowAnswerOrCommentUpdate(
-                        "How to test scheduler?",
-                        true,
-                        "alice",
-                        Instant.parse("2026-03-02T00:00:00Z"),
-                        "answer body")),
+                        "How to test scheduler?", true, "alice", Instant.parse("2026-03-02T00:00:00Z"), "answer body")),
                 result);
     }
 }

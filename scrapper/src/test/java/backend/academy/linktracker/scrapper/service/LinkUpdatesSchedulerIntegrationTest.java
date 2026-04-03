@@ -113,18 +113,8 @@ class LinkUpdatesSchedulerIntegrationTest {
         stubBotNotificationsAlwaysOk();
         stubStackoverflowUpdatedAt(123L, 1_772_323_200L, 10);
         stubStackoverflowQuestionTitle(123L, "How to build resilient schedulers?", 10);
-        stubStackoverflowLatestAnswer(
-                123L,
-                1_772_409_600L,
-                "alice",
-                "<p>%s</p>".formatted("B".repeat(260)),
-                10);
-        stubStackoverflowLatestComment(
-                123L,
-                1_772_300_000L,
-                "bob",
-                "<p>Older comment</p>",
-                10);
+        stubStackoverflowLatestAnswer(123L, 1_772_409_600L, "alice", "<p>%s</p>".formatted("B".repeat(260)), 10);
+        stubStackoverflowLatestComment(123L, 1_772_300_000L, "bob", "<p>Older comment</p>", 10);
 
         long chatId = 502L;
         registerAndTrack(chatId, "https://stackoverflow.com/questions/123/example-question", List.of(), List.of());
@@ -308,8 +298,7 @@ class LinkUpdatesSchedulerIntegrationTest {
                                     "pull_request": %s
                                   }
                                 ]
-                                """
-                                .formatted(title, body, author, createdAtIso, pullRequest))));
+                                """.formatted(title, body, author, createdAtIso, pullRequest))));
     }
 
     private void stubStackoverflowUpdatedAt(long questionId, long lastActivityEpochSeconds, int priority) {
@@ -340,8 +329,7 @@ class LinkUpdatesSchedulerIntegrationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
                                 {"items":[{"creation_date":%d,"body":"%s","owner":{"display_name":"%s"}}]}
-                                """
-                                .formatted(creationDate, body, author))));
+                                """.formatted(creationDate, body, author))));
     }
 
     private void stubStackoverflowLatestComment(
@@ -354,8 +342,7 @@ class LinkUpdatesSchedulerIntegrationTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
                                 {"items":[{"creation_date":%d,"body":"%s","owner":{"display_name":"%s"}}]}
-                                """
-                                .formatted(creationDate, body, author))));
+                                """.formatted(creationDate, body, author))));
     }
 
     private List<JsonNode> capturedBotUpdates() {

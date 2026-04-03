@@ -16,8 +16,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
@@ -100,10 +100,12 @@ class LinkUpdatesSchedulerTest {
                 "bad-repo", () -> Instant.parse("2026-02-25T00:00:00Z")));
         Map<String, Supplier<Instant>> failureResponses = Map.<String, Supplier<Instant>>of(
                 "good-repo", () -> Instant.parse("2026-02-25T00:00:00Z"),
-                "bad-repo", () -> {
-                    throw new RuntimeException("API error");
-                });
-        GithubClient githubClient = (owner, repo) -> responsesByRepo.get()
+                "bad-repo",
+                        () -> {
+                            throw new RuntimeException("API error");
+                        });
+        GithubClient githubClient = (owner, repo) -> responsesByRepo
+                .get()
                 .getOrDefault(repo, () -> Instant.parse("2026-02-25T00:00:00Z"))
                 .get();
         StackoverflowClient stackoverflowClient = questionId -> Instant.EPOCH;
@@ -143,7 +145,8 @@ class LinkUpdatesSchedulerTest {
         assertEquals(List.of(42L), errorReport.tgChatIds());
 
         String actualDescription = errorReport.description();
-        var runIdMatcher = Pattern.compile("⚠ Отчёт планировщика \\(runId: ([^)]+)\\)\n").matcher(actualDescription);
+        var runIdMatcher =
+                Pattern.compile("⚠ Отчёт планировщика \\(runId: ([^)]+)\\)\n").matcher(actualDescription);
         assertTrue(runIdMatcher.find());
 
         String expectedDescription = """
