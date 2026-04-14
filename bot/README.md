@@ -12,14 +12,15 @@
 - удаляет ссылку из отслеживания по `/untrack <url>`;
 - показывает отслеживаемые ссылки по `/list` (опционально с фильтром по тегу: `/list <tag>`);
 - прерывает текущий диалог по `/cancel`;
-- принимает уведомления об обновлениях от `scrapper` по HTTP (`POST /updates`) или gRPC.
+- принимает уведомления об обновлениях от `scrapper`; транспорт задаётся конфигурацией, по умолчанию Kafka-консьюмер.
 
 ## Требования
 
 - JDK и Maven Wrapper из проекта (`mvnw`, `pom.xml`);
 - токен Telegram-бота от `@BotFather`;
 - доступ в интернет к Telegram API;
-- запущенный `scrapper` для команд `/track`, `/untrack`, `/list` и регистрации чата.
+- запущенный `scrapper` для команд `/track`, `/untrack`, `/list` и регистрации чата;
+- доступный Kafka-брокер (по умолчанию `localhost:9092`) для приёма уведомлений.
 
 ## Настройка
 
@@ -28,12 +29,18 @@
 
 ```properties
 TELEGRAM_TOKEN=ваш_токен_из_BotFather
-```
 
-3. При необходимости укажите адрес `scrapper`:
-
-```properties
+# Куда ходить за scrapper (для REST/gRPC команд)
 SCRAPPER_BASE_URL=http://localhost:8081
+SCRAPPER_TRANSPORT=HTTP
+SCRAPPER_GRPC_HOST=localhost
+SCRAPPER_GRPC_PORT=9091
+
+# Kafka для получения уведомлений (по умолчанию используется)
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_TOPIC=link-updates
+KAFKA_GROUP_ID=bot-link-updates
+KAFKA_CLIENT_ID=bot
 ```
 
 `bot` автоматически читает `bot/.env` через `spring.config.import` в `bot/src/main/resources/application.yaml`.

@@ -17,7 +17,8 @@
 
 - JDK версии, указанной в `pom.xml` проекта;
 - Maven Wrapper из репозитория (`mvnw`, `mvnw.cmd`);
-- Docker Desktop (для blackbox/E2E тестов).
+- Kafka-кластер, доступный по `KAFKA_BOOTSTRAP_SERVERS` (по умолчанию `localhost:9092`) — уведомления теперь по умолчанию идут через Kafka;
+- Docker Desktop (для Testcontainers/blackbox/E2E тестов).
 
 ## Быстрый старт
 
@@ -28,6 +29,7 @@ Windows PowerShell:
 ```powershell
 .\mvnw.cmd spotless:apply
 .\mvnw.cmd verify
+.\mvnw.cmd -am -pl scrapper,bot package
 ```
 
 Unix/macOS:
@@ -35,6 +37,7 @@ Unix/macOS:
 ```shell
 ./mvnw spotless:apply
 ./mvnw verify
+./mvnw -am -pl scrapper,bot package
 ```
 
 ## Документация по сервисам

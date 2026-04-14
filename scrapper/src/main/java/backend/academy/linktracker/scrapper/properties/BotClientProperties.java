@@ -30,7 +30,7 @@ public class BotClientProperties {
     /**
      * Транспорт отправки уведомлений в bot.
      */
-    private TransportMode transport = TransportMode.HTTP;
+    private TransportMode transport = TransportMode.KAFKA;
 
     /**
      * Хост gRPC-сервера bot.

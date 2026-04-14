@@ -11,7 +11,11 @@ public enum TransportMode {
     /**
      * gRPC транспорт.
      */
-    GRPC;
+    GRPC,
+    /**
+     * Kafka транспорт (асинхронный через очередь сообщений).
+     */
+    KAFKA;
 
     /**
      * Символьное значение HTTP режима для property-конфигурации.
@@ -21,4 +25,9 @@ public enum TransportMode {
      * Символьное значение gRPC режима для property-конфигурации.
      */
     public static final String GRPC_VALUE = "GRPC";
+
+    /**
+     * Символьное значение Kafka режима для property-конфигурации.
+     */
+    public static final String KAFKA_VALUE = "KAFKA";
 }

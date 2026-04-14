@@ -8,7 +8,7 @@
 - хранит чаты и отслеживаемые ссылки;
 - предоставляет HTTP API для регистрации чатов и управления ссылками;
 - периодически проверяет обновления у внешних источников (GitHub/StackOverflow);
-- автоматически отправляет уведомления в `bot` по HTTP или gRPC.
+- автоматически отправляет уведомления в `bot`; транспорт выбирается конфигурацией, по умолчанию Kafka.
 
 ## Важно про режим работы
 
@@ -23,7 +23,8 @@
 
 - JDK и Maven Wrapper из проекта (`mvnw`, `pom.xml`);
 - запущенный `bot` для отправки уведомлений;
-- при необходимости Docker (для контейнерных сценариев).
+- доступный Kafka-брокер (по умолчанию `localhost:9092`);
+- при необходимости Docker (для контейнерных сценариев/Testcontainers).
 
 ## Настройка
 
@@ -37,7 +38,14 @@ ACCESS_TYPE=SQL
 LIQUIBASE_ENABLED=true
 
 BOT_BASE_URL=http://localhost:8080
-BOT_TRANSPORT=HTTP
+BOT_TRANSPORT=KAFKA
+BOT_GRPC_HOST=localhost
+BOT_GRPC_PORT=9090
+
+# Kafka (отправка уведомлений по умолчанию)
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_TOPIC=link-updates
+KAFKA_CLIENT_ID=scrapper
 SCRAPPER_SCHEDULER_INTERVAL=30s
 SCRAPPER_SCHEDULER_BATCH_SIZE=100
 SCRAPPER_SCHEDULER_THREAD_COUNT=4
@@ -48,8 +56,14 @@ STACKOVERFLOW_KEY=
 STACKOVERFLOW_ACCESS_KEY=
 ```
 
-Если используете gRPC-канал до `bot`:
+Если хотите сменить транспорт:
 
+- HTTP:
+```properties
+BOT_TRANSPORT=HTTP
+```
+
+- gRPC:
 ```properties
 BOT_TRANSPORT=GRPC
 BOT_GRPC_HOST=localhost
@@ -146,7 +160,7 @@ Unix/macOS:
 2. Запустите `scrapper`.
 3. Зарегистрируйте чат через `POST /tg-chat/{id}`.
 4. Добавьте ссылку через `POST /links`.
-5. Подождите один-два интервала scheduler и проверьте, что в `bot` ушло уведомление при изменении источника.
+5. Подождите один-два интервала scheduler и проверьте, что в `bot` ушло уведомление при изменении источника (при Kafka убедитесь в доступности брокера и топика).
 
 ## Контейнерный E2E
 

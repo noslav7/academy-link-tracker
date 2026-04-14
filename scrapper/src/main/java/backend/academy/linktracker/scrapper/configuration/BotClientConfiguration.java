@@ -5,8 +5,6 @@ import backend.academy.linktracker.scrapper.client.GrpcBotNotificationsClient;
 import backend.academy.linktracker.scrapper.client.RestBotNotificationsClient;
 import backend.academy.linktracker.scrapper.properties.BotClientProperties;
 import backend.academy.linktracker.scrapper.properties.TransportMode;
-import backend.academy.linktracker.scrapper.service.ClientMessageSender;
-import backend.academy.linktracker.scrapper.service.MessageSender;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -58,13 +56,5 @@ public class BotClientConfiguration {
     @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = TransportMode.GRPC_VALUE)
     BotNotificationsClient grpcBotNotificationsClient(ManagedChannel botGrpcChannel) {
         return new GrpcBotNotificationsClient(botGrpcChannel);
-    }
-
-    /**
-     * Отправитель уведомлений, делегирующий в клиент bot-сервиса.
-     */
-    @Bean
-    MessageSender messageSender(BotNotificationsClient botNotificationsClient) {
-        return new ClientMessageSender(botNotificationsClient);
     }
 }

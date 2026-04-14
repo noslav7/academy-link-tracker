@@ -30,9 +30,13 @@ app:
     base-url: ${GITHUB_BASE_URL:https://api.github.com}
   bot:
     base-url: ${BOT_BASE_URL:http://localhost:8080}
-    transport: ${BOT_TRANSPORT:HTTP}
+    transport: ${BOT_TRANSPORT:KAFKA}
     grpc-host: ${BOT_GRPC_HOST:localhost}
     grpc-port: ${BOT_GRPC_PORT:9090}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    topic: ${KAFKA_TOPIC:link-updates}
+    client-id: ${KAFKA_CLIENT_ID:scrapper}
   scheduler:
     interval: ${SCRAPPER_SCHEDULER_INTERVAL:30s}
     batch-size: ${SCRAPPER_SCHEDULER_BATCH_SIZE:100}
