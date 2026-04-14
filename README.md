@@ -17,7 +17,7 @@
 
 - JDK версии, указанной в `pom.xml` проекта;
 - Maven Wrapper из репозитория (`mvnw`, `mvnw.cmd`);
-- Kafka-кластер, доступный по `KAFKA_BOOTSTRAP_SERVERS` (по умолчанию `localhost:9092`) — уведомления теперь по умолчанию идут через Kafka;
+- Kafka-кластер, доступный по `KAFKA_BOOTSTRAP_SERVERS` (по умолчанию `localhost:9092,localhost:9093,localhost:9094`) — уведомления теперь по умолчанию идут через Kafka;
 - Docker Desktop (для Testcontainers/blackbox/E2E тестов).
 
 ## Быстрый старт

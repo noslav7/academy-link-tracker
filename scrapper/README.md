@@ -23,7 +23,7 @@
 
 - JDK и Maven Wrapper из проекта (`mvnw`, `pom.xml`);
 - запущенный `bot` для отправки уведомлений;
-- доступный Kafka-брокер (по умолчанию `localhost:9092`);
+- доступный Kafka-кластер (по умолчанию `localhost:9092,localhost:9093,localhost:9094`);
 - при необходимости Docker (для контейнерных сценариев/Testcontainers).
 
 ## Настройка
@@ -43,7 +43,7 @@ BOT_GRPC_HOST=localhost
 BOT_GRPC_PORT=9090
 
 # Kafka (отправка уведомлений по умолчанию)
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092,localhost:9093,localhost:9094
 KAFKA_TOPIC=link-updates
 KAFKA_CLIENT_ID=scrapper
 SCRAPPER_SCHEDULER_INTERVAL=30s
@@ -59,11 +59,13 @@ STACKOVERFLOW_ACCESS_KEY=
 Если хотите сменить транспорт:
 
 - HTTP:
+
 ```properties
 BOT_TRANSPORT=HTTP
 ```
 
 - gRPC:
+
 ```properties
 BOT_TRANSPORT=GRPC
 BOT_GRPC_HOST=localhost

@@ -20,7 +20,7 @@
 - токен Telegram-бота от `@BotFather`;
 - доступ в интернет к Telegram API;
 - запущенный `scrapper` для команд `/track`, `/untrack`, `/list` и регистрации чата;
-- доступный Kafka-брокер (по умолчанию `localhost:9092`) для приёма уведомлений.
+- доступный Kafka-кластер (по умолчанию `localhost:9092,localhost:9093,localhost:9094`) для приёма уведомлений.
 
 ## Настройка
 
@@ -37,7 +37,7 @@ SCRAPPER_GRPC_HOST=localhost
 SCRAPPER_GRPC_PORT=9091
 
 # Kafka для получения уведомлений (по умолчанию используется)
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092,localhost:9093,localhost:9094
 KAFKA_TOPIC=link-updates
 KAFKA_GROUP_ID=bot-link-updates
 KAFKA_CLIENT_ID=bot
