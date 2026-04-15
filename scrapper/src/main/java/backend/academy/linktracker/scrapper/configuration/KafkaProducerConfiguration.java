@@ -3,13 +3,10 @@ package backend.academy.linktracker.scrapper.configuration;
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
 import backend.academy.linktracker.scrapper.properties.TransportMode;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.errors.SerializationException;
-import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -36,7 +33,11 @@ public class KafkaProducerConfiguration {
      */
     @Bean(destroyMethod = "destroy")
     ProducerFactory<String, LinkUpdate> linkUpdateProducerFactory(
-            KafkaProperties kafkaProperties, ObjectMapper objectMapper) {
+            KafkaProperties kafkaProperties,
+            ObjectMapper objectMapper,
+            KafkaInfrastructureValidator kafkaInfrastructureValidator) {
+        kafkaInfrastructureValidator.validateConnectivity(kafkaProperties, "linkUpdateProducerFactory");
+
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
         config.put(ProducerConfig.CLIENT_ID_CONFIG, kafkaProperties.getClientId());
@@ -53,29 +54,5 @@ public class KafkaProducerConfiguration {
     KafkaTemplate<String, LinkUpdate> linkUpdateKafkaTemplate(
             ProducerFactory<String, LinkUpdate> linkUpdateProducerFactory) {
         return new KafkaTemplate<>(linkUpdateProducerFactory);
-    }
-
-    /**
-     * Простая JSON-сериализация LinkUpdate без заголовков типизации.
-     */
-    private static final class LinkUpdateSerializer implements Serializer<LinkUpdate> {
-
-        private final ObjectMapper objectMapper;
-
-        private LinkUpdateSerializer(ObjectMapper objectMapper) {
-            this.objectMapper = objectMapper;
-        }
-
-        @Override
-        public byte[] serialize(String topic, LinkUpdate data) {
-            if (data == null) {
-                return null;
-            }
-            try {
-                return objectMapper.writeValueAsBytes(data);
-            } catch (JsonProcessingException e) {
-                throw new SerializationException("Failed to serialize LinkUpdate", e);
-            }
-        }
     }
 }

@@ -24,7 +24,7 @@ public class NotificationMessagingConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = TransportMode.HTTP_VALUE)
     MessageSender httpMessageSender(BotNotificationsClient botNotificationsClient) {
-        return new ClientMessageSender(botNotificationsClient);
+        return clientMessageSender(botNotificationsClient);
     }
 
     /**
@@ -33,7 +33,7 @@ public class NotificationMessagingConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = TransportMode.GRPC_VALUE)
     MessageSender grpcMessageSender(BotNotificationsClient botNotificationsClient) {
-        return new ClientMessageSender(botNotificationsClient);
+        return clientMessageSender(botNotificationsClient);
     }
 
     /**
@@ -47,5 +47,15 @@ public class NotificationMessagingConfiguration {
             matchIfMissing = true)
     MessageSender kafkaMessageSender(KafkaTemplate<String, LinkUpdate> kafkaTemplate, KafkaProperties kafkaProperties) {
         return new KafkaMessageSender(kafkaTemplate, kafkaProperties);
+    }
+
+    /**
+     * Создает отправитель уведомлений через клиент bot-сервиса.
+     *
+     * @param botNotificationsClient клиент доставки уведомлений
+     * @return отправитель уведомлений через клиентский транспорт
+     */
+    private MessageSender clientMessageSender(BotNotificationsClient botNotificationsClient) {
+        return new ClientMessageSender(botNotificationsClient);
     }
 }

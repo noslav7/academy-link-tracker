@@ -99,6 +99,11 @@ Unix/macOS:
 ./mvnw -f ./scrapper/pom.xml spring-boot:run
 ```
 
+### Проверка fail-fast старта Kafka
+
+При `BOT_TRANSPORT=KAFKA` сервис проверяет доступность Kafka во время инициализации producer-инфраструктуры.
+Если Kafka недоступна, `scrapper` завершает запуск с `ERROR`-логом и исключением.
+
 Порт `scrapper` по умолчанию: `8081`.
 
 ## HTTP API (базово)

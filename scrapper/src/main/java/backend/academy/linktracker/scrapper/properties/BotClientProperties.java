@@ -1,6 +1,6 @@
 package backend.academy.linktracker.scrapper.properties;
 
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotBlank;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,7 +23,7 @@ public class BotClientProperties {
     /**
      * Базовый URL bot HTTP API.
      */
-    @NotEmpty
+    @NotBlank
     @URL
     private String baseUrl;
 
@@ -35,6 +35,7 @@ public class BotClientProperties {
     /**
      * Хост gRPC-сервера bot.
      */
+    @NotBlank
     private String grpcHost = "localhost";
 
     /**

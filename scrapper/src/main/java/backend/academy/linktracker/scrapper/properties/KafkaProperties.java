@@ -1,6 +1,6 @@
 package backend.academy.linktracker.scrapper.properties;
 
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotBlank;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,17 +22,18 @@ public class KafkaProperties {
     /**
      * Адреса bootstrap-серверов Kafka.
      */
-    @NotEmpty
+    @NotBlank
     private String bootstrapServers = "localhost:9092";
 
     /**
      * Имя топика уведомлений.
      */
-    @NotEmpty
+    @NotBlank
     private String topic = "link-updates";
 
     /**
      * Идентификатор клиента-публикатора.
      */
+    @NotBlank
     private String clientId = "scrapper";
 }

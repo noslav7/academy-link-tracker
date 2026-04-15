@@ -39,7 +39,11 @@ public class KafkaConsumerConfiguration {
     @Bean
     @SuppressWarnings({"deprecation", "resource"})
     ConsumerFactory<String, LinkUpdate> linkUpdateConsumerFactory(
-            KafkaProperties kafkaProperties, ObjectMapper objectMapper) {
+            KafkaProperties kafkaProperties,
+            ObjectMapper objectMapper,
+            KafkaInfrastructureValidator kafkaInfrastructureValidator) {
+        kafkaInfrastructureValidator.validateConnectivity(kafkaProperties, "linkUpdateConsumerFactory");
+
         Map<String, Object> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
         config.put(ConsumerConfig.GROUP_ID_CONFIG, kafkaProperties.getGroupId());

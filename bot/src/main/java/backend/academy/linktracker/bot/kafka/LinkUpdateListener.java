@@ -13,14 +13,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class LinkUpdateListener {
 
+    /**
+     * Логгер компонента.
+     */
     private static final Logger log = LoggerFactory.getLogger(LinkUpdateListener.class);
 
+    /**
+     * Сервис отправки уведомлений в Telegram.
+     */
     private final UpdateNotificationService updateNotificationService;
 
+    /**
+     * Создает Kafka-слушатель уведомлений.
+     *
+     * @param updateNotificationService сервис доставки уведомлений
+     */
     public LinkUpdateListener(UpdateNotificationService updateNotificationService) {
         this.updateNotificationService = updateNotificationService;
     }
 
+    /**
+     * Обрабатывает входящее уведомление об обновлении ссылки из Kafka.
+     *
+     * @param update уведомление об обновлении ссылки
+     */
     @KafkaListener(
             topics = "${app.kafka.topic}",
             groupId = "${app.kafka.group-id}",
