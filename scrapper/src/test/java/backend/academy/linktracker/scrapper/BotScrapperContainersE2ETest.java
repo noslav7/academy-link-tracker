@@ -37,7 +37,9 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers(disabledWithoutDocker = true)
 @Tag("integration")
@@ -78,15 +80,22 @@ class BotScrapperContainersE2ETest {
 
     @SuppressWarnings("resource")
     @Container
+    private static final KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("apache/kafka-native:4.1.1"))
+            .withNetwork(NETWORK)
+            .withNetworkAliases("kafka");
+
+    @SuppressWarnings("resource")
+    @Container
     private static final GenericContainer<?> bot = new GenericContainer<>(BOT_IMAGE)
             .withNetwork(NETWORK)
             .withNetworkAliases("bot")
             .withExposedPorts(8080)
-            .dependsOn(wiremock)
+            .dependsOn(wiremock, kafka)
             .withEnv("TELEGRAM_TOKEN", "test-token")
             .withEnv("APP_TELEGRAM_URL", "http://wiremock:8080/bot")
             .withEnv("SCRAPPER_BASE_URL", "http://scrapper:8081")
             .withEnv("SCRAPPER_TRANSPORT", "HTTP")
+            .withEnv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9093")
             .withEnv("APP_TELEGRAM_POLLING_ENABLED", "false")
             .withEnv("APP_TELEGRAM_SET_MY_COMMANDS_ON_STARTUP", "false")
             .withEnv("BOT_GRPC_SERVER_ENABLED", "false")

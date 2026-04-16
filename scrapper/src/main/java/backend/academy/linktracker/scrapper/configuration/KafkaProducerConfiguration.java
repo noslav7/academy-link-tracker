@@ -4,10 +4,12 @@ import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
 import backend.academy.linktracker.scrapper.properties.TransportMode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +29,15 @@ import org.springframework.kafka.core.ProducerFactory;
         havingValue = TransportMode.KAFKA_VALUE,
         matchIfMissing = true)
 public class KafkaProducerConfiguration {
+
+    /**
+     * ObjectMapper с автоподключением модулей для сериализации Kafka-пейлоуда.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ObjectMapper.class)
+    ObjectMapper objectMapper() {
+        return JsonMapper.builder().findAndAddModules().build();
+    }
 
     /**
      * Фабрика Kafka-публикатора для LinkUpdate с ручным сериализатором.

@@ -37,7 +37,8 @@ final class KafkaInfrastructureValidator {
         adminConfig.put(AdminClientConfig.CLIENT_ID_CONFIG, kafkaProperties.getClientId() + "-startup-check");
 
         try (AdminClient adminClient = AdminClient.create(adminConfig)) {
-            int nodesCount = adminClient.describeCluster()
+            int nodesCount = adminClient
+                    .describeCluster()
                     .nodes()
                     .get(STARTUP_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                     .size();
@@ -48,12 +49,11 @@ final class KafkaInfrastructureValidator {
                     .addKeyValue("infrastructure", infrastructureName)
                     .log("Kafka connectivity check passed");
         } catch (Exception exception) {
-            log.atError()
+            log.atWarn()
                     .setCause(exception)
                     .addKeyValue("bootstrapServers", kafkaProperties.getBootstrapServers())
                     .addKeyValue("infrastructure", infrastructureName)
-                    .log("Kafka connectivity check failed");
-            throw new IllegalStateException("Failed to initialize Kafka infrastructure: " + infrastructureName, exception);
+                    .log("Kafka connectivity check failed, continuing without fail-fast startup");
         }
     }
 }

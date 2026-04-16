@@ -8,11 +8,11 @@ import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
-import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import backend.academy.linktracker.bot.command.BotMessages;
 import backend.academy.linktracker.bot.properties.TelegramProperties;
@@ -21,14 +21,18 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.wiremock.spring.EnableWireMock;
 
 @SpringBootTest(properties = {"app.telegram.polling-enabled=true", "app.telegram.set-my-commands-on-startup=false"})
@@ -36,45 +40,29 @@ import org.wiremock.spring.EnableWireMock;
 @ActiveProfiles("test")
 @EnableWireMock
 @Tag("integration")
+@Testcontainers(disabledWithoutDocker = true)
 class TelegramCommandFlowIntegrationTest {
+
+    private static final String HELP_TEXT = """
+            Доступные команды:
+            /cancel - прервать текущий процесс
+            /help - список доступных команд
+            /list - показать отслеживаемые ссылки
+            /start - начало работы
+            /track - начать отслеживание ссылки
+            /untrack - прекратить отслеживание ссылки
+            """;
 
     @Autowired
     TelegramProperties telegramProperties;
 
-    @Test
-    void givenStartCommandUpdateWhenPollingProcessesItThenSendMessageEqualsWelcomeText() {
-        // Проверяет end-to-end обработку /start и отправку приветственного ответа.
-        long chatId = 1001L;
-        stubFlowForSingleUpdate("Start Command Flow", chatId, "/start");
-
-        await().atMost(10, SECONDS).untilAsserted(() -> verifySendMessage(chatId, BotMessages.START_FIRST_TIME));
-    }
-
-    @Test
-    void givenHelpCommandUpdateWhenPollingProcessesItThenSendMessageEqualsFullHelpText() {
-        // Проверяет end-to-end обработку /help и полный текст справки.
-        long chatId = 1002L;
-        stubFlowForSingleUpdate("Help Command Flow", chatId, "/help");
-
-        String expectedHelpText = """
-                Доступные команды:
-                /cancel - прервать текущий процесс
-                /help - список доступных команд
-                /list - показать отслеживаемые ссылки
-                /start - начало работы
-                /track - начать отслеживание ссылки
-                /untrack - прекратить отслеживание ссылки
-                """;
-        await().atMost(10, SECONDS).untilAsserted(() -> verifySendMessage(chatId, expectedHelpText));
-    }
-
-    @Test
-    void givenUnsupportedCommandUpdateWhenPollingProcessesItThenSendMessageEqualsUnknownCommandText() {
-        // Проверяет end-to-end обработку неподдерживаемой команды.
-        long chatId = 1003L;
-        stubFlowForSingleUpdate("Unknown Command Flow", chatId, "/unsupported");
-
-        await().atMost(10, SECONDS).untilAsserted(() -> verifySendMessage(chatId, BotMessages.UNKNOWN_COMMAND));
+    @ParameterizedTest
+    @MethodSource("commandScenarios")
+    void givenCommandUpdateWhenPollingProcessesItThenSendMessageEqualsExpectedText(
+            String scenarioName, long chatId, String command, String expectedText) {
+        // Проверяет: для каждой входной команды бот отправляет ожидаемый текст ответа.
+        stubFlowForSingleUpdate(scenarioName, chatId, command);
+        await().atMost(10, SECONDS).untilAsserted(() -> verifySendMessage(chatId, expectedText));
     }
 
     private void stubFlowForSingleUpdate(String scenarioName, long chatId, String command) {
@@ -115,12 +103,19 @@ class TelegramCommandFlowIntegrationTest {
     private void verifySendMessage(long chatId, String expectedText) {
         var requestPattern = postRequestedFor(urlPathTemplate("/bot{token}/sendMessage"))
                 .withPathParam("token", equalTo(telegramProperties.getToken()));
-        verify(1, requestPattern);
-
-        LoggedRequest request = findAll(requestPattern).getFirst();
+        var requests = findAll(requestPattern);
+        assertEquals(1, requests.size());
+        LoggedRequest request = requests.getFirst();
         Map<String, String> actualFormData = parseFormData(request.getBodyAsString());
         Map<String, String> expectedFormData = Map.of("chat_id", String.valueOf(chatId), "text", expectedText);
         assertEquals(expectedFormData, actualFormData);
+    }
+
+    private static Stream<Arguments> commandScenarios() {
+        return Stream.of(
+                arguments("Start Command Flow", 1001L, "/start", BotMessages.START_FIRST_TIME),
+                arguments("Help Command Flow", 1002L, "/help", HELP_TEXT),
+                arguments("Unknown Command Flow", 1003L, "/unsupported", BotMessages.UNKNOWN_COMMAND));
     }
 
     private Map<String, String> parseFormData(String body) {

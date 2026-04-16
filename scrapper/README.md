@@ -172,4 +172,11 @@ Unix/macOS:
 ## Контейнерный E2E
 
 В модуле есть контейнерные E2E-тесты в `BotScrapperContainersE2ETest`.
-Они запускаются в составе обычного `test` и требуют Docker.
+Они запускаются через `failsafe` на фазах `integration-test/verify` и требуют Docker.
+
+Пример запуска:
+
+```powershell
+.\mvnw.cmd -pl scrapper -am verify
+```
+

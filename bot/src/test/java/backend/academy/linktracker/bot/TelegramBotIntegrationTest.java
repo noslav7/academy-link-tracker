@@ -9,11 +9,13 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.bot.properties.TelegramProperties;
+import com.github.tomakehurst.wiremock.client.WireMock;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.Message;
@@ -26,6 +28,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.assertj.core.api.WithAssertions;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.wiremock.spring.EnableWireMock;
 
 @SpringBootTest
@@ -41,6 +45,7 @@ import org.wiremock.spring.EnableWireMock;
 @ActiveProfiles("test")
 @EnableWireMock
 @Tag("integration")
+@Testcontainers(disabledWithoutDocker = true)
 class TelegramBotIntegrationTest implements WithAssertions {
 
     @Autowired
@@ -48,6 +53,11 @@ class TelegramBotIntegrationTest implements WithAssertions {
 
     @Autowired
     TelegramProperties telegramProperties;
+
+    @BeforeEach
+    void resetWireMock() {
+        WireMock.reset();
+    }
 
     @AfterEach
     void clearUpdatesListener() {
@@ -65,23 +75,13 @@ class TelegramBotIntegrationTest implements WithAssertions {
         var getUpdatesRequest = new GetUpdates();
         var getUpdatesResponse = telegramBot.execute(getUpdatesRequest);
 
-        assertFalse(getUpdatesResponse.isOk());
-        assertEquals(Integer.valueOf(404), getUpdatesResponse.errorCode());
-
-        verify(
-                1,
-                postRequestedFor(urlPathTemplate("/bot{token}/getUpdates"))
-                        .withPathParam("token", equalTo(telegramProperties.getToken())));
-    }
-
-    @Test
-    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenListenerReceivesSingleUpdate()
-            throws InterruptedException {
-        // Проверяет, что listener получает один апдейт при первом polling-ответе.
-        stubSingleUpdateFlow();
-        List<Update> receivedUpdates = receiveUpdatesByListener();
-
-        assertEquals(1, receivedUpdates.size());
+        assertAll(
+                () -> assertFalse(getUpdatesResponse.isOk()),
+                () -> assertEquals(404, getUpdatesResponse.errorCode()),
+                () -> verify(
+                        1,
+                        postRequestedFor(urlPathTemplate("/bot{token}/getUpdates"))
+                                .withPathParam("token", equalTo(telegramProperties.getToken()))));
     }
 
     @Test
@@ -94,7 +94,7 @@ class TelegramBotIntegrationTest implements WithAssertions {
         assertThat(receivedUpdates)
                 .hasSize(1)
                 .first()
-                .returns(Integer.valueOf(123456), Update::updateId)
+                .returns(123456, Update::updateId)
                 .extracting(Update::message)
                 .returns("Hello Bot", Message::text)
                 .extracting(Message::from)
@@ -102,7 +102,7 @@ class TelegramBotIntegrationTest implements WithAssertions {
     }
 
     private void stubSingleUpdateFlow() {
-        String scenarioName = "Updates Listener " + System.nanoTime();
+        String scenarioName = "Updates Listener Scenario";
         String deliveredState = "Updates Received";
 
         stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
@@ -163,10 +163,10 @@ class TelegramBotIntegrationTest implements WithAssertions {
         });
 
         boolean received = latch.await(10, TimeUnit.SECONDS);
-        assertTrue(received);
-
-        verify(postRequestedFor(urlPathTemplate("/bot{token}/getUpdates"))
-                .withPathParam("token", equalTo(telegramProperties.getToken())));
+        assertAll(
+                () -> assertTrue(received),
+                () -> verify(postRequestedFor(urlPathTemplate("/bot{token}/getUpdates"))
+                        .withPathParam("token", equalTo(telegramProperties.getToken()))));
 
         return receivedUpdates;
     }
