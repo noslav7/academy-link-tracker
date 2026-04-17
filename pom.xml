@@ -46,6 +46,8 @@
         <maven.version>3.9.12</maven.version>
 
         <awaitility.version>4.3.0</awaitility.version>
+        <avro.version>1.12.1</avro.version>
+        <avro-maven-plugin.version>1.12.1</avro-maven-plugin.version>
         <commons-codec.version>1.21.0</commons-codec.version>
         <commons-collections.version>4.5.0</commons-collections.version>
         <commons-compress.version>1.28.0</commons-compress.version>
@@ -59,6 +61,7 @@
         <java-telegram-bot-api.version>9.3.0</java-telegram-bot-api.version>
         <modernizer.version>3.2.0</modernizer.version>
         <opentelemetry-instrumentation.version>2.24.0</opentelemetry-instrumentation.version>
+        <apicurio-registry-serdes.version>2.6.13.Final</apicurio-registry-serdes.version>
         <protobuf-java.version>4.33.4</protobuf-java.version>
         <spotbugs.version>4.9.8</spotbugs.version>
         <spring-ai.version>2.0.0-M2</spring-ai.version>
@@ -119,6 +122,16 @@
                 <version>${opentelemetry-instrumentation.version}-alpha</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro</artifactId>
+                <version>${avro.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.apicurio</groupId>
+                <artifactId>apicurio-registry-serdes-avro-serde</artifactId>
+                <version>${apicurio-registry-serdes.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.google.guava</groupId>

@@ -4,7 +4,7 @@ import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 
 /**
  * Абстракция отправки уведомлений об обновлениях ссылок из scrapper в bot.
- * Реализации: HTTP (текущая), Kafka (будет добавлена позже).
+ * Основная реализация пишет сообщения в Transactional Outbox.
  */
 public interface MessageSender {
     /**

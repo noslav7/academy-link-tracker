@@ -38,9 +38,13 @@ SCRAPPER_GRPC_PORT=9091
 
 # Kafka для получения уведомлений (по умолчанию используется)
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092,localhost:9093,localhost:9094
+KAFKA_SCHEMA_REGISTRY_URL=http://localhost:8085/apis/registry/v2
 KAFKA_TOPIC=link-updates
+KAFKA_DLQ_TOPIC=link-updates-dlq
 KAFKA_GROUP_ID=bot-link-updates
 KAFKA_CLIENT_ID=bot
+KAFKA_RETRY_ATTEMPTS=3
+KAFKA_RETRY_BACKOFF_MS=1000
 ```
 
 `bot` автоматически читает `bot/.env` через `spring.config.import` в `bot/src/main/resources/application.yaml`.
@@ -65,6 +69,14 @@ Unix/macOS:
 
 При `app.kafka.*` конфигурации по умолчанию бот проверяет доступность Kafka во время инициализации consumer-инфраструктуры.
 Если Kafka недоступна, бот логирует предупреждение и продолжает запуск.
+Формат входящих сообщений — Avro (`LinkUpdateEvent`), схема читается из Schema Registry по `KAFKA_SCHEMA_REGISTRY_URL`.
+
+### Повторные попытки и DLQ
+
+- Для временных ошибок обработки включены повторы; лимит задается `KAFKA_RETRY_ATTEMPTS`.
+- После исчерпания попыток сообщение публикуется в `KAFKA_DLQ_TOPIC`.
+- Ошибки десериализации и валидации не ретраятся и сразу отправляются в DLQ.
+- Пауза между попытками задается `KAFKA_RETRY_BACKOFF_MS` (мс).
 
 При необходимости Kafka-консьюмер можно отключить:
 

@@ -1,10 +1,13 @@
 package backend.academy.linktracker.scrapper.configuration;
 
-import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
 import backend.academy.linktracker.scrapper.properties.TransportMode;
+import com.example.notification.LinkUpdateEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.apicurio.registry.serde.avro.AvroKafkaSerdeConfig;
+import io.apicurio.registry.serde.avro.AvroKafkaSerializer;
+import io.apicurio.registry.serde.avro.strategy.RecordIdStrategy;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -40,30 +43,35 @@ public class KafkaProducerConfiguration {
     }
 
     /**
-     * Фабрика Kafka-публикатора для LinkUpdate с ручным сериализатором.
+     * Фабрика Kafka-публикатора для LinkUpdateEvent с Avro-сериализацией через Schema Registry.
      */
     @Bean(destroyMethod = "destroy")
-    ProducerFactory<String, LinkUpdate> linkUpdateProducerFactory(
-            KafkaProperties kafkaProperties,
-            ObjectMapper objectMapper,
-            KafkaInfrastructureValidator kafkaInfrastructureValidator) {
+    @SuppressWarnings({"deprecation", "resource"})
+    ProducerFactory<String, LinkUpdateEvent> linkUpdateProducerFactory(
+            KafkaProperties kafkaProperties, KafkaInfrastructureValidator kafkaInfrastructureValidator) {
         kafkaInfrastructureValidator.validateConnectivity(kafkaProperties, "linkUpdateProducerFactory");
+        kafkaInfrastructureValidator.ensureNotificationTopicExists(kafkaProperties);
 
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
         config.put(ProducerConfig.CLIENT_ID_CONFIG, kafkaProperties.getClientId());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, AvroKafkaSerializer.class);
+        config.put("apicurio.registry.url", kafkaProperties.getSchemaRegistryUrl());
+        config.put("apicurio.registry.auto-register", true);
+        config.put("apicurio.registry.find-latest", true);
+        config.put("apicurio.registry.artifact-id.strategy", RecordIdStrategy.class.getName());
+        config.put(AvroKafkaSerdeConfig.AVRO_ENCODING, AvroKafkaSerdeConfig.AVRO_ENCODING_BINARY);
 
-        return new DefaultKafkaProducerFactory<>(
-                config, new StringSerializer(), new LinkUpdateSerializer(objectMapper));
+        return new DefaultKafkaProducerFactory<>(config);
     }
 
     /**
-     * KafkaTemplate для публикации LinkUpdate в топик уведомлений.
+     * KafkaTemplate для публикации LinkUpdateEvent в топик уведомлений.
      */
     @Bean
-    KafkaTemplate<String, LinkUpdate> linkUpdateKafkaTemplate(
-            ProducerFactory<String, LinkUpdate> linkUpdateProducerFactory) {
+    KafkaTemplate<String, LinkUpdateEvent> linkUpdateKafkaTemplate(
+            ProducerFactory<String, LinkUpdateEvent> linkUpdateProducerFactory) {
         return new KafkaTemplate<>(linkUpdateProducerFactory);
     }
 }

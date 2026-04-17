@@ -4,9 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.nio.charset.StandardCharsets;
+import com.example.notification.LinkUpdateEvent;
+import io.apicurio.registry.serde.avro.AvroKafkaDeserializer;
+import io.apicurio.registry.serde.avro.AvroKafkaSerdeConfig;
+import io.apicurio.registry.serde.avro.AvroKafkaSerializer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
@@ -40,7 +42,11 @@ class KafkaMessageSenderIntegrationTest {
     @Container
     private static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka-native:4.1.1"));
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    @SuppressWarnings("resource")
+    @Container
+    private static final GenericContainer<?> SCHEMA_REGISTRY = new GenericContainer<>(
+                    DockerImageName.parse("apicurio/apicurio-registry-mem:2.6.13.Final"))
+            .withExposedPorts(8080);
 
     @AfterAll
     static void tearDownTopic() {
@@ -53,25 +59,21 @@ class KafkaMessageSenderIntegrationTest {
     }
 
     @Test
-    void givenKafkaTransportWhenMessageSenderSendsThenMessageAppearsInExpectedJsonFormat() throws Exception {
-        // Проверяет: KafkaMessageSender публикует JSON с ожидаемыми полями и значениями.
+    void givenKafkaTransportWhenMessageSenderSendsThenMessageAppearsInExpectedAvroFormat() throws Exception {
+        // Проверяет: KafkaMessageSender публикует Avro-событие с ожидаемыми полями.
         createTopicIfMissing();
         KafkaMessageSender sender = new KafkaMessageSender(kafkaTemplate(), kafkaProperties());
         LinkUpdate update = new LinkUpdate(
                 77L, "https://github.com/octocat/hello-world", "Repository updated", List.of(501L, 777L));
 
-        sender.send(update);
+        sender.dispatch(update);
 
-        ConsumerRecord<String, String> record = pollSingleRecord();
-        JsonNode payload = objectMapper.readTree(record.value());
+        ConsumerRecord<String, LinkUpdateEvent> record = pollSingleRecord();
         Map<String, Object> actualMessage = Map.of(
                 "key", record.key(),
-                "url", payload.path("url").asText(),
-                "description", payload.path("description").asText(),
-                "tgChatIds",
-                        List.of(
-                                payload.path("tgChatIds").get(0).asLong(),
-                                payload.path("tgChatIds").get(1).asLong()));
+                "url", record.value().getUrl().toString(),
+                "description", record.value().getDescription().toString(),
+                "tgChatIds", record.value().getTgChatIds());
         Map<String, Object> expectedMessage = Map.of(
                 "key", "77",
                 "url", "https://github.com/octocat/hello-world",
@@ -80,17 +82,22 @@ class KafkaMessageSenderIntegrationTest {
         assertEquals(expectedMessage, actualMessage);
     }
 
-    private KafkaTemplate<String, LinkUpdate> kafkaTemplate() {
-        ProducerFactory<String, LinkUpdate> producerFactory = new DefaultKafkaProducerFactory<>(
-                Map.of(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers()),
-                new StringSerializer(),
-                (topic, data) -> {
-                    try {
-                        return objectMapper.writeValueAsString(data).getBytes(StandardCharsets.UTF_8);
-                    } catch (Exception exception) {
-                        throw new IllegalStateException("Unable to serialize test LinkUpdate payload", exception);
-                    }
-                });
+    private KafkaTemplate<String, LinkUpdateEvent> kafkaTemplate() {
+        ProducerFactory<String, LinkUpdateEvent> producerFactory = new DefaultKafkaProducerFactory<>(Map.of(
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                KAFKA.getBootstrapServers(),
+                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                StringSerializer.class,
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                AvroKafkaSerializer.class,
+                "apicurio.registry.url",
+                schemaRegistryUrl(),
+                "apicurio.registry.auto-register",
+                true,
+                "apicurio.registry.find-latest",
+                true,
+                AvroKafkaSerdeConfig.AVRO_ENCODING,
+                AvroKafkaSerdeConfig.AVRO_ENCODING_BINARY));
         return new KafkaTemplate<>(producerFactory);
     }
 
@@ -99,6 +106,7 @@ class KafkaMessageSenderIntegrationTest {
         properties.setBootstrapServers(KAFKA.getBootstrapServers());
         properties.setTopic(TOPIC);
         properties.setClientId("scrapper-it");
+        properties.setSchemaRegistryUrl(schemaRegistryUrl());
         return properties;
     }
 
@@ -112,16 +120,25 @@ class KafkaMessageSenderIntegrationTest {
         }
     }
 
-    private ConsumerRecord<String, String> pollSingleRecord() {
+    private ConsumerRecord<String, LinkUpdateEvent> pollSingleRecord() {
         Map<String, Object> config = Map.of(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
                 KAFKA.getBootstrapServers(),
                 ConsumerConfig.GROUP_ID_CONFIG,
                 GROUP_ID,
+                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                StringDeserializer.class,
                 ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
-                "earliest");
-        try (KafkaConsumer<String, String> consumer =
-                new KafkaConsumer<>(config, new StringDeserializer(), new StringDeserializer())) {
+                "earliest",
+                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                AvroKafkaDeserializer.class,
+                "apicurio.registry.url",
+                schemaRegistryUrl(),
+                "apicurio.registry.find-latest",
+                true,
+                AvroKafkaSerdeConfig.USE_SPECIFIC_AVRO_READER,
+                true);
+        try (KafkaConsumer<String, LinkUpdateEvent> consumer = new KafkaConsumer<>(config)) {
             consumer.subscribe(List.of(TOPIC));
 
             long deadline = System.currentTimeMillis() + Duration.ofSeconds(15).toMillis();
@@ -133,5 +150,10 @@ class KafkaMessageSenderIntegrationTest {
             }
         }
         throw new AssertionError("Kafka message was not consumed in time");
+    }
+
+    private static String schemaRegistryUrl() {
+        return "http://%s:%d/apis/registry/v2"
+                .formatted(SCHEMA_REGISTRY.getHost(), SCHEMA_REGISTRY.getMappedPort(8080));
     }
 }

@@ -1,5 +1,9 @@
 package backend.academy.linktracker.bot.client.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.util.List;
 
 /**
@@ -10,4 +14,8 @@ import java.util.List;
  * @param description описание обновления
  * @param tgChatIds получатели уведомления
  */
-public record LinkUpdate(long id, String url, String description, List<Long> tgChatIds) {}
+public record LinkUpdate(
+        @Positive long id,
+        @NotBlank String url,
+        @NotBlank String description,
+        @NotEmpty List<@NotNull @Positive Long> tgChatIds) {}

@@ -44,11 +44,14 @@ BOT_GRPC_PORT=9090
 
 # Kafka (отправка уведомлений по умолчанию)
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092,localhost:9093,localhost:9094
+KAFKA_SCHEMA_REGISTRY_URL=http://localhost:8085/apis/registry/v2
 KAFKA_TOPIC=link-updates
 KAFKA_CLIENT_ID=scrapper
 SCRAPPER_SCHEDULER_INTERVAL=30s
 SCRAPPER_SCHEDULER_BATCH_SIZE=100
 SCRAPPER_SCHEDULER_THREAD_COUNT=4
+OUTBOX_PUBLISH_INTERVAL=1s
+OUTBOX_BATCH_SIZE=100
 
 # Опционально:
 GITHUB_TOKEN=
@@ -103,6 +106,16 @@ Unix/macOS:
 
 При `BOT_TRANSPORT=KAFKA` сервис проверяет доступность Kafka во время инициализации producer-инфраструктуры.
 Если Kafka недоступна, `scrapper` завершает запуск с `ERROR`-логом и исключением.
+Для Kafka используется Avro-сериализация; схема `LinkUpdateEvent` регистрируется в Schema Registry по `KAFKA_SCHEMA_REGISTRY_URL`.
+
+### Отправка уведомлений через Transactional Outbox
+
+- `scrapper` не отправляет уведомления напрямую из бизнес-транзакции.
+- Сначала уведомление пишется в таблицу `notification_outbox` в той же транзакции, где фиксируется обновление `tracked_links`.
+- Отдельный фоновой publisher читает outbox и отправляет сообщение в выбранный транспорт (`HTTP`, `gRPC`, `KAFKA`).
+- Параметры publisher-а:
+  - `OUTBOX_PUBLISH_INTERVAL` — интервал публикации;
+  - `OUTBOX_BATCH_SIZE` — размер батча сообщений за запуск.
 
 Порт `scrapper` по умолчанию: `8081`.
 

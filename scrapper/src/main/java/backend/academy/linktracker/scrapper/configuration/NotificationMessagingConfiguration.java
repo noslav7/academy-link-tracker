@@ -1,12 +1,15 @@
 package backend.academy.linktracker.scrapper.configuration;
 
 import backend.academy.linktracker.scrapper.client.BotNotificationsClient;
-import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
 import backend.academy.linktracker.scrapper.properties.TransportMode;
 import backend.academy.linktracker.scrapper.service.ClientMessageSender;
 import backend.academy.linktracker.scrapper.service.KafkaMessageSender;
 import backend.academy.linktracker.scrapper.service.MessageSender;
+import backend.academy.linktracker.scrapper.service.NotificationDispatcher;
+import backend.academy.linktracker.scrapper.service.OutboxMessageSender;
+import backend.academy.linktracker.scrapper.service.outbox.NotificationOutboxRepository;
+import com.example.notification.LinkUpdateEvent;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,25 +22,25 @@ import org.springframework.kafka.core.KafkaTemplate;
 public class NotificationMessagingConfiguration {
 
     /**
-     * Отправитель через HTTP-клиент bot-сервиса.
+     * Транспорт доставки через HTTP-клиент bot-сервиса.
      */
     @Bean
     @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = TransportMode.HTTP_VALUE)
-    MessageSender httpMessageSender(BotNotificationsClient botNotificationsClient) {
+    NotificationDispatcher httpNotificationDispatcher(BotNotificationsClient botNotificationsClient) {
         return clientMessageSender(botNotificationsClient);
     }
 
     /**
-     * Отправитель через gRPC-клиент bot-сервиса.
+     * Транспорт доставки через gRPC-клиент bot-сервиса.
      */
     @Bean
     @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = TransportMode.GRPC_VALUE)
-    MessageSender grpcMessageSender(BotNotificationsClient botNotificationsClient) {
+    NotificationDispatcher grpcNotificationDispatcher(BotNotificationsClient botNotificationsClient) {
         return clientMessageSender(botNotificationsClient);
     }
 
     /**
-     * Отправитель через Kafka (транспорт по умолчанию).
+     * Транспорт доставки через Kafka (транспорт по умолчанию).
      */
     @Bean
     @ConditionalOnProperty(
@@ -45,8 +48,17 @@ public class NotificationMessagingConfiguration {
             name = "transport",
             havingValue = TransportMode.KAFKA_VALUE,
             matchIfMissing = true)
-    MessageSender kafkaMessageSender(KafkaTemplate<String, LinkUpdate> kafkaTemplate, KafkaProperties kafkaProperties) {
+    NotificationDispatcher kafkaNotificationDispatcher(
+            KafkaTemplate<String, LinkUpdateEvent> kafkaTemplate, KafkaProperties kafkaProperties) {
         return new KafkaMessageSender(kafkaTemplate, kafkaProperties);
+    }
+
+    /**
+     * Отправитель бизнес-сообщений через Transactional Outbox.
+     */
+    @Bean
+    MessageSender outboxMessageSender(NotificationOutboxRepository notificationOutboxRepository) {
+        return new OutboxMessageSender(notificationOutboxRepository);
     }
 
     /**
@@ -55,7 +67,7 @@ public class NotificationMessagingConfiguration {
      * @param botNotificationsClient клиент доставки уведомлений
      * @return отправитель уведомлений через клиентский транспорт
      */
-    private MessageSender clientMessageSender(BotNotificationsClient botNotificationsClient) {
+    private NotificationDispatcher clientMessageSender(BotNotificationsClient botNotificationsClient) {
         return new ClientMessageSender(botNotificationsClient);
     }
 }

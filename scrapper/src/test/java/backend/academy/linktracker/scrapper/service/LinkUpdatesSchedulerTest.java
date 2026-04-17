@@ -46,8 +46,10 @@ class LinkUpdatesSchedulerTest {
         linkService.add(42L, new AddLinkRequest("https://github.com/user/repo", List.of("work"), List.of()));
 
         CapturingMessageSender messageSender = new CapturingMessageSender();
+        LinkUpdatePersistenceService persistenceService =
+                new LinkUpdatePersistenceService(messageSender, trackedLinkMaintenanceService);
         LinkUpdateChecker linkUpdateChecker =
-                new LinkUpdateChecker(linkMetadataResolver, messageSender, trackedLinkMaintenanceService);
+                new LinkUpdateChecker(linkMetadataResolver, persistenceService, trackedLinkMaintenanceService);
         SchedulerRunReporter runReporter = new SchedulerRunReporter(messageSender);
         LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(
                 trackedLinkMaintenanceService, linkUpdateChecker, runReporter, schedulerProperties);
@@ -81,8 +83,10 @@ class LinkUpdatesSchedulerTest {
         linkService.add(42L, new AddLinkRequest("https://github.com/user/repo", List.of("work"), List.of()));
 
         CapturingMessageSender messageSender = new CapturingMessageSender();
+        LinkUpdatePersistenceService persistenceService =
+                new LinkUpdatePersistenceService(messageSender, trackedLinkMaintenanceService);
         LinkUpdateChecker linkUpdateChecker =
-                new LinkUpdateChecker(linkMetadataResolver, messageSender, trackedLinkMaintenanceService);
+                new LinkUpdateChecker(linkMetadataResolver, persistenceService, trackedLinkMaintenanceService);
         SchedulerRunReporter runReporter = new SchedulerRunReporter(messageSender);
         LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(
                 trackedLinkMaintenanceService, linkUpdateChecker, runReporter, schedulerProperties);
@@ -127,8 +131,10 @@ class LinkUpdatesSchedulerTest {
         responsesByRepo.set(failureResponses);
 
         CapturingMessageSender messageSender = new CapturingMessageSender();
+        LinkUpdatePersistenceService persistenceService =
+                new LinkUpdatePersistenceService(messageSender, trackedLinkMaintenanceService);
         LinkUpdateChecker linkUpdateChecker =
-                new LinkUpdateChecker(linkMetadataResolver, messageSender, trackedLinkMaintenanceService);
+                new LinkUpdateChecker(linkMetadataResolver, persistenceService, trackedLinkMaintenanceService);
         SchedulerRunReporter runReporter = new SchedulerRunReporter(messageSender);
         LinkUpdatesScheduler scheduler = new LinkUpdatesScheduler(
                 trackedLinkMaintenanceService, linkUpdateChecker, runReporter, schedulerProperties);

@@ -73,6 +73,18 @@ class BotScrapperKafkaContainersE2ETest {
 
     @SuppressWarnings("resource")
     @Container
+    private static final GenericContainer<?> SCHEMA_REGISTRY = new GenericContainer<>(
+                    "apicurio/apicurio-registry-mem:2.6.13.Final")
+            .withNetwork(NETWORK)
+            .withNetworkAliases("schema-registry")
+            .withEnv("QUARKUS_HTTP_PORT", "8080")
+            .withExposedPorts(8080)
+            .waitingFor(Wait.forHttp("/apis/registry/v2/system/info")
+                    .forStatusCode(200)
+                    .forPort(8080));
+
+    @SuppressWarnings("resource")
+    @Container
     private static final GenericContainer<?> WIREMOCK = new GenericContainer<>("wiremock/wiremock:3.13.1")
             .withNetwork(NETWORK)
             .withNetworkAliases("wiremock")
@@ -85,7 +97,7 @@ class BotScrapperKafkaContainersE2ETest {
             .withNetwork(NETWORK)
             .withNetworkAliases("bot")
             .withExposedPorts(8080)
-            .dependsOn(WIREMOCK, KAFKA)
+            .dependsOn(WIREMOCK, KAFKA, SCHEMA_REGISTRY)
             .withEnv("TELEGRAM_TOKEN", "test-token")
             .withEnv("APP_TELEGRAM_URL", "http://wiremock:8080/bot")
             .withEnv("APP_TELEGRAM_POLLING_ENABLED", "false")
@@ -93,6 +105,7 @@ class BotScrapperKafkaContainersE2ETest {
             .withEnv("SCRAPPER_TRANSPORT", "HTTP")
             .withEnv("SCRAPPER_BASE_URL", "http://scrapper:8081")
             .withEnv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9093")
+            .withEnv("KAFKA_SCHEMA_REGISTRY_URL", "http://schema-registry:8080/apis/registry/v2")
             .withEnv("KAFKA_TOPIC", "link-updates")
             .withEnv("BOT_GRPC_SERVER_ENABLED", "false")
             .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8080));
@@ -103,13 +116,15 @@ class BotScrapperKafkaContainersE2ETest {
             .withNetwork(NETWORK)
             .withNetworkAliases("scrapper")
             .withExposedPorts(8081)
-            .dependsOn(POSTGRES, BOT, WIREMOCK, KAFKA)
+            .dependsOn(POSTGRES, BOT, WIREMOCK, KAFKA, SCHEMA_REGISTRY)
             .withEnv("GITHUB_BASE_URL", "http://wiremock:8080/github")
             .withEnv("STACKOVERFLOW_BASE_URL", "http://wiremock:8080/so")
             .withEnv("APP_BOT_TRANSPORT", "KAFKA")
             .withEnv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9093")
+            .withEnv("KAFKA_SCHEMA_REGISTRY_URL", "http://schema-registry:8080/apis/registry/v2")
             .withEnv("KAFKA_TOPIC", "link-updates")
-            .withEnv("APP_SCHEDULER_INTERVAL", "500ms")
+            .withEnv("SCRAPPER_SCHEDULER_INTERVAL", "500ms")
+            .withEnv("OUTBOX_PUBLISH_INTERVAL", "500ms")
             .withEnv("SCRAPPER_GRPC_SERVER_ENABLED", "false")
             .withEnv("DATASOURCE_URL", "jdbc:postgresql://postgres:5432/link_tracker")
             .withEnv("DATASOURCE_USERNAME", "postgres")

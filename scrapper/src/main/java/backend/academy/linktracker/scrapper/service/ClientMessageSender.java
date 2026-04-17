@@ -6,7 +6,7 @@ import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 /**
  * Реализация отправки уведомлений через клиент bot-сервиса (REST или gRPC).
  */
-public class ClientMessageSender implements MessageSender {
+public class ClientMessageSender implements NotificationDispatcher {
 
     private final BotNotificationsClient botNotificationsClient;
 
@@ -20,7 +20,7 @@ public class ClientMessageSender implements MessageSender {
     }
 
     @Override
-    public void send(LinkUpdate update) {
+    public void dispatch(LinkUpdate update) {
         botNotificationsClient.sendUpdate(update);
     }
 }

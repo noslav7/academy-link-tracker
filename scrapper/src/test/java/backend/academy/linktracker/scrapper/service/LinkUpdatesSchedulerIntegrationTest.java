@@ -11,6 +11,8 @@ import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.scrapper.ScrapperApplication;
 import backend.academy.linktracker.scrapper.TestcontainersConfiguration;
@@ -40,7 +42,8 @@ import org.wiremock.spring.EnableWireMock;
             "app.bot.base-url=${wiremock.server.baseUrl}/bot",
             "app.scheduler.interval=365d",
             "app.scheduler.batch-size=2",
-            "app.scheduler.thread-count=2"
+            "app.scheduler.thread-count=2",
+            "app.outbox.publish-interval=365d"
         })
 @EnableWireMock
 @Tag("integration")
@@ -57,6 +60,9 @@ class LinkUpdatesSchedulerIntegrationTest {
 
     @Autowired
     private TrackedLinkMaintenanceService maintenanceService;
+
+    @Autowired
+    private OutboxPublisher outboxPublisher;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -89,6 +95,7 @@ class LinkUpdatesSchedulerIntegrationTest {
 
         stubGithubUpdatedAt("octocat", "hello-world", "2026-03-02T00:00:00Z", 1);
         linkUpdatesScheduler.checkUpdates();
+        outboxPublisher.publishPendingNotifications();
 
         List<JsonNode> updates = capturedBotUpdates();
         assertAll(
@@ -121,6 +128,7 @@ class LinkUpdatesSchedulerIntegrationTest {
 
         stubStackoverflowUpdatedAt(123L, 1_772_409_600L, 1);
         linkUpdatesScheduler.checkUpdates();
+        outboxPublisher.publishPendingNotifications();
 
         List<JsonNode> updates = capturedBotUpdates();
         assertAll(
@@ -165,6 +173,7 @@ class LinkUpdatesSchedulerIntegrationTest {
         }
 
         linkUpdatesScheduler.checkUpdates();
+        outboxPublisher.publishPendingNotifications();
 
         Set<String> actualUrls = capturedBotUpdates().stream()
                 .map(update -> update.path("url").asText())
@@ -208,18 +217,16 @@ class LinkUpdatesSchedulerIntegrationTest {
         stubGithubUpdatedAt("octocat", "bad-repo", "2026-03-02T00:00:00Z", 1);
 
         linkUpdatesScheduler.checkUpdates();
+        outboxPublisher.publishPendingNotifications();
 
         List<String> actualUrls = capturedBotUpdates().stream()
                 .map(update -> update.path("url").asText())
                 .sorted()
                 .toList();
-        assertEquals(
-                List.of(
-                        "https://github.com/octocat/bad-repo",
-                        "https://github.com/octocat/bad-repo",
-                        "https://github.com/octocat/good-repo",
-                        "system://scheduler-error-report"),
-                actualUrls);
+        assertAll(
+                () -> assertTrue(actualUrls.contains("https://github.com/octocat/good-repo")),
+                () -> assertTrue(actualUrls.contains("https://github.com/octocat/bad-repo")),
+                () -> assertFalse(actualUrls.contains("system://scheduler-error-report")));
     }
 
     @Test

@@ -26,6 +26,12 @@ public class KafkaProperties {
     private String bootstrapServers = "localhost:9092";
 
     /**
+     * URL Schema Registry для хранения и чтения Avro-схем.
+     */
+    @NotBlank
+    private String schemaRegistryUrl = "http://localhost:8085/apis/registry/v2";
+
+    /**
      * Имя топика уведомлений.
      */
     @NotBlank

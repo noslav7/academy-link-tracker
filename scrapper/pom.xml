@@ -136,6 +136,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.apicurio</groupId>
+            <artifactId>apicurio-registry-serdes-avro-serde</artifactId>
+        </dependency>
 
         <!-- Opentelemetry support: -->
         <!-- <dependency> -->
@@ -272,6 +280,24 @@
                             <outputDirectory>${project.build.directory}/generated-sources/protobuf/grpc-java</outputDirectory>
                             <clearOutputDirectory>false</clearOutputDirectory>
                             <temporaryProtoFileDirectory>${project.build.directory}/protoc-dependencies-grpc-${maven.build.timestamp}</temporaryProtoFileDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro-maven-plugin</artifactId>
+                <version>${avro-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-avro-sources</id>
+                        <goals>
+                            <goal>schema</goal>
+                        </goals>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <sourceDirectory>${project.basedir}/src/main/avro</sourceDirectory>
+                            <stringType>String</stringType>
                         </configuration>
                     </execution>
                 </executions>

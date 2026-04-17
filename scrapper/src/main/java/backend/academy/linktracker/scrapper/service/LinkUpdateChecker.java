@@ -18,22 +18,22 @@ public class LinkUpdateChecker {
     private static final Logger log = LoggerFactory.getLogger(LinkUpdateChecker.class);
 
     private final LinkMetadataResolver linkMetadataResolver;
-    private final MessageSender messageSender;
+    private final LinkUpdatePersistenceService persistenceService;
     private final TrackedLinkMaintenanceService maintenanceService;
 
     /**
      * Создает компонент проверки обновлений ссылок.
      *
      * @param linkMetadataResolver резолвер метаданных внешних ссылок
-     * @param messageSender        отправитель уведомлений подписчикам
+     * @param persistenceService   транзакционное сохранение обновлений и outbox-сообщений
      * @param maintenanceService   сервис обновления метаданных ссылок в БД
      */
     public LinkUpdateChecker(
             LinkMetadataResolver linkMetadataResolver,
-            MessageSender messageSender,
+            LinkUpdatePersistenceService persistenceService,
             TrackedLinkMaintenanceService maintenanceService) {
         this.linkMetadataResolver = linkMetadataResolver;
-        this.messageSender = messageSender;
+        this.persistenceService = persistenceService;
         this.maintenanceService = maintenanceService;
     }
 
@@ -52,9 +52,9 @@ public class LinkUpdateChecker {
         }
 
         String description = linkMetadataResolver.resolveUpdateDescription(trackedLink.url());
-        messageSender.send(
-                new LinkUpdate(trackedLink.id(), trackedLink.url(), description, List.of(trackedLink.chatId())));
-        maintenanceService.updateTrackedLink(trackedLink.withLastCheck(Instant.now(), currentUpdatedAt));
+        persistenceService.enqueueNotificationAndUpdateTrackedLink(
+                new LinkUpdate(trackedLink.id(), trackedLink.url(), description, List.of(trackedLink.chatId())),
+                trackedLink.withLastCheck(Instant.now(), currentUpdatedAt));
 
         log.atInfo()
                 .addKeyValue("chatId", trackedLink.chatId())

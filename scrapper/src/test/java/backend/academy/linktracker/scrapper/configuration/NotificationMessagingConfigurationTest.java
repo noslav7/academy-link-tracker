@@ -6,7 +6,9 @@ import static org.mockito.Mockito.verify;
 import backend.academy.linktracker.scrapper.client.BotNotificationsClient;
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
-import backend.academy.linktracker.scrapper.service.MessageSender;
+import backend.academy.linktracker.scrapper.service.NotificationDispatcher;
+import backend.academy.linktracker.scrapper.service.outbox.NotificationOutboxRepository;
+import com.example.notification.LinkUpdateEvent;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -21,17 +23,19 @@ class NotificationMessagingConfigurationTest {
 
     @Test
     void givenHttpTransportWhenContextStartsThenClientMessageSenderIsUsed() {
-        // Проверяет: при HTTP-транспорте сообщение делегируется в BotNotificationsClient.
+        // Проверяет: при HTTP-транспорте dispatcher делегирует в BotNotificationsClient.
         BotNotificationsClient botNotificationsClient = mock(BotNotificationsClient.class);
+        NotificationOutboxRepository outboxRepository = mock(NotificationOutboxRepository.class);
 
         contextRunner
                 .withPropertyValues("app.bot.transport=HTTP")
                 .withBean(BotNotificationsClient.class, () -> botNotificationsClient)
+                .withBean(NotificationOutboxRepository.class, () -> outboxRepository)
                 .run(context -> {
-                    MessageSender messageSender = context.getBean(MessageSender.class);
+                    NotificationDispatcher dispatcher = context.getBean(NotificationDispatcher.class);
                     LinkUpdate update = new LinkUpdate(11L, "https://example.com", "description", List.of(1001L));
 
-                    messageSender.send(update);
+                    dispatcher.dispatch(update);
 
                     verify(botNotificationsClient).sendUpdate(update);
                 });
@@ -40,22 +44,34 @@ class NotificationMessagingConfigurationTest {
     @Test
     @SuppressWarnings("unchecked")
     void givenKafkaTransportWhenContextStartsThenKafkaMessageSenderIsUsed() {
-        // Проверяет: при KAFKA-транспорте сообщение публикуется в ожидаемый топик.
-        KafkaTemplate<String, LinkUpdate> kafkaTemplate = mock(KafkaTemplate.class);
+        // Проверяет: при KAFKA-транспорте dispatcher публикует в ожидаемый топик.
+        KafkaTemplate<String, LinkUpdateEvent> kafkaTemplate = mock(KafkaTemplate.class);
         KafkaProperties kafkaProperties = new KafkaProperties();
         kafkaProperties.setTopic("link-updates-test");
+        NotificationOutboxRepository outboxRepository = mock(NotificationOutboxRepository.class);
 
         contextRunner
                 .withPropertyValues("app.bot.transport=KAFKA")
                 .withBean(KafkaTemplate.class, () -> kafkaTemplate)
                 .withBean(KafkaProperties.class, () -> kafkaProperties)
+                .withBean(NotificationOutboxRepository.class, () -> outboxRepository)
                 .run(context -> {
-                    MessageSender messageSender = context.getBean(MessageSender.class);
+                    NotificationDispatcher dispatcher = context.getBean(NotificationDispatcher.class);
                     LinkUpdate update = new LinkUpdate(12L, "https://example.org", "description", List.of(1002L));
 
-                    messageSender.send(update);
+                    dispatcher.dispatch(update);
 
-                    verify(kafkaTemplate).send("link-updates-test", "12", update);
+                    verify(kafkaTemplate)
+                            .send(
+                                    org.mockito.ArgumentMatchers.eq("link-updates-test"),
+                                    org.mockito.ArgumentMatchers.eq("12"),
+                                    org.mockito.ArgumentMatchers.argThat(event -> event.getId() == 12L
+                                            && "https://example.org"
+                                                    .equals(event.getUrl().toString())
+                                            && "description"
+                                                    .equals(event.getDescription()
+                                                            .toString())
+                                            && List.of(1002L).equals(event.getTgChatIds())));
                 });
     }
 }

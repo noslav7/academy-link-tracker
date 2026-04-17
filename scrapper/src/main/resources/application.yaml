@@ -35,12 +35,16 @@ app:
     grpc-port: ${BOT_GRPC_PORT:9090}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    schema-registry-url: ${KAFKA_SCHEMA_REGISTRY_URL:http://localhost:8085/apis/registry/v2}
     topic: ${KAFKA_TOPIC:link-updates}
     client-id: ${KAFKA_CLIENT_ID:scrapper}
   scheduler:
     interval: ${SCRAPPER_SCHEDULER_INTERVAL:30s}
     batch-size: ${SCRAPPER_SCHEDULER_BATCH_SIZE:100}
     thread-count: ${SCRAPPER_SCHEDULER_THREAD_COUNT:4}
+  outbox:
+    publish-interval: ${OUTBOX_PUBLISH_INTERVAL:1s}
+    batch-size: ${OUTBOX_BATCH_SIZE:100}
   grpc:
     server:
       enabled: ${SCRAPPER_GRPC_SERVER_ENABLED:false}

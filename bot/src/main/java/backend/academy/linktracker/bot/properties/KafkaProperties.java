@@ -1,6 +1,8 @@
 package backend.academy.linktracker.bot.properties;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,6 +28,12 @@ public class KafkaProperties {
     private String bootstrapServers = "localhost:9092";
 
     /**
+     * URL Schema Registry для Avro-схем Kafka-сообщений.
+     */
+    @NotBlank
+    private String schemaRegistryUrl = "http://localhost:8085/apis/registry/v2";
+
+    /**
      * Имя топика уведомлений.
      */
     @NotBlank
@@ -42,4 +50,22 @@ public class KafkaProperties {
      */
     @NotBlank
     private String clientId = "bot";
+
+    /**
+     * Количество попыток обработки сообщения (включая первую).
+     */
+    @Positive
+    private int retryAttempts = 3;
+
+    /**
+     * Задержка между повторными попытками обработки, мс.
+     */
+    @PositiveOrZero
+    private long retryBackoffMs = 1000L;
+
+    /**
+     * Имя dead-letter топика для сообщений, не прошедших обработку.
+     */
+    @NotBlank
+    private String dlqTopic = "link-updates-dlq";
 }

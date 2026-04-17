@@ -16,16 +16,27 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import backend.academy.linktracker.bot.command.BotMessages;
 import backend.academy.linktracker.bot.properties.TelegramProperties;
+import com.example.notification.LinkUpdateEvent;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import io.apicurio.registry.serde.avro.AvroKafkaSerdeConfig;
+import io.apicurio.registry.serde.avro.AvroKafkaSerializer;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
@@ -40,6 +51,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.kafka.KafkaContainer;
@@ -55,11 +67,18 @@ import org.wiremock.spring.EnableWireMock;
 class LinkUpdateListenerKafkaIntegrationTest {
 
     private static final String TOPIC = "link-updates-bot-it";
+    private static final String DLQ_TOPIC = "link-updates-bot-it-dlq";
     private static final String GROUP_ID = "bot-link-update-listener-it-group";
 
     @SuppressWarnings("resource")
     @Container
-    private static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka-native:4.1.1"));
+    private static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka:4.1.1"));
+
+    @SuppressWarnings("resource")
+    @Container
+    private static final GenericContainer<?> SCHEMA_REGISTRY = new GenericContainer<>(
+                    DockerImageName.parse("apicurio/apicurio-registry-mem:2.6.13.Final"))
+            .withExposedPorts(8080);
 
     @Autowired
     private TelegramProperties telegramProperties;
@@ -69,6 +88,10 @@ class LinkUpdateListenerKafkaIntegrationTest {
         registry.add("app.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         registry.add("app.kafka.group-id", () -> GROUP_ID);
         registry.add("app.kafka.client-id", () -> "bot-it");
+        registry.add("app.kafka.dlq-topic", () -> DLQ_TOPIC);
+        registry.add("app.kafka.retry-attempts", () -> 2);
+        registry.add("app.kafka.retry-backoff-ms", () -> 50L);
+        registry.add("app.kafka.schema-registry-url", LinkUpdateListenerKafkaIntegrationTest::schemaRegistryUrl);
     }
 
     @BeforeEach
@@ -84,17 +107,15 @@ class LinkUpdateListenerKafkaIntegrationTest {
     @Test
     @Order(1)
     void givenValidKafkaPayloadWhenConsumedThenBotSendsNotificationToTelegram() {
-        // Проверяет: валидное Kafka-сообщение приводит к отправке корректного уведомления в Telegram.
-        String payload = """
-                {
-                  "id": 15,
-                  "url": "https://example.com/news",
-                  "description": "New post detected",
-                  "tgChatIds": [1001]
-                }
-                """;
-
-        publishRawJson("15", payload);
+        // Проверяет: валидное Avro-сообщение приводит к отправке корректного уведомления в Telegram.
+        publishAvro(
+                "15",
+                LinkUpdateEvent.newBuilder()
+                        .setId(15L)
+                        .setUrl("https://example.com/news")
+                        .setDescription("New post detected")
+                        .setTgChatIds(List.of(1001L))
+                        .build());
 
         await().atMost(20, SECONDS).untilAsserted(() -> {
             verifySendMessage(1001L);
@@ -107,15 +128,15 @@ class LinkUpdateListenerKafkaIntegrationTest {
     @Test
     @Order(2)
     void givenScrapperSendsKafkaMessageWhenBotConsumesThenEndToEndPathWorks() {
-        // Проверяет: сообщение scrapper-формата проходит полный путь Kafka -> bot -> Telegram.
-        publishRawJson("18", """
-                {
-                  "id": 18,
-                  "url": "https://github.com/octocat/hello-world",
-                  "description": "Issue created",
-                  "tgChatIds": [2002]
-                }
-                """);
+        // Проверяет: Avro-сообщение scrapper-формата проходит путь Kafka -> bot -> Telegram.
+        publishAvro(
+                "18",
+                LinkUpdateEvent.newBuilder()
+                        .setId(18L)
+                        .setUrl("https://github.com/octocat/hello-world")
+                        .setDescription("Issue created")
+                        .setTgChatIds(List.of(2002L))
+                        .build());
 
         await().atMost(20, SECONDS).untilAsserted(() -> {
             verifySendMessage(2002L);
@@ -128,8 +149,8 @@ class LinkUpdateListenerKafkaIntegrationTest {
     @Test
     @Order(3)
     void givenMalformedKafkaPayloadWhenConsumedThenBotSkipsTelegramNotification() {
-        // Проверяет: невалидный JSON из Kafka не должен приводить к вызову Telegram API.
-        publishRawJson("malformed", "{\"id\": \"wrong\", \"url\": ");
+        // Проверяет: невалидный бинарный payload не вызывает Telegram API и публикуется в DLQ.
+        publishMalformedBytes("malformed", new byte[] {1, 2, 3, 4, 5});
 
         await().during(1, SECONDS)
                 .atMost(2, SECONDS)
@@ -137,17 +158,42 @@ class LinkUpdateListenerKafkaIntegrationTest {
                         0,
                         postRequestedFor(urlPathTemplate("/bot{token}/sendMessage"))
                                 .withPathParam("token", equalTo(telegramProperties.getToken()))));
+
+        await().atMost(10, SECONDS).untilAsserted(() -> {
+            ConsumerRecord<String, String> record = pollSingleRecord(DLQ_TOPIC);
+            assertEquals("malformed", record.key());
+        });
     }
 
-    private void publishRawJson(String key, String json) {
+    private void publishAvro(String key, LinkUpdateEvent event) {
         Properties config = new Properties();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        try (KafkaProducer<String, String> producer = new KafkaProducer<>(config)) {
-            producer.send(new ProducerRecord<>(TOPIC, key, json));
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, AvroKafkaSerializer.class.getName());
+        config.put("apicurio.registry.url", schemaRegistryUrl());
+        config.put("apicurio.registry.auto-register", true);
+        config.put("apicurio.registry.find-latest", true);
+        config.put(AvroKafkaSerdeConfig.AVRO_ENCODING, AvroKafkaSerdeConfig.AVRO_ENCODING_BINARY);
+        try (KafkaProducer<String, LinkUpdateEvent> producer = new KafkaProducer<>(config)) {
+            producer.send(new ProducerRecord<>(TOPIC, key, event));
             producer.flush();
         }
+    }
+
+    private void publishMalformedBytes(String key, byte[] payload) {
+        Properties config = new Properties();
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        try (KafkaProducer<String, byte[]> producer = new KafkaProducer<>(config)) {
+            producer.send(new ProducerRecord<>(TOPIC, key, payload));
+            producer.flush();
+        }
+    }
+
+    private static String schemaRegistryUrl() {
+        return "http://%s:%d/apis/registry/v2"
+                .formatted(SCHEMA_REGISTRY.getHost(), SCHEMA_REGISTRY.getMappedPort(8080));
     }
 
     private void verifySendMessage(long chatId) {
@@ -157,6 +203,24 @@ class LinkUpdateListenerKafkaIntegrationTest {
                         postRequestedFor(urlPathTemplate("/bot{token}/sendMessage"))
                                 .withPathParam("token", equalTo(telegramProperties.getToken()))),
                 () -> assertEquals(String.valueOf(chatId), sentFormData().get("chat_id")));
+    }
+
+    private ConsumerRecord<String, String> pollSingleRecord(String topic) {
+        Properties config = new Properties();
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        config.put(ConsumerConfig.GROUP_ID_CONFIG, "bot-it-dlq-check-" + UUID.randomUUID());
+        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+        try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(config)) {
+            consumer.subscribe(List.of(topic));
+            for (ConsumerRecord<String, String> record :
+                    consumer.poll(Duration.ofSeconds(2)).records(topic)) {
+                return record;
+            }
+            throw new AssertionError("Expected record in topic " + topic);
+        }
     }
 
     private Map<String, String> sentFormData() {

@@ -20,9 +20,13 @@ app:
     grpc-port: ${SCRAPPER_GRPC_PORT:9091}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    schema-registry-url: ${KAFKA_SCHEMA_REGISTRY_URL:http://localhost:8085/apis/registry/v2}
     topic: ${KAFKA_TOPIC:link-updates}
+    dlq-topic: ${KAFKA_DLQ_TOPIC:link-updates-dlq}
     group-id: ${KAFKA_GROUP_ID:bot-link-updates}
     client-id: ${KAFKA_CLIENT_ID:bot}
+    retry-attempts: ${KAFKA_RETRY_ATTEMPTS:3}
+    retry-backoff-ms: ${KAFKA_RETRY_BACKOFF_MS:1000}
   grpc:
     server:
       enabled: ${BOT_GRPC_SERVER_ENABLED:false}
