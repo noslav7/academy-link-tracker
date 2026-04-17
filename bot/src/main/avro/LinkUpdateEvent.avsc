@@ -1,0 +1,30 @@
+{
+  "type": "record",
+  "name": "LinkUpdateEvent",
+  "namespace": "com.example.notification",
+  "fields": [
+    {
+      "name": "id",
+      "type": "long",
+      "doc": "ID ссылки"
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "doc": "Ссылка"
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "doc": "Описание изменений"
+    },
+    {
+      "name": "tgChatIds",
+      "type": {
+        "type": "array",
+        "items": "long"
+      },
+      "doc": "ИД чатов"
+    }
+  ]
+}

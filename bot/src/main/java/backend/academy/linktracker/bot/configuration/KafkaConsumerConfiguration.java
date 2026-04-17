@@ -78,7 +78,12 @@ public class KafkaConsumerConfiguration {
      * KafkaTemplate для публикации необработанных сообщений в DLQ.
      */
     @Bean
-    KafkaTemplate<String, Object> deadLetterKafkaTemplate(KafkaProperties kafkaProperties, ObjectMapper objectMapper) {
+    KafkaTemplate<String, Object> deadLetterKafkaTemplate(
+            KafkaProperties kafkaProperties,
+            ObjectMapper objectMapper,
+            KafkaInfrastructureValidator kafkaInfrastructureValidator) {
+        kafkaInfrastructureValidator.ensureDeadLetterTopicExists(kafkaProperties);
+
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
         config.put(ProducerConfig.CLIENT_ID_CONFIG, kafkaProperties.getClientId() + "-dlq-producer");
@@ -100,7 +105,9 @@ public class KafkaConsumerConfiguration {
             KafkaProperties kafkaProperties, KafkaTemplate<String, Object> deadLetterKafkaTemplate) {
         DeadLetterPublishingRecoverer deadLetterPublishingRecoverer = new DeadLetterPublishingRecoverer(
                 deadLetterKafkaTemplate,
-                (record, exception) -> new TopicPartition(kafkaProperties.getDlqTopic(), record.partition()));
+                // Не закрепляем номер партиции в DLQ: это исключает сбои,
+                // если число партиций исходного топика и DLQ отличается.
+                (record, exception) -> new TopicPartition(kafkaProperties.getDlqTopic(), -1));
 
         long retriesAfterFirstAttempt = Math.max(0L, kafkaProperties.getRetryAttempts() - 1L);
         FixedBackOff fixedBackOff = new FixedBackOff(kafkaProperties.getRetryBackoffMs(), retriesAfterFirstAttempt);

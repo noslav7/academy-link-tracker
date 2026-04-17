@@ -49,7 +49,10 @@ public class UpdateNotificationService {
             if (chatId == null) {
                 continue;
             }
-            telegramBot.execute(new SendMessage(String.valueOf(chatId), notificationText));
+            var response = telegramBot.execute(new SendMessage(String.valueOf(chatId), notificationText));
+            if (response == null || !response.isOk()) {
+                throw new IllegalStateException("Telegram API returned non-success response");
+            }
             log.atInfo()
                     .addKeyValue("chatId", chatId)
                     .addKeyValue("linkId", update.id())
