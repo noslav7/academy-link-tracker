@@ -2,11 +2,11 @@ package backend.academy.linktracker.bot.kafka;
 
 import backend.academy.linktracker.bot.client.dto.LinkUpdate;
 import backend.academy.linktracker.bot.service.UpdateNotificationService;
-import com.example.notification.LinkUpdateEvent;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import java.util.Set;
+import org.apache.avro.generic.GenericRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -52,8 +52,8 @@ public class LinkUpdateListener {
             topics = "${app.kafka.topic}",
             groupId = "${app.kafka.group-id}",
             containerFactory = "linkUpdateKafkaListenerContainerFactory")
-    public void onMessage(LinkUpdateEvent event) {
-        LinkUpdate update = toDto(event);
+    public void handleLinkUpdateMessage(GenericRecord event) {
+        LinkUpdate update = LinkUpdatePayloadMapper.toLinkUpdate(event);
         if (update == null) {
             throw new InvalidLinkUpdateException("Received null LinkUpdate payload");
         }
@@ -68,12 +68,5 @@ public class LinkUpdateListener {
                 .addKeyValue("linkId", update.id())
                 .addKeyValue("url", update.url())
                 .log("Link update notification consumed from Kafka");
-    }
-
-    private static LinkUpdate toDto(LinkUpdateEvent event) {
-        if (event == null) {
-            return null;
-        }
-        return new LinkUpdate(event.getId(), event.getUrl(), event.getDescription(), event.getTgChatIds());
     }
 }

@@ -51,12 +51,18 @@ Unix/macOS:
 
 Корневой `README` — индекс проекта. Детали запуска, сценарии и примеры вынесены в модульные README:
 
-- `bot/README.md` — запуск `bot`, Telegram-команды, сценарии ручной проверки.
-- `scrapper/README.md` — запуск `scrapper`, HTTP API, примеры `curl`, E2E примечания.
+- [`bot/README.md`](bot/README.md) — запуск `bot`, Telegram-команды, сценарии ручной проверки.
+- [`scrapper/README.md`](scrapper/README.md) — запуск `scrapper`, HTTP API, примеры `curl`, E2E примечания.
+
+## Сценарии и примеры
+
+- Сценарий диалога `/track`: [`bot/README.md`](bot/README.md)
+- Примеры HTTP-запросов для `scrapper`: [`scrapper/README.md`](scrapper/README.md)
+- Контейнерные E2E-проверки: [`scrapper/README.md`](scrapper/README.md)
 
 ## Полезные ссылки
 
-- Общая справка: `HELP.md`
-- Модуль `bot`: `bot/README.md`
-- Модуль `scrapper`: `scrapper/README.md`
+- Общая справка: [`HELP.md`](HELP.md)
+- Модуль `bot`: [`bot/README.md`](bot/README.md)
+- Модуль `scrapper`: [`scrapper/README.md`](scrapper/README.md)
 

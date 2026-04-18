@@ -1,13 +1,10 @@
 package backend.academy.linktracker.bot.configuration;
 
 import backend.academy.linktracker.bot.properties.KafkaProperties;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.errors.TopicExistsException;
@@ -45,9 +42,7 @@ final class KafkaInfrastructureValidator {
      * @param infrastructureName имя инфраструктурного бина, для которого идет проверка
      */
     void validateConnectivity(KafkaProperties kafkaProperties, String infrastructureName) {
-        Map<String, Object> adminConfig = new HashMap<>();
-        adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
-        adminConfig.put(AdminClientConfig.CLIENT_ID_CONFIG, kafkaProperties.getClientId() + "-startup-check");
+        var adminConfig = KafkaClientConfigFactory.adminConfig(kafkaProperties, "-startup-check");
 
         try (AdminClient adminClient = AdminClient.create(adminConfig)) {
             int nodesCount = adminClient
@@ -79,9 +74,7 @@ final class KafkaInfrastructureValidator {
      * @param kafkaProperties настройки подключения к Kafka
      */
     void ensureDeadLetterTopicExists(KafkaProperties kafkaProperties) {
-        Map<String, Object> adminConfig = new HashMap<>();
-        adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
-        adminConfig.put(AdminClientConfig.CLIENT_ID_CONFIG, kafkaProperties.getClientId() + "-dlq-topic-provisioner");
+        var adminConfig = KafkaClientConfigFactory.adminConfig(kafkaProperties, "-dlq-topic-provisioner");
 
         try (AdminClient adminClient = AdminClient.create(adminConfig)) {
             int partitions = resolveSourceTopicPartitions(adminClient, kafkaProperties);
