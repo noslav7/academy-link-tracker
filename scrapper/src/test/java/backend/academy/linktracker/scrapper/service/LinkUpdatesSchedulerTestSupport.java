@@ -73,8 +73,7 @@ final class LinkUpdatesSchedulerTestSupport {
                                     "pull_request": %s
                                   }
                                 ]
-                                """
-                                .formatted(title, body, author, createdAtIso, pullRequest))));
+                                """.formatted(title, body, author, createdAtIso, pullRequest))));
     }
 
     static void stubStackoverflowUpdatedAt(long questionId, long lastActivityEpochSeconds, int priority) {
@@ -92,11 +91,11 @@ final class LinkUpdatesSchedulerTestSupport {
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
                                 {"items":[{"title":"%s"}]}
-                                """
-                                .formatted(title))));
+                                """.formatted(title))));
     }
 
-    static void stubStackoverflowLatestAnswer(long questionId, long creationDate, String author, String body, int priority) {
+    static void stubStackoverflowLatestAnswer(
+            long questionId, long creationDate, String author, String body, int priority) {
         stubFor(get(urlEqualTo(
                         "/so/questions/%d/answers?site=stackoverflow&order=desc&sort=creation&filter=withbody&pagesize=1"
                                 .formatted(questionId)))
@@ -105,8 +104,7 @@ final class LinkUpdatesSchedulerTestSupport {
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
                                 {"items":[{"creation_date":%d,"body":"%s","owner":{"display_name":"%s"}}]}
-                                """
-                                .formatted(creationDate, body, author))));
+                                """.formatted(creationDate, body, author))));
     }
 
     static void stubStackoverflowLatestComment(
@@ -119,8 +117,7 @@ final class LinkUpdatesSchedulerTestSupport {
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
                                 {"items":[{"creation_date":%d,"body":"%s","owner":{"display_name":"%s"}}]}
-                                """
-                                .formatted(creationDate, body, author))));
+                                """.formatted(creationDate, body, author))));
     }
 
     static List<JsonNode> capturedBotUpdates(ObjectMapper objectMapper) {
@@ -131,57 +128,45 @@ final class LinkUpdatesSchedulerTestSupport {
     }
 
     static int pendingOutboxCount(JdbcTemplate jdbcTemplate) {
-        return jdbcTemplate.queryForObject(
-                """
+        return jdbcTemplate.queryForObject("""
                 select count(*)
                 from notification_outbox
                 where processed_at is null
-                """,
-                Integer.class);
+                """, Integer.class);
     }
 
     static String latestOutboxPayloadUrl(JdbcTemplate jdbcTemplate) {
-        return jdbcTemplate.queryForObject(
-                """
+        return jdbcTemplate.queryForObject("""
                 select payload->>'url'
                 from notification_outbox
                 order by id desc
                 limit 1
-                """,
-                String.class);
+                """, String.class);
     }
 
     static long latestOutboxMessageId(JdbcTemplate jdbcTemplate) {
-        return jdbcTemplate.queryForObject(
-                """
+        return jdbcTemplate.queryForObject("""
                 select id
                 from notification_outbox
                 order by id desc
                 limit 1
-                """,
-                Long.class);
+                """, Long.class);
     }
 
     static int pendingOutboxCountById(JdbcTemplate jdbcTemplate, long messageId) {
-        return jdbcTemplate.queryForObject(
-                """
+        return jdbcTemplate.queryForObject("""
                 select count(*)
                 from notification_outbox
                 where id = ? and processed_at is null
-                """,
-                Integer.class,
-                messageId);
+                """, Integer.class, messageId);
     }
 
     static int processedOutboxCountById(JdbcTemplate jdbcTemplate, long messageId) {
-        return jdbcTemplate.queryForObject(
-                """
+        return jdbcTemplate.queryForObject("""
                 select count(*)
                 from notification_outbox
                 where id = ? and processed_at is not null
-                """,
-                Integer.class,
-                messageId);
+                """, Integer.class, messageId);
     }
 
     private static JsonNode toJson(ObjectMapper objectMapper, String value) {

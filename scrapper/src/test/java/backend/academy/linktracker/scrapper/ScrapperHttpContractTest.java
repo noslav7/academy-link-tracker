@@ -4,7 +4,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,7 +50,7 @@ class ScrapperHttpContractTest {
     }
 
     @Test
-    void givenRegisteredChatAndAddedLinkWhenListRequestedThenReturnsExactListResponse()
+    void GivenRegisteredChatAndAddedLinkWhenListRequestedThenReturnsExactListResponse()
             throws IOException, InterruptedException {
         // Проверяет HTTP-контракт add/list: ответ списка полностью совпадает с эталонным JSON.
         long chatId = 1001L;
@@ -70,7 +72,7 @@ class ScrapperHttpContractTest {
     }
 
     @Test
-    void givenAddedLinkWhenDeletedAndListRequestedThenReturnsEmptyListResponse()
+    void GivenAddedLinkWhenDeletedAndListRequestedThenReturnsEmptyListResponse()
             throws IOException, InterruptedException {
         // Проверяет HTTP-контракт delete/list: после удаления список должен быть строго пустым.
         long chatId = 1002L;
@@ -92,7 +94,7 @@ class ScrapperHttpContractTest {
     }
 
     @Test
-    void givenMissingChatWhenDeleteRequestedThenReturnsNotFoundAndKeepsExistingSubscription()
+    void GivenMissingChatWhenDeleteRequestedThenReturnsNotFoundAndKeepsExistingSubscription()
             throws IOException, InterruptedException {
         // Проверяет, что удаление по несуществующему чату возвращает 404 и не затрагивает чужую подписку.
         long existingChatId = 1003L;
@@ -118,17 +120,18 @@ class ScrapperHttpContractTest {
     }
 
     @Test
-    void givenMissingChatWhenAddLinkRequestedThenReturnsNotFound() throws IOException, InterruptedException {
-        // Проверяет, что add link для несуществующего чата возвращает точный статус 404.
+    void GivenMissingChatWhenAddLinkRequestedThenReturnsNotFound() throws IOException, InterruptedException {
+        // Проверяет контракт 404: код и тело ошибки для add link в несуществующем чате.
         assertEquals(200, postWithoutBody("/tg-chat/1004").statusCode());
 
         HttpResponse<String> addResponse = postLink(2004L, "https://github.com/user/repo-2004");
         assertEquals(404, addResponse.statusCode());
+        assertApiError(addResponse.body(), "404", "ChatNotFoundException", "Chat not found: 2004");
     }
 
     @Test
-    void givenDeletedChatWhenAddLinkRequestedThenReturnsNotFound() throws IOException, InterruptedException {
-        // Проверяет, что add link для удалённого чата возвращает точный статус 404.
+    void GivenDeletedChatWhenAddLinkRequestedThenReturnsNotFound() throws IOException, InterruptedException {
+        // Проверяет контракт 404: код и тело ошибки для add link в удалённом чате.
         long chatId = 1005L;
 
         assertEquals(200, postWithoutBody("/tg-chat/" + chatId).statusCode());
@@ -136,18 +139,33 @@ class ScrapperHttpContractTest {
 
         HttpResponse<String> addResponse = postLink(chatId, "https://github.com/user/repo-1005");
         assertEquals(404, addResponse.statusCode());
+        assertApiError(addResponse.body(), "404", "ChatNotFoundException", "Chat not found: 1005");
     }
 
     @Test
-    void givenMissingChatWhenDeleteChatRequestedThenReturnsNotFound() throws IOException, InterruptedException {
-        // Проверяет, что удаление несуществующего чата возвращает точный статус 404.
+    void GivenMissingChatWhenDeleteChatRequestedThenReturnsNotFound() throws IOException, InterruptedException {
+        // Проверяет контракт 404: код и тело ошибки для удаления несуществующего чата.
         HttpResponse<String> deleteResponse = deleteWithoutBody("/tg-chat/1006");
 
         assertEquals(404, deleteResponse.statusCode());
+        assertApiError(deleteResponse.body(), "404", "ChatNotFoundException", "Chat not found: 1006");
     }
 
     private JsonNode parseJson(String body) throws IOException {
         return objectMapper.readTree(body);
+    }
+
+    private void assertApiError(String body, String expectedCode, String expectedException, String expectedMessage)
+            throws IOException {
+        JsonNode error = parseJson(body);
+        assertAll(
+                () -> assertEquals(expectedCode, error.path("code").asText()),
+                () -> assertEquals(
+                        expectedException, error.path("exceptionName").asText()),
+                () -> assertEquals(
+                        expectedMessage, error.path("exceptionMessage").asText()),
+                () -> assertTrue(error.path("stacktrace").isArray()),
+                () -> assertTrue(error.path("stacktrace").size() > 0));
     }
 
     private HttpResponse<String> postLink(long chatId, String link) throws IOException, InterruptedException {

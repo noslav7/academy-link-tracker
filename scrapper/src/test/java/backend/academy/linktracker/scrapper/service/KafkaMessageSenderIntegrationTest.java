@@ -4,13 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
-import com.example.notification.LinkUpdateEvent;
 import io.apicurio.registry.serde.avro.AvroKafkaDeserializer;
 import io.apicurio.registry.serde.avro.AvroKafkaSerdeConfig;
 import io.apicurio.registry.serde.avro.AvroKafkaSerializer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -59,21 +59,21 @@ class KafkaMessageSenderIntegrationTest {
     }
 
     @Test
-    void givenKafkaTransportWhenMessageSenderSendsThenMessageAppearsInExpectedAvroFormat() throws Exception {
+    void GivenKafkaTransportWhenMessageSenderSendsThenMessageAppearsInExpectedAvroFormat() throws Exception {
         // Проверяет: KafkaMessageSender публикует Avro-событие с ожидаемыми полями.
         createTopicIfMissing();
-        KafkaMessageSender sender = new KafkaMessageSender(kafkaTemplate(), kafkaProperties());
+        NotificationDispatcher sender = createKafkaMessageSender();
         LinkUpdate update = new LinkUpdate(
                 77L, "https://github.com/octocat/hello-world", "Repository updated", List.of(501L, 777L));
 
         sender.dispatch(update);
 
-        ConsumerRecord<String, LinkUpdateEvent> record = pollSingleRecord();
+        ConsumerRecord<String, GenericRecord> record = pollSingleRecord();
         Map<String, Object> actualMessage = Map.of(
                 "key", record.key(),
-                "url", record.value().getUrl().toString(),
-                "description", record.value().getDescription().toString(),
-                "tgChatIds", record.value().getTgChatIds());
+                "url", String.valueOf(record.value().get("url")),
+                "description", String.valueOf(record.value().get("description")),
+                "tgChatIds", record.value().get("tgChatIds"));
         Map<String, Object> expectedMessage = Map.of(
                 "key", "77",
                 "url", "https://github.com/octocat/hello-world",
@@ -82,8 +82,15 @@ class KafkaMessageSenderIntegrationTest {
         assertEquals(expectedMessage, actualMessage);
     }
 
-    private KafkaTemplate<String, LinkUpdateEvent> kafkaTemplate() {
-        ProducerFactory<String, LinkUpdateEvent> producerFactory = new DefaultKafkaProducerFactory<>(Map.of(
+    private NotificationDispatcher createKafkaMessageSender() throws Exception {
+        return (NotificationDispatcher) Class.forName("backend.academy.linktracker.scrapper.service.KafkaMessageSender")
+                .getConstructor(KafkaTemplate.class, KafkaProperties.class)
+                .newInstance(kafkaTemplate(), kafkaProperties());
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private KafkaTemplate kafkaTemplate() {
+        ProducerFactory producerFactory = new DefaultKafkaProducerFactory<>(Map.of(
                 ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
                 KAFKA.getBootstrapServers(),
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
@@ -120,7 +127,7 @@ class KafkaMessageSenderIntegrationTest {
         }
     }
 
-    private ConsumerRecord<String, LinkUpdateEvent> pollSingleRecord() {
+    private ConsumerRecord<String, GenericRecord> pollSingleRecord() {
         Map<String, Object> config = Map.of(
                 ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
                 KAFKA.getBootstrapServers(),
@@ -135,14 +142,11 @@ class KafkaMessageSenderIntegrationTest {
                 "apicurio.registry.url",
                 schemaRegistryUrl(),
                 "apicurio.registry.find-latest",
-                true,
-                AvroKafkaSerdeConfig.USE_SPECIFIC_AVRO_READER,
                 true);
-        try (KafkaConsumer<String, LinkUpdateEvent> consumer = new KafkaConsumer<>(config)) {
+        try (KafkaConsumer<String, GenericRecord> consumer = new KafkaConsumer<>(config)) {
             consumer.subscribe(List.of(TOPIC));
-
-            long deadline = System.currentTimeMillis() + Duration.ofSeconds(15).toMillis();
-            while (System.currentTimeMillis() < deadline) {
+            int maxPollAttempts = 50;
+            for (int pollAttempt = 0; pollAttempt < maxPollAttempts; pollAttempt++) {
                 var records = consumer.poll(Duration.ofMillis(300));
                 if (!records.isEmpty()) {
                     return records.iterator().next();

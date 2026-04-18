@@ -61,8 +61,7 @@ final class LinkUpdatePayloadMapper {
         Object descriptionValue = event.get(DESCRIPTION_FIELD);
         Object tgChatIdsValue = event.get(CHAT_IDS_FIELD);
 
-        if (!(idValue instanceof Number idNumber)
-                || !(tgChatIdsValue instanceof List<?> rawChatIds)) {
+        if (!(idValue instanceof Number idNumber) || !(tgChatIdsValue instanceof List<?> rawChatIds)) {
             throw new InvalidLinkUpdateException("Invalid Avro payload structure");
         }
 

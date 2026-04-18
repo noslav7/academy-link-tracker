@@ -89,9 +89,7 @@ final class KafkaInfrastructureValidator {
                     .log("Kafka DLQ topic has been created");
         } catch (Exception exception) {
             if (topicAlreadyExists(exception)) {
-                log.atInfo()
-                        .addKeyValue("topic", kafkaProperties.getDlqTopic())
-                        .log("Kafka DLQ topic already exists");
+                log.atInfo().addKeyValue("topic", kafkaProperties.getDlqTopic()).log("Kafka DLQ topic already exists");
                 return;
             }
             log.atWarn()

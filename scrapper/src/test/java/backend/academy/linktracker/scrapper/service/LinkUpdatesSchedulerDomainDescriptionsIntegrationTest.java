@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("integration")
 class LinkUpdatesSchedulerDomainDescriptionsIntegrationTest extends BaseLinkUpdatesSchedulerIntegrationTest {
 
     @Test
@@ -44,8 +46,7 @@ class LinkUpdatesSchedulerDomainDescriptionsIntegrationTest extends BaseLinkUpda
                         Пользователь: dev-user
                         Время создания: 2026-03-02T00:15:00Z
                         Превью описания: %s
-                        """
-                                .formatted("A".repeat(200)),
+                        """.formatted("A".repeat(200)),
                         updates.getFirst().path("description").asText()));
     }
 
@@ -57,7 +58,8 @@ class LinkUpdatesSchedulerDomainDescriptionsIntegrationTest extends BaseLinkUpda
         LinkUpdatesSchedulerTestSupport.stubStackoverflowQuestionTitle(123L, "How to build resilient schedulers?", 10);
         LinkUpdatesSchedulerTestSupport.stubStackoverflowLatestAnswer(
                 123L, 1_772_409_600L, "alice", "<p>%s</p>".formatted("B".repeat(260)), 10);
-        LinkUpdatesSchedulerTestSupport.stubStackoverflowLatestComment(123L, 1_772_300_000L, "bob", "<p>Older comment</p>", 10);
+        LinkUpdatesSchedulerTestSupport.stubStackoverflowLatestComment(
+                123L, 1_772_300_000L, "bob", "<p>Older comment</p>", 10);
 
         long chatId = 502L;
         registerAndTrack(chatId, "https://stackoverflow.com/questions/123/example-question", List.of(), List.of());
@@ -79,8 +81,7 @@ class LinkUpdatesSchedulerDomainDescriptionsIntegrationTest extends BaseLinkUpda
                         Пользователь: alice
                         Время создания: 2026-03-02T00:00:00Z
                         Превью: %s
-                        """
-                                .formatted("B".repeat(200)),
+                        """.formatted("B".repeat(200)),
                         updates.getFirst().path("description").asText()));
     }
 }

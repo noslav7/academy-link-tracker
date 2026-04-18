@@ -80,6 +80,7 @@ public class NotificationOutboxRepository {
                 outboxMessageId);
     }
 
+    @SuppressWarnings("PMD.UnusedFormalParameter")
     private static OutboxNotificationMessage mapOutboxRow(ResultSet resultSet, int rowNumber) throws SQLException {
         return new OutboxNotificationMessage(resultSet.getLong("id"), resultSet.getString("payload"));
     }

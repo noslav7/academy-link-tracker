@@ -2,17 +2,16 @@ package backend.academy.linktracker.scrapper.service;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.scrapper.domain.TrackedLink;
 import backend.academy.linktracker.scrapper.dto.AddLinkRequest;
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("integration")
 class LinkUpdatesSchedulerBatchAndPersistenceIntegrationTest extends BaseLinkUpdatesSchedulerIntegrationTest {
 
     @Test
@@ -47,13 +46,12 @@ class LinkUpdatesSchedulerBatchAndPersistenceIntegrationTest extends BaseLinkUpd
                 .map(update -> update.path("url").asText())
                 .collect(java.util.stream.Collectors.toSet());
 
-        assertEquals(5, actualUrls.size());
-        assertEquals(Set.copyOf(links), actualUrls);
+        assertAll(() -> assertEquals(5, actualUrls.size()), () -> assertEquals(Set.copyOf(links), actualUrls));
     }
 
     @Test
-    void givenPartiallyFailingBatchWhenSchedulerRunsThenFailureIsIsolatedAndErrorReportIsSent() throws Exception {
-        // Проверяет изоляцию ошибки в пакете: успешные ссылки доставляются, а сбой отражается в системном отчете.
+    void givenPartiallyFailingBatchWhenSchedulerRunsThenFailureIsIsolatedWithoutSystemErrorReport() throws Exception {
+        // Проверяет изоляцию ошибки доставки: уведомления по ссылкам отправляются без system error report.
         LinkUpdatesSchedulerTestSupport.stubBotFailureForUrl("https://github.com/octocat/bad-repo");
 
         long chatId = 504L;
@@ -86,10 +84,11 @@ class LinkUpdatesSchedulerBatchAndPersistenceIntegrationTest extends BaseLinkUpd
                 .map(update -> update.path("url").asText())
                 .sorted()
                 .toList();
-        assertAll(
-                () -> assertTrue(actualUrls.contains("https://github.com/octocat/good-repo")),
-                () -> assertTrue(actualUrls.contains("https://github.com/octocat/bad-repo")),
-                () -> assertFalse(actualUrls.contains("system://scheduler-error-report")));
+        List<String> expectedUrls = List.of(
+                "https://github.com/octocat/bad-repo",
+                "https://github.com/octocat/bad-repo",
+                "https://github.com/octocat/good-repo");
+        assertEquals(expectedUrls, actualUrls);
     }
 
     @Test
@@ -102,35 +101,34 @@ class LinkUpdatesSchedulerBatchAndPersistenceIntegrationTest extends BaseLinkUpd
         chatService.register(chatId);
         linkService.add(chatId, new AddLinkRequest(link, List.of("work", "urgent"), List.of("author=me", "label=bug")));
 
-        int chatsCount = Objects.requireNonNull(
-                jdbcTemplate.queryForObject("select count(*) from chats where chat_id = ?", Integer.class, chatId));
-        int linksCount = Objects.requireNonNull(jdbcTemplate.queryForObject(
-                "select count(*) from tracked_links where chat_id = ? and url = ?", Integer.class, chatId, link));
-        int tagsCount = Objects.requireNonNull(jdbcTemplate.queryForObject(
-                """
+        int chatsCount = queryRequiredCount("select count(*) from chats where chat_id = ?", chatId);
+        int linksCount =
+                queryRequiredCount("select count(*) from tracked_links where chat_id = ? and url = ?", chatId, link);
+        int tagsCount = queryRequiredCount("""
                 select count(*)
                 from tracked_link_tags tlt
                 join tracked_links tl on tl.id = tlt.tracked_link_id
                 where tl.chat_id = ? and tl.url = ?
-                """,
-                Integer.class,
-                chatId,
-                link));
-        int filtersCount = Objects.requireNonNull(jdbcTemplate.queryForObject(
-                """
+                """, chatId, link);
+        int filtersCount = queryRequiredCount("""
                 select count(*)
                 from tracked_link_filters tlf
                 join tracked_links tl on tl.id = tlf.tracked_link_id
                 where tl.chat_id = ? and tl.url = ?
-                """,
-                Integer.class,
-                chatId,
-                link));
+                """, chatId, link);
 
         assertAll(
                 () -> assertEquals(1, chatsCount),
                 () -> assertEquals(1, linksCount),
                 () -> assertEquals(2, tagsCount),
                 () -> assertEquals(2, filtersCount));
+    }
+
+    private int queryRequiredCount(String sql, Object... args) {
+        Integer value = jdbcTemplate.queryForObject(sql, Integer.class, args);
+        if (value == null) {
+            throw new IllegalStateException("Expected non-null count for query: " + sql);
+        }
+        return value;
     }
 }

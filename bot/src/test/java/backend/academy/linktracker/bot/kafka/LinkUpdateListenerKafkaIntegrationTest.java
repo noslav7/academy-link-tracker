@@ -28,7 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -69,6 +69,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
     private static final String TOPIC = "link-updates-bot-it";
     private static final String DLQ_TOPIC = "link-updates-bot-it-dlq";
     private static final String GROUP_ID = "bot-link-update-listener-it-group";
+    private static final AtomicInteger DLQ_CONSUMER_ID_SEQUENCE = new AtomicInteger();
 
     @SuppressWarnings("resource")
     @Container
@@ -210,7 +211,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        config.put(ConsumerConfig.GROUP_ID_CONFIG, "bot-it-dlq-check-" + UUID.randomUUID());
+        config.put(ConsumerConfig.GROUP_ID_CONFIG, "bot-it-dlq-check-" + DLQ_CONSUMER_ID_SEQUENCE.incrementAndGet());
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(config)) {
