@@ -11,6 +11,7 @@ import backend.academy.linktracker.scrapper.properties.KafkaProperties;
 import backend.academy.linktracker.scrapper.service.NotificationDispatcher;
 import backend.academy.linktracker.scrapper.service.outbox.NotificationOutboxRepository;
 import java.util.List;
+import org.apache.avro.generic.GenericRecord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -72,23 +73,17 @@ class NotificationMessagingConfigurationTest {
                                     org.mockito.ArgumentMatchers.eq("link-updates-test"),
                                     org.mockito.ArgumentMatchers.eq("12"),
                                     eventCaptor.capture());
-                    Object sentEvent = eventCaptor.getValue();
+                    GenericRecord sentEvent = (GenericRecord) eventCaptor.getValue();
                     assertAll(
-                            () -> assertEquals(12L, invokeGetter(sentEvent, "getId")),
+                            () -> assertEquals(12L, sentEvent.get("id")),
+                            () -> assertEquals("https://example.org", String.valueOf(sentEvent.get("url"))),
+                            () -> assertEquals("description", String.valueOf(sentEvent.get("description"))),
                             () -> assertEquals(
-                                    "https://example.org", String.valueOf(invokeGetter(sentEvent, "getUrl"))),
-                            () -> assertEquals(
-                                    "description", String.valueOf(invokeGetter(sentEvent, "getDescription"))),
-                            () -> assertEquals(List.of(1002L), invokeGetter(sentEvent, "getTgChatIds")));
+                                    List.of(1002L),
+                                    ((List<?>) sentEvent.get("tgChatIds"))
+                                            .stream()
+                                                    .map(value -> ((Number) value).longValue())
+                                                    .toList()));
                 });
-    }
-
-    private static Object invokeGetter(Object target, String methodName) {
-        try {
-            return target.getClass().getMethod(methodName).invoke(target);
-        } catch (ReflectiveOperationException ex) {
-            throw new AssertionError(
-                    "Unable to call " + methodName + " on " + target.getClass().getName(), ex);
-        }
     }
 }

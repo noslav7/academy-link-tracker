@@ -21,7 +21,8 @@ public class NotificationOutboxRepository {
             NotificationOutboxRepository::mapOutboxRow;
 
     private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
+    private final ObjectProvider<ObjectMapper> objectMapperProvider;
+    private volatile ObjectMapper objectMapper;
 
     /**
      * Создает репозиторий outbox-сообщений.
@@ -31,8 +32,7 @@ public class NotificationOutboxRepository {
      */
     public NotificationOutboxRepository(JdbcTemplate jdbcTemplate, ObjectProvider<ObjectMapper> objectMapperProvider) {
         this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapperProvider.getIfAvailable(
-                () -> JsonMapper.builder().findAndAddModules().build());
+        this.objectMapperProvider = objectMapperProvider;
     }
 
     /**
@@ -42,7 +42,7 @@ public class NotificationOutboxRepository {
      */
     public void enqueue(LinkUpdate update) {
         try {
-            String payloadJson = objectMapper.writeValueAsString(update);
+            String payloadJson = resolveObjectMapper().writeValueAsString(update);
             jdbcTemplate.update(
                     "insert into notification_outbox(payload, processed_at) values (cast(? as jsonb), null)",
                     payloadJson);
@@ -83,5 +83,22 @@ public class NotificationOutboxRepository {
     @SuppressWarnings("PMD.UnusedFormalParameter")
     private static OutboxNotificationMessage mapOutboxRow(ResultSet resultSet, int rowNumber) throws SQLException {
         return new OutboxNotificationMessage(resultSet.getLong("id"), resultSet.getString("payload"));
+    }
+
+    private ObjectMapper resolveObjectMapper() {
+        ObjectMapper mapper = objectMapper;
+        if (mapper != null) {
+            return mapper;
+        }
+
+        synchronized (this) {
+            mapper = objectMapper;
+            if (mapper == null) {
+                mapper = objectMapperProvider.getIfAvailable(
+                        () -> JsonMapper.builder().findAndAddModules().build());
+                objectMapper = mapper;
+            }
+        }
+        return mapper;
     }
 }

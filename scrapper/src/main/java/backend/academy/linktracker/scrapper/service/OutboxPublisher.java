@@ -24,7 +24,8 @@ public class OutboxPublisher {
     private final NotificationOutboxRepository notificationOutboxRepository;
     private final NotificationDispatcher notificationDispatcher;
     private final OutboxProperties outboxProperties;
-    private final ObjectMapper objectMapper;
+    private final ObjectProvider<ObjectMapper> objectMapperProvider;
+    private volatile ObjectMapper objectMapper;
 
     /**
      * Создает publisher outbox-сообщений.
@@ -42,8 +43,7 @@ public class OutboxPublisher {
         this.notificationOutboxRepository = notificationOutboxRepository;
         this.notificationDispatcher = notificationDispatcher;
         this.outboxProperties = outboxProperties;
-        this.objectMapper = objectMapperProvider.getIfAvailable(
-                () -> JsonMapper.builder().findAndAddModules().build());
+        this.objectMapperProvider = objectMapperProvider;
     }
 
     /**
@@ -55,7 +55,7 @@ public class OutboxPublisher {
                 notificationOutboxRepository.fetchUnprocessedBatch(outboxProperties.getBatchSize());
         for (OutboxNotificationMessage message : messages) {
             try {
-                LinkUpdate update = objectMapper.readValue(message.payloadJson(), LinkUpdate.class);
+                LinkUpdate update = resolveObjectMapper().readValue(message.payloadJson(), LinkUpdate.class);
                 notificationDispatcher.dispatch(update);
                 notificationOutboxRepository.markProcessed(message.id());
             } catch (Exception exception) {
@@ -65,5 +65,22 @@ public class OutboxPublisher {
                         .log("Failed to publish outbox notification, will retry on next run");
             }
         }
+    }
+
+    private ObjectMapper resolveObjectMapper() {
+        ObjectMapper mapper = objectMapper;
+        if (mapper != null) {
+            return mapper;
+        }
+
+        synchronized (this) {
+            mapper = objectMapper;
+            if (mapper == null) {
+                mapper = objectMapperProvider.getIfAvailable(
+                        () -> JsonMapper.builder().findAndAddModules().build());
+                objectMapper = mapper;
+            }
+        }
+        return mapper;
     }
 }

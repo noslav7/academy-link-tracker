@@ -229,6 +229,17 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>src/main/avro</directory>
+                <includes>
+                    <include>**/*.avsc</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -280,24 +291,6 @@
                             <outputDirectory>${project.build.directory}/generated-sources/protobuf/grpc-java</outputDirectory>
                             <clearOutputDirectory>false</clearOutputDirectory>
                             <temporaryProtoFileDirectory>${project.build.directory}/protoc-dependencies-grpc-${maven.build.timestamp}</temporaryProtoFileDirectory>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.avro</groupId>
-                <artifactId>avro-maven-plugin</artifactId>
-                <version>${avro-maven-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>generate-avro-sources</id>
-                        <goals>
-                            <goal>schema</goal>
-                        </goals>
-                        <phase>generate-sources</phase>
-                        <configuration>
-                            <sourceDirectory>${project.basedir}/src/main/avro</sourceDirectory>
-                            <stringType>String</stringType>
                         </configuration>
                     </execution>
                 </executions>

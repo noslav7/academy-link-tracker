@@ -16,11 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import backend.academy.linktracker.bot.command.BotMessages;
 import backend.academy.linktracker.bot.properties.TelegramProperties;
-import com.example.notification.LinkUpdateEvent;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import io.apicurio.registry.serde.avro.AvroKafkaSerdeConfig;
 import io.apicurio.registry.serde.avro.AvroKafkaSerializer;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -29,6 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -65,6 +69,9 @@ import org.wiremock.spring.EnableWireMock;
 @Tag("integration")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class LinkUpdateListenerKafkaIntegrationTest {
+
+    private static final String LINK_UPDATE_EVENT_SCHEMA_RESOURCE = "LinkUpdateEvent.avsc";
+    private static final Schema LINK_UPDATE_EVENT_SCHEMA = loadSchema();
 
     private static final String TOPIC = "link-updates-bot-it";
     private static final String DLQ_TOPIC = "link-updates-bot-it-dlq";
@@ -109,14 +116,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
     @Order(1)
     void givenValidKafkaPayloadWhenConsumedThenBotSendsNotificationToTelegram() {
         // Проверяет: валидное Avro-сообщение приводит к отправке корректного уведомления в Telegram.
-        publishAvro(
-                "15",
-                LinkUpdateEvent.newBuilder()
-                        .setId(15L)
-                        .setUrl("https://example.com/news")
-                        .setDescription("New post detected")
-                        .setTgChatIds(List.of(1001L))
-                        .build());
+        publishAvro("15", linkUpdateEvent(15L, "https://example.com/news", "New post detected", List.of(1001L)));
 
         await().atMost(20, SECONDS).untilAsserted(() -> {
             verifySendMessage(1001L);
@@ -131,13 +131,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
     void givenScrapperSendsKafkaMessageWhenBotConsumesThenEndToEndPathWorks() {
         // Проверяет: Avro-сообщение scrapper-формата проходит путь Kafka -> bot -> Telegram.
         publishAvro(
-                "18",
-                LinkUpdateEvent.newBuilder()
-                        .setId(18L)
-                        .setUrl("https://github.com/octocat/hello-world")
-                        .setDescription("Issue created")
-                        .setTgChatIds(List.of(2002L))
-                        .build());
+                "18", linkUpdateEvent(18L, "https://github.com/octocat/hello-world", "Issue created", List.of(2002L)));
 
         await().atMost(20, SECONDS).untilAsserted(() -> {
             verifySendMessage(2002L);
@@ -166,7 +160,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
         });
     }
 
-    private void publishAvro(String key, LinkUpdateEvent event) {
+    private void publishAvro(String key, GenericRecord event) {
         Properties config = new Properties();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -175,9 +169,31 @@ class LinkUpdateListenerKafkaIntegrationTest {
         config.put("apicurio.registry.auto-register", true);
         config.put("apicurio.registry.find-latest", true);
         config.put(AvroKafkaSerdeConfig.AVRO_ENCODING, AvroKafkaSerdeConfig.AVRO_ENCODING_BINARY);
-        try (KafkaProducer<String, LinkUpdateEvent> producer = new KafkaProducer<>(config)) {
+        try (KafkaProducer<String, GenericRecord> producer = new KafkaProducer<>(config)) {
             producer.send(new ProducerRecord<>(TOPIC, key, event));
             producer.flush();
+        }
+    }
+
+    private static GenericRecord linkUpdateEvent(long id, String url, String description, List<Long> tgChatIds) {
+        GenericRecord event = new GenericData.Record(LINK_UPDATE_EVENT_SCHEMA);
+        event.put("id", id);
+        event.put("url", url);
+        event.put("description", description);
+        event.put("tgChatIds", tgChatIds);
+        return event;
+    }
+
+    private static Schema loadSchema() {
+        ClassLoader classLoader = LinkUpdateListenerKafkaIntegrationTest.class.getClassLoader();
+        try (InputStream inputStream = classLoader.getResourceAsStream(LINK_UPDATE_EVENT_SCHEMA_RESOURCE)) {
+            if (inputStream == null) {
+                throw new IllegalStateException("Avro schema resource not found: " + LINK_UPDATE_EVENT_SCHEMA_RESOURCE);
+            }
+            return new Schema.Parser().parse(inputStream);
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                    "Failed to load Avro schema resource: " + LINK_UPDATE_EVENT_SCHEMA_RESOURCE, exception);
         }
     }
 

@@ -9,7 +9,7 @@ import backend.academy.linktracker.scrapper.service.MessageSender;
 import backend.academy.linktracker.scrapper.service.NotificationDispatcher;
 import backend.academy.linktracker.scrapper.service.OutboxMessageSender;
 import backend.academy.linktracker.scrapper.service.outbox.NotificationOutboxRepository;
-import com.example.notification.LinkUpdateEvent;
+import org.apache.avro.generic.GenericRecord;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,7 +49,7 @@ public class NotificationMessagingConfiguration {
             havingValue = TransportMode.KAFKA_VALUE,
             matchIfMissing = true)
     NotificationDispatcher kafkaNotificationDispatcher(
-            KafkaTemplate<String, LinkUpdateEvent> kafkaTemplate, KafkaProperties kafkaProperties) {
+            KafkaTemplate<String, GenericRecord> kafkaTemplate, KafkaProperties kafkaProperties) {
         return new KafkaMessageSender(kafkaTemplate, kafkaProperties);
     }
 

@@ -2,7 +2,6 @@ package backend.academy.linktracker.scrapper.configuration;
 
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
 import backend.academy.linktracker.scrapper.properties.TransportMode;
-import com.example.notification.LinkUpdateEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.apicurio.registry.serde.avro.AvroKafkaSerdeConfig;
@@ -10,6 +9,7 @@ import io.apicurio.registry.serde.avro.AvroKafkaSerializer;
 import io.apicurio.registry.serde.avro.strategy.RecordIdStrategy;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -46,8 +46,8 @@ public class KafkaProducerConfiguration {
      * Фабрика Kafka-публикатора для LinkUpdateEvent с Avro-сериализацией через Schema Registry.
      */
     @Bean(destroyMethod = "destroy")
-    @SuppressWarnings({"deprecation", "resource"})
-    ProducerFactory<String, LinkUpdateEvent> linkUpdateProducerFactory(
+    @SuppressWarnings("resource")
+    ProducerFactory<String, GenericRecord> linkUpdateProducerFactory(
             KafkaProperties kafkaProperties, KafkaInfrastructureValidator kafkaInfrastructureValidator) {
         kafkaInfrastructureValidator.validateConnectivity(kafkaProperties, "linkUpdateProducerFactory");
         kafkaInfrastructureValidator.ensureNotificationTopicExists(kafkaProperties);
@@ -70,8 +70,8 @@ public class KafkaProducerConfiguration {
      * KafkaTemplate для публикации LinkUpdateEvent в топик уведомлений.
      */
     @Bean
-    KafkaTemplate<String, LinkUpdateEvent> linkUpdateKafkaTemplate(
-            ProducerFactory<String, LinkUpdateEvent> linkUpdateProducerFactory) {
+    KafkaTemplate<String, GenericRecord> linkUpdateKafkaTemplate(
+            ProducerFactory<String, GenericRecord> linkUpdateProducerFactory) {
         return new KafkaTemplate<>(linkUpdateProducerFactory);
     }
 }

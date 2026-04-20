@@ -1,7 +1,7 @@
 {
   "type": "record",
   "name": "LinkUpdateEvent",
-  "namespace": "com.example.notification",
+  "namespace": "backend.academy.linktracker.notification",
   "fields": [
     {
       "name": "id",
