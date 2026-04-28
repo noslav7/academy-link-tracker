@@ -123,7 +123,7 @@ Unix/macOS:
 
 - `POST /tg-chat/{id}` — зарегистрировать чат.
 - `DELETE /tg-chat/{id}` — удалить чат.
-- `GET /links` + заголовок `Tg-Chat-Id` — получить список ссылок чата.
+- `GET /list` + заголовок `Tg-Chat-Id` — получить список ссылок чата.
 - `POST /links` + заголовок `Tg-Chat-Id` — добавить ссылку.
 - `DELETE /links` + заголовок `Tg-Chat-Id` — удалить ссылку.
 - `GET /tags?link=...` + заголовок `Tg-Chat-Id` — получить теги конкретной подписки.

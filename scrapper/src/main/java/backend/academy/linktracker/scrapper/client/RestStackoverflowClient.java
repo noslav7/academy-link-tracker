@@ -58,10 +58,11 @@ public class RestStackoverflowClient implements StackoverflowClient {
                     .retrieve()
                     .body(StackoverflowResponse.class);
 
-            if (response == null || response.items() == null || response.items().isEmpty()) {
+            Optional<StackoverflowItem> firstItem = firstItem(response);
+            if (firstItem.isEmpty()) {
                 return Instant.EPOCH;
             }
-            Long lastActivity = response.items().getFirst().lastActivityDate();
+            Long lastActivity = firstItem.orElseThrow().lastActivityDate();
             return lastActivity == null ? Instant.EPOCH : Instant.ofEpochSecond(lastActivity);
         } catch (RuntimeException ex) {
             return Instant.EPOCH;
@@ -85,12 +86,11 @@ public class RestStackoverflowClient implements StackoverflowClient {
                     .retrieve()
                     .body(StackoverflowResponse.class);
 
-            if (questionResponse == null
-                    || questionResponse.items() == null
-                    || questionResponse.items().isEmpty()) {
+            Optional<StackoverflowItem> questionItem = firstItem(questionResponse);
+            if (questionItem.isEmpty()) {
                 return Optional.empty();
             }
-            StackoverflowItem question = questionResponse.items().getFirst();
+            StackoverflowItem question = questionItem.orElseThrow();
             String questionTitle = question.title() == null ? "Без названия" : question.title();
 
             Optional<StackoverflowEvent> latestAnswer = fetchLatestEvent(questionId, "/questions/{id}/answers", true);
@@ -130,10 +130,11 @@ public class RestStackoverflowClient implements StackoverflowClient {
                 .retrieve()
                 .body(StackoverflowResponse.class);
 
-        if (response == null || response.items() == null || response.items().isEmpty()) {
+        Optional<StackoverflowItem> firstItem = firstItem(response);
+        if (firstItem.isEmpty()) {
             return Optional.empty();
         }
-        StackoverflowItem item = response.items().getFirst();
+        StackoverflowItem item = firstItem.orElseThrow();
         if (item.creationDate() == null) {
             return Optional.empty();
         }
@@ -144,6 +145,19 @@ public class RestStackoverflowClient implements StackoverflowClient {
                         : "unknown",
                 Instant.ofEpochSecond(item.creationDate()),
                 item.body() == null ? "" : item.body()));
+    }
+
+    /**
+     * Возвращает первый элемент ответа StackOverflow API, если он присутствует.
+     *
+     * @param response ответ StackOverflow API
+     * @return первый элемент ответа или пустой результат
+     */
+    private static Optional<StackoverflowItem> firstItem(StackoverflowResponse response) {
+        if (response == null || response.items() == null || response.items().isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(response.items().getFirst());
     }
 
     /**

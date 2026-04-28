@@ -17,6 +17,17 @@ spring:
   liquibase:
     enabled: ${LIQUIBASE_ENABLED:true}
     change-log: ${LIQUIBASE_CHANGELOG:classpath:migrations/master.xml}
+  data:
+    redis:
+      client-type: lettuce
+      cluster:
+        nodes: ${VALKEY_CLUSTER_NODES:localhost:6379}
+      timeout: ${VALKEY_TIMEOUT:2s}
+      lettuce:
+        cluster:
+          refresh:
+            adaptive: true
+            period: ${VALKEY_CLUSTER_REFRESH_PERIOD:30s}
 
 app:
   database:
@@ -49,3 +60,7 @@ app:
     server:
       enabled: ${SCRAPPER_GRPC_SERVER_ENABLED:false}
       port: ${SCRAPPER_GRPC_SERVER_PORT:9091}
+  cache:
+    links:
+      enabled: ${LINKS_CACHE_ENABLED:true}
+      ttl: ${LINKS_CACHE_TTL:5m}

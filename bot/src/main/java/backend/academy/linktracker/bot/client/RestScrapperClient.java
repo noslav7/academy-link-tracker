@@ -100,7 +100,7 @@ public class RestScrapperClient implements ScrapperClient {
         try {
             ListLinksResponse response = restClient
                     .get()
-                    .uri("/links")
+                    .uri("/list")
                     .header("Tg-Chat-Id", String.valueOf(chatId))
                     .retrieve()
                     .body(ListLinksResponse.class);

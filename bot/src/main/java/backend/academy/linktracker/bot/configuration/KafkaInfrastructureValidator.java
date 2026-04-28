@@ -57,11 +57,13 @@ final class KafkaInfrastructureValidator {
                     .addKeyValue("infrastructure", infrastructureName)
                     .log("Kafka connectivity check passed");
         } catch (Exception exception) {
-            log.atWarn()
+            log.atError()
                     .setCause(exception)
                     .addKeyValue("bootstrapServers", kafkaProperties.getBootstrapServers())
                     .addKeyValue("infrastructure", infrastructureName)
-                    .log("Kafka connectivity check failed, continuing without fail-fast startup");
+                    .log("Kafka connectivity check failed");
+            throw new IllegalStateException(
+                    "Failed to initialize Kafka infrastructure: " + infrastructureName, exception);
         }
     }
 
@@ -92,10 +94,13 @@ final class KafkaInfrastructureValidator {
                 log.atInfo().addKeyValue("topic", kafkaProperties.getDlqTopic()).log("Kafka DLQ topic already exists");
                 return;
             }
-            log.atWarn()
+            log.atError()
                     .setCause(exception)
                     .addKeyValue("topic", kafkaProperties.getDlqTopic())
-                    .log("Failed to create Kafka DLQ topic, continuing without fail-fast startup");
+                    .addKeyValue("bootstrapServers", kafkaProperties.getBootstrapServers())
+                    .log("Failed to create Kafka DLQ topic");
+            throw new IllegalStateException(
+                    "Failed to provision Kafka DLQ topic: " + kafkaProperties.getDlqTopic(), exception);
         }
     }
 

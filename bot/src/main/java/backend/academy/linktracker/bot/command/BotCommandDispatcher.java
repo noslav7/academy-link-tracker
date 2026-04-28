@@ -78,17 +78,15 @@ public class BotCommandDispatcher {
             return BotMessages.UNKNOWN_COMMAND;
         }
 
-        if (trackDialogService.isActive(chatId)) {
-            if (!isCommandMessage(messageText)) {
-                return trackDialogService.consume(chatId, messageText);
-            }
-            Optional<String> commandInText = normalizeCommandToken(messageText);
-            if (!"/cancel".equals(commandInText.orElseThrow())) {
-                trackDialogService.cancel(chatId);
-            }
+        boolean commandMessage = isCommandMessage(messageText);
+        Optional<String> normalizedCommand = normalizeCommandToken(messageText);
+
+        Optional<String> activeDialogResponse =
+                handleActiveTrackDialog(chatId, messageText, commandMessage, normalizedCommand);
+        if (activeDialogResponse.isPresent()) {
+            return activeDialogResponse.orElseThrow();
         }
 
-        Optional<String> normalizedCommand = normalizeCommandToken(messageText);
         if (normalizedCommand.isEmpty()) {
             return BotMessages.UNKNOWN_COMMAND;
         }
@@ -153,5 +151,29 @@ public class BotCommandDispatcher {
     private static boolean isCommandMessage(String text) {
         String trimmed = text == null ? "" : text.trim();
         return !trimmed.isEmpty() && trimmed.charAt(0) == '/';
+    }
+
+    /**
+     * Обрабатывает сообщение в контексте активного пошагового диалога {@code /track}.
+     *
+     * @param chatId идентификатор чата
+     * @param messageText входной текст сообщения
+     * @param commandMessage признак, что сообщение начинается с {@code '/'}
+     * @param normalizedCommand нормализованный токен команды (если есть)
+     * @return ответ диалога, если сообщение было обработано диалогом; иначе пустой результат
+     */
+    private Optional<String> handleActiveTrackDialog(
+            long chatId, String messageText, boolean commandMessage, Optional<String> normalizedCommand) {
+        if (!trackDialogService.isActive(chatId)) {
+            return Optional.empty();
+        }
+        if (!commandMessage) {
+            return Optional.of(trackDialogService.consume(chatId, messageText));
+        }
+
+        if (!normalizedCommand.map("/cancel"::equals).orElse(false)) {
+            trackDialogService.cancel(chatId);
+        }
+        return Optional.empty();
     }
 }
