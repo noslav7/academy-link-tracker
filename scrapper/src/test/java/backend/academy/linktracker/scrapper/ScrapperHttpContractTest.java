@@ -176,7 +176,7 @@ class ScrapperHttpContractTest {
                   "filters": []
                 }
                 """.formatted(link);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -198,7 +198,7 @@ class ScrapperHttpContractTest {
                   "link": "%s"
                 }
                 """.formatted(link);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .method("DELETE", HttpRequest.BodyPublishers.ofString(body))

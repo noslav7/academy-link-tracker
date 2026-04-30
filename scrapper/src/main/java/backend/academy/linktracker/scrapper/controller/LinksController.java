@@ -57,7 +57,7 @@ public class LinksController {
      * @param request тело запроса с ссылкой, тегами и фильтрами
      * @return добавленная ссылка
      */
-    @PostMapping("/list")
+    @PostMapping("/links")
     @CacheEvict(cacheNames = LinksCacheConfiguration.LINKS_LIST_CACHE, key = "#chatId")
     public ResponseEntity<LinkResponse> add(
             @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @Valid @RequestBody AddLinkRequest request) {
@@ -71,7 +71,7 @@ public class LinksController {
      * @param request тело запроса с удаляемой ссылкой
      * @return удаленная ссылка
      */
-    @DeleteMapping("/list")
+    @DeleteMapping("/links")
     @CacheEvict(cacheNames = LinksCacheConfiguration.LINKS_LIST_CACHE, key = "#chatId")
     public ResponseEntity<LinkResponse> remove(
             @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @Valid @RequestBody RemoveLinkRequest request) {

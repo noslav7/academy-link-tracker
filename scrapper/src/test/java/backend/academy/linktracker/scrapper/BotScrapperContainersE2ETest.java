@@ -302,7 +302,7 @@ class BotScrapperContainersE2ETest {
                   "filters": []
                 }
                 """.formatted(link);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(scrapperBaseUrl() + "/list"))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(scrapperBaseUrl() + "/links"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(addLinkBody))

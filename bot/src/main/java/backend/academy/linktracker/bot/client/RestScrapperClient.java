@@ -6,7 +6,6 @@ import backend.academy.linktracker.bot.client.dto.ListLinksResponse;
 import backend.academy.linktracker.bot.client.dto.RemoveLinkRequest;
 import java.util.List;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -39,7 +38,7 @@ public class RestScrapperClient implements ScrapperClient {
                     .post()
                     .uri("/tg-chat/{id}", chatId)
                     .retrieve()
-                    .onStatus(HttpStatus.CONFLICT::equals, (request, response) -> {})
+                    .onStatus(statusCode -> statusCode.value() == 409, (request, response) -> {})
                     .toBodilessEntity();
         } catch (RestClientException ex) {
             throw new ScrapperClientException("Failed to register chat in scrapper", ex);
@@ -54,11 +53,11 @@ public class RestScrapperClient implements ScrapperClient {
         try {
             return restClient
                     .post()
-                    .uri("/list")
+                    .uri("/links")
                     .header("Tg-Chat-Id", String.valueOf(chatId))
                     .body(new AddLinkRequest(link, tags, filters))
                     .retrieve()
-                    .onStatus(HttpStatus.CONFLICT::equals, (request, response) -> {
+                    .onStatus(statusCode -> statusCode.value() == 409, (request, response) -> {
                         throw new LinkAlreadyTrackedException();
                     })
                     .body(LinkResponse.class);
@@ -77,11 +76,11 @@ public class RestScrapperClient implements ScrapperClient {
         try {
             return restClient
                     .method(HttpMethod.DELETE)
-                    .uri("/list")
+                    .uri("/links")
                     .header("Tg-Chat-Id", String.valueOf(chatId))
                     .body(new RemoveLinkRequest(link))
                     .retrieve()
-                    .onStatus(HttpStatus.NOT_FOUND::equals, (request, response) -> {
+                    .onStatus(statusCode -> statusCode.value() == 404, (request, response) -> {
                         throw new LinkNotFoundException();
                     })
                     .body(LinkResponse.class);
