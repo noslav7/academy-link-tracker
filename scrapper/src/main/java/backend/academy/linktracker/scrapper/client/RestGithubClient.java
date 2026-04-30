@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -72,7 +73,7 @@ public class RestGithubClient implements GithubClient {
                             repository)
                     .headers(this::applyAuthHeader)
                     .retrieve()
-                    .body(new org.springframework.core.ParameterizedTypeReference<List<GithubIssueResponse>>() {});
+                    .body(new ParameterizedTypeReference<List<GithubIssueResponse>>() {});
 
             if (items == null || items.isEmpty()) {
                 return Optional.empty();

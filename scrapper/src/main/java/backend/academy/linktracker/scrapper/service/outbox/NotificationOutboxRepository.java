@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,8 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class NotificationOutboxRepository {
 
-    private static final org.springframework.jdbc.core.RowMapper<OutboxNotificationMessage> OUTBOX_ROW_MAPPER =
-            NotificationOutboxRepository::mapOutboxRow;
+    private static final RowMapper<OutboxNotificationMessage> OUTBOX_ROW_MAPPER = NotificationOutboxRepository::mapOutboxRow;
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectProvider<ObjectMapper> objectMapperProvider;
