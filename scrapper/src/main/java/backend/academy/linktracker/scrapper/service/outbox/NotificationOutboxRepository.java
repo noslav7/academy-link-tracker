@@ -18,7 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class NotificationOutboxRepository {
 
-    private static final RowMapper<OutboxNotificationMessage> OUTBOX_ROW_MAPPER = NotificationOutboxRepository::mapOutboxRow;
+    private static final RowMapper<OutboxNotificationMessage> OUTBOX_ROW_MAPPER =
+            NotificationOutboxRepository::mapOutboxRow;
 
     private final JdbcTemplate jdbcTemplate;
     private final ObjectProvider<ObjectMapper> objectMapperProvider;

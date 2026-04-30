@@ -1,15 +1,11 @@
 package backend.academy.linktracker.scrapper.controller;
 
-import backend.academy.linktracker.scrapper.configuration.LinksCacheConfiguration;
 import backend.academy.linktracker.scrapper.dto.AddLinkRequest;
 import backend.academy.linktracker.scrapper.dto.LinkResponse;
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
 import backend.academy.linktracker.scrapper.dto.RemoveLinkRequest;
-import backend.academy.linktracker.scrapper.service.LinkService;
+import backend.academy.linktracker.scrapper.service.CachedLinksService;
 import jakarta.validation.Valid;
-import java.util.List;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,15 +23,15 @@ public class LinksController {
     /**
      * Сервис управления ссылками.
      */
-    private final LinkService linkService;
+    private final CachedLinksService cachedLinksService;
 
     /**
      * Создает контроллер управления ссылками.
      *
-     * @param linkService сервис управления ссылками
+     * @param cachedLinksService прослойка кэширования ответов API ссылок
      */
-    public LinksController(LinkService linkService) {
-        this.linkService = linkService;
+    public LinksController(CachedLinksService cachedLinksService) {
+        this.cachedLinksService = cachedLinksService;
     }
 
     /**
@@ -45,9 +41,8 @@ public class LinksController {
      * @return список ссылок и их количество
      */
     @GetMapping("/list")
-    @Cacheable(cacheNames = LinksCacheConfiguration.LINKS_LIST_CACHE, key = "#chatId")
     public ListLinksResponse list(@RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId) {
-        return buildListResponse(chatId);
+        return cachedLinksService.list(chatId);
     }
 
     /**
@@ -58,10 +53,9 @@ public class LinksController {
      * @return добавленная ссылка
      */
     @PostMapping("/links")
-    @CacheEvict(cacheNames = LinksCacheConfiguration.LINKS_LIST_CACHE, key = "#chatId")
     public ResponseEntity<LinkResponse> add(
             @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @Valid @RequestBody AddLinkRequest request) {
-        return ResponseEntity.ok(linkService.add(chatId, request));
+        return ResponseEntity.ok(cachedLinksService.add(chatId, request));
     }
 
     /**
@@ -72,14 +66,8 @@ public class LinksController {
      * @return удаленная ссылка
      */
     @DeleteMapping("/links")
-    @CacheEvict(cacheNames = LinksCacheConfiguration.LINKS_LIST_CACHE, key = "#chatId")
     public ResponseEntity<LinkResponse> remove(
             @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @Valid @RequestBody RemoveLinkRequest request) {
-        return ResponseEntity.ok(linkService.remove(chatId, request.link()));
-    }
-
-    private ListLinksResponse buildListResponse(long chatId) {
-        List<LinkResponse> links = linkService.list(chatId);
-        return new ListLinksResponse(links, links.size());
+        return ResponseEntity.ok(cachedLinksService.remove(chatId, request.link()));
     }
 }
