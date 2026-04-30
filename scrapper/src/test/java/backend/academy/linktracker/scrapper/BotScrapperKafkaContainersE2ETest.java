@@ -28,6 +28,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Tag;
@@ -69,7 +70,8 @@ class BotScrapperKafkaContainersE2ETest {
     @Container
     private static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka-native:4.1.1"))
             .withNetwork(NETWORK)
-            .withNetworkAliases("kafka");
+            .withNetworkAliases("kafka")
+            .withStartupTimeout(Duration.ofMinutes(3));
 
     @SuppressWarnings("resource")
     @Container

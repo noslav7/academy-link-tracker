@@ -40,7 +40,8 @@ class KafkaMessageSenderIntegrationTest {
 
     @SuppressWarnings("resource")
     @Container
-    private static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka-native:4.1.1"));
+    private static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka-native:4.1.1"))
+            .withStartupTimeout(Duration.ofMinutes(3));
 
     @SuppressWarnings("resource")
     @Container
