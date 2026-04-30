@@ -117,6 +117,8 @@ class BotScrapperContainersE2ETest {
             .withEnv("BOT_TRANSPORT", "HTTP")
             .withEnv("SCRAPPER_SCHEDULER_INTERVAL", "500ms")
             .withEnv("SCRAPPER_GRPC_SERVER_ENABLED", "false")
+            .withEnv("LINKS_CACHE_ENABLED", "false")
+            .withEnv("MANAGEMENT_HEALTH_REDIS_ENABLED", "false")
             .withEnv("DATASOURCE_URL", "jdbc:postgresql://postgres:5432/link_tracker")
             .withEnv("DATASOURCE_USERNAME", "postgres")
             .withEnv("DATASOURCE_PASSWORD", "postgres")
@@ -300,7 +302,7 @@ class BotScrapperContainersE2ETest {
                   "filters": []
                 }
                 """.formatted(link);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(scrapperBaseUrl() + "/links"))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(scrapperBaseUrl() + "/list"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(addLinkBody))

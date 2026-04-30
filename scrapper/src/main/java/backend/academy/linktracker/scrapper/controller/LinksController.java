@@ -1,10 +1,10 @@
 package backend.academy.linktracker.scrapper.controller;
 
+import backend.academy.linktracker.scrapper.configuration.LinksCacheConfiguration;
 import backend.academy.linktracker.scrapper.dto.AddLinkRequest;
 import backend.academy.linktracker.scrapper.dto.LinkResponse;
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
 import backend.academy.linktracker.scrapper.dto.RemoveLinkRequest;
-import backend.academy.linktracker.scrapper.configuration.LinksCacheConfiguration;
 import backend.academy.linktracker.scrapper.service.LinkService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -57,7 +57,7 @@ public class LinksController {
      * @param request тело запроса с ссылкой, тегами и фильтрами
      * @return добавленная ссылка
      */
-    @PostMapping("/links")
+    @PostMapping("/list")
     @CacheEvict(cacheNames = LinksCacheConfiguration.LINKS_LIST_CACHE, key = "#chatId")
     public ResponseEntity<LinkResponse> add(
             @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @Valid @RequestBody AddLinkRequest request) {
@@ -71,7 +71,7 @@ public class LinksController {
      * @param request тело запроса с удаляемой ссылкой
      * @return удаленная ссылка
      */
-    @DeleteMapping("/links")
+    @DeleteMapping("/list")
     @CacheEvict(cacheNames = LinksCacheConfiguration.LINKS_LIST_CACHE, key = "#chatId")
     public ResponseEntity<LinkResponse> remove(
             @RequestHeader(ApiHeaders.TG_CHAT_ID) long chatId, @Valid @RequestBody RemoveLinkRequest request) {

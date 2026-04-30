@@ -119,7 +119,8 @@ public class ApiExceptionHandler {
      * @return строка формата {@code field: message}
      */
     private static String toFieldValidationMessage(FieldError fieldError) {
-        String defaultMessage = fieldError.getDefaultMessage() == null ? "invalid value" : fieldError.getDefaultMessage();
+        String defaultMessage =
+                fieldError.getDefaultMessage() == null ? "invalid value" : fieldError.getDefaultMessage();
         return fieldError.getField() + ": " + defaultMessage;
     }
 }

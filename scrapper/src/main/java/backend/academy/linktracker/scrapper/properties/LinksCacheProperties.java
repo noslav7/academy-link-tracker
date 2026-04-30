@@ -35,5 +35,4 @@ public class LinksCacheProperties {
     @NotNull
     @DurationUnit(ChronoUnit.SECONDS)
     private Duration ttl = Duration.ofMinutes(5);
-
 }

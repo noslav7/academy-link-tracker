@@ -176,7 +176,7 @@ class ScrapperHttpContractTest {
                   "filters": []
                 }
                 """.formatted(link);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -185,7 +185,7 @@ class ScrapperHttpContractTest {
     }
 
     private HttpResponse<String> getLinks(long chatId) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .GET()
                 .build();
@@ -198,7 +198,7 @@ class ScrapperHttpContractTest {
                   "link": "%s"
                 }
                 """.formatted(link);
-        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .method("DELETE", HttpRequest.BodyPublishers.ofString(body))

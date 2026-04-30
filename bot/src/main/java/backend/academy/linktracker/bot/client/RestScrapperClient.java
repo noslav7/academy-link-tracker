@@ -54,7 +54,7 @@ public class RestScrapperClient implements ScrapperClient {
         try {
             return restClient
                     .post()
-                    .uri("/links")
+                    .uri("/list")
                     .header("Tg-Chat-Id", String.valueOf(chatId))
                     .body(new AddLinkRequest(link, tags, filters))
                     .retrieve()
@@ -77,7 +77,7 @@ public class RestScrapperClient implements ScrapperClient {
         try {
             return restClient
                     .method(HttpMethod.DELETE)
-                    .uri("/links")
+                    .uri("/list")
                     .header("Tg-Chat-Id", String.valueOf(chatId))
                     .body(new RemoveLinkRequest(link))
                     .retrieve()
