@@ -41,6 +41,20 @@ Unix/macOS:
 ./mvnw -am -pl scrapper,bot package
 ```
 
+## Запуск из IDE
+
+Приложение можно запускать напрямую из IDE без дополнительных зависимостей, кроме заранее поднятых сервисов через Docker Compose.
+
+1. Поднимите необходимые инфраструктурные сервисы:
+
+```powershell
+docker compose up -d postgresql liquibase-migrations
+```
+
+2. Запустите `scrapper` и `bot` из IDE (классы `ScrapperApplication` и `BotApplication`) или через Maven-команды из модульных README.
+
+3. Для Kafka-режима убедитесь, что доступны брокеры и Schema Registry из конфигурации окружения.
+
 ## Поведение при старте и Kafka
 
 - Для `scrapper` при `BOT_TRANSPORT=KAFKA` включена проверка доступности Kafka на старте; при недоступности кластера запуск завершается с ошибкой.
