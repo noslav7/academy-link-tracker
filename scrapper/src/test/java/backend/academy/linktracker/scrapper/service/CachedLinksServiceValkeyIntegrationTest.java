@@ -15,6 +15,7 @@ import backend.academy.linktracker.scrapper.configuration.LinksCacheConfiguratio
 import backend.academy.linktracker.scrapper.dto.AddLinkRequest;
 import backend.academy.linktracker.scrapper.dto.LinkResponse;
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
+import backend.academy.linktracker.scrapper.ValkeyClusterTestcontainers;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
@@ -40,10 +41,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = CachedLinksServiceValkeyIntegrationTest.TestConfig.class)
@@ -53,10 +51,10 @@ class CachedLinksServiceValkeyIntegrationTest {
 
     private static final Duration CACHE_TTL = Duration.ofSeconds(1);
 
-    @SuppressWarnings("resource")
-    @Container
-    private static final GenericContainer<?> VALKEY =
-            new GenericContainer<>(DockerImageName.parse("valkey/valkey:8.1-alpine")).withExposedPorts(6379);
+    // Кластер поднимается один раз до создания Spring-контекста тестов.
+    static {
+        ValkeyClusterTestcontainers.start();
+    }
 
     @Autowired
     private CachedLinksService cachedLinksService;
@@ -70,6 +68,9 @@ class CachedLinksServiceValkeyIntegrationTest {
     @Autowired
     private RedisConnectionFactory redisConnectionFactory;
 
+    /**
+     * Сбрасывает моки и очищает кэш перед каждым тестовым сценарием.
+     */
     @BeforeEach
     void setUp() {
         reset(linkService);
@@ -190,12 +191,22 @@ class CachedLinksServiceValkeyIntegrationTest {
                 });
     }
 
+    /**
+     * Ожидает появления записи в Valkey для конкретного chatId.
+     *
+     * <p>Используется из тестов, где запись в кэш происходит асинхронно относительно проверки.
+     */
     private void awaitCachedEntry(long chatId) {
         await().atMost(3, TimeUnit.SECONDS)
                 .pollInterval(50, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> assertNotNull(cachedValue(chatId)));
     }
 
+    /**
+     * Возвращает сырое значение кэша из Valkey по ключу `links-list::<chatId>`.
+     *
+     * <p>Нужно для проверок наличия/отсутствия данных и формата сериализации.
+     */
     private byte[] cachedValue(long chatId) {
         byte[] cacheKey = (LinksCacheConfiguration.LINKS_LIST_CACHE + "::" + chatId).getBytes(StandardCharsets.UTF_8);
         try (var connection = redisConnectionFactory.getConnection()) {
@@ -205,28 +216,49 @@ class CachedLinksServiceValkeyIntegrationTest {
 
     @Configuration
     @EnableCaching(proxyTargetClass = true)
+    /**
+     * Минимальный Spring-контекст для тестирования `CachedLinksService`.
+     *
+     * <p>Содержит mock доменного сервиса, подключение к тестовому Valkey и CacheManager с коротким TTL.
+     */
     static class TestConfig {
 
+        /**
+         * Регистрирует тестируемый сервис с кэш-аннотациями.
+         */
         @Bean
         CachedLinksService cachedLinksService(LinkService linkService) {
             return new CachedLinksService(linkService);
         }
 
+        /**
+         * Возвращает mock `LinkService`, чтобы контролировать поведение доменного слоя.
+         */
         @Bean
         @Primary
         LinkService linkService() {
             return Mockito.mock(LinkService.class);
         }
 
+        /**
+         * Создает подключение к Valkey для тестов.
+         *
+         * <p>Подключаемся к первой ноде кластера, что достаточно для сценариев работы кэша.
+         */
         @Bean(destroyMethod = "destroy")
         RedisConnectionFactory redisConnectionFactory() {
-            RedisStandaloneConfiguration configuration =
-                    new RedisStandaloneConfiguration(VALKEY.getHost(), VALKEY.getMappedPort(6379));
+            RedisStandaloneConfiguration configuration = new RedisStandaloneConfiguration(
+                    ValkeyClusterTestcontainers.firstNodeHost(), ValkeyClusterTestcontainers.firstNodePort());
             LettuceConnectionFactory connectionFactory = new LettuceConnectionFactory(configuration);
             connectionFactory.afterPropertiesSet();
             return connectionFactory;
         }
 
+        /**
+         * Конфигурирует Redis CacheManager с коротким TTL и JSON-сериализацией.
+         *
+         * <p>Короткий TTL нужен для быстрого воспроизведения сценария автоматического истечения кэша.
+         */
         @Bean
         CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
             RedisCacheConfiguration configuration = RedisCacheConfiguration.defaultCacheConfig()

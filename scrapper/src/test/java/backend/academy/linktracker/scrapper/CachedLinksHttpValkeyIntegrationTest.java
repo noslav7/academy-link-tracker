@@ -32,10 +32,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import org.wiremock.spring.EnableWireMock;
 
 @SpringBootTest(
@@ -56,10 +53,10 @@ class CachedLinksHttpValkeyIntegrationTest {
 
     private static final String TG_CHAT_ID_HEADER = "Tg-Chat-Id";
 
-    @SuppressWarnings("resource")
-    @Container
-    private static final GenericContainer<?> VALKEY =
-            new GenericContainer<>(DockerImageName.parse("valkey/valkey:8.1-alpine")).withExposedPorts(6379);
+    // Инициализируем общий 3-нодовый кластер до поднятия Spring-контекста теста.
+    static {
+        ValkeyClusterTestcontainers.start();
+    }
 
     @LocalServerPort
     private int port;
@@ -70,12 +67,21 @@ class CachedLinksHttpValkeyIntegrationTest {
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Прокидывает в Spring теста параметры подключения к Valkey.
+     *
+     * <p>Для текущих сценариев достаточно подключения к первой ноде (master), при этом
+     * инфраструктура в фоне остается кластерной, как требует задание.
+     */
     @DynamicPropertySource
     static void registerValkeyProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.data.redis.host", VALKEY::getHost);
-        registry.add("spring.data.redis.port", () -> VALKEY.getMappedPort(6379));
+        ValkeyClusterTestcontainers.registerSpringStandaloneProperties(registry);
     }
 
+    /**
+     * Подготавливает окружение перед каждым тестом:
+     * настраивает мок GitHub-ответа и очищает Valkey.
+     */
     @BeforeEach
     void setUp() {
         stubFor(get(urlMatching("/github/repos/.+/.+"))
@@ -169,6 +175,11 @@ class CachedLinksHttpValkeyIntegrationTest {
         assertEquals(1, afterDelete.size());
     }
 
+    /**
+     * Возвращает сырое значение кэша по chatId из `links-list::<chatId>`.
+     *
+     * <p>Нужно для явной проверки формата хранения данных в Valkey.
+     */
     private byte[] cachedValue(long chatId) {
         byte[] key = (LinksCacheConfiguration.LINKS_LIST_CACHE + "::" + chatId).getBytes(StandardCharsets.UTF_8);
         try (var connection = redisConnectionFactory.getConnection()) {
@@ -176,6 +187,11 @@ class CachedLinksHttpValkeyIntegrationTest {
         }
     }
 
+    /**
+     * Отправляет HTTP-запрос на добавление ссылки пользователю.
+     *
+     * <p>Используется в сценариях, где после изменения ссылок кэш должен инвалидироваться.
+     */
     private HttpResponse<String> postLink(long chatId, String link) throws IOException, InterruptedException {
         String body = """
                 {
@@ -192,6 +208,11 @@ class CachedLinksHttpValkeyIntegrationTest {
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
+    /**
+     * Отправляет HTTP GET `/list` и получает список ссылок для пользователя.
+     *
+     * <p>Это основной endpoint, для которого проверяется кэширование.
+     */
     private HttpResponse<String> getLinks(long chatId) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
                 .header(TG_CHAT_ID_HEADER, String.valueOf(chatId))
@@ -200,6 +221,11 @@ class CachedLinksHttpValkeyIntegrationTest {
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
+    /**
+     * Отправляет HTTP DELETE для удаления ссылки у пользователя.
+     *
+     * <p>Используется для проверки, что удаление инвалидирует ранее построенный кэш.
+     */
     private HttpResponse<String> deleteLink(long chatId, String link) throws IOException, InterruptedException {
         String body = """
                 {
@@ -214,6 +240,9 @@ class CachedLinksHttpValkeyIntegrationTest {
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
+    /**
+     * Вспомогательный POST без тела для регистрации чата в тестовых сценариях.
+     */
     private HttpResponse<String> postWithoutBody(String path) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + path))
                 .POST(HttpRequest.BodyPublishers.noBody())
@@ -221,6 +250,9 @@ class CachedLinksHttpValkeyIntegrationTest {
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
+    /**
+     * Возвращает базовый URL случайного порта тестового Spring Boot приложения.
+     */
     private String baseUrl() {
         return "http://localhost:" + port;
     }

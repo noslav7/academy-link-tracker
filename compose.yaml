@@ -118,7 +118,107 @@ services:
     ports:
       - "8085:8080"
 
+  valkey-node-1:
+    image: valkey/valkey:8-alpine
+    container_name: link-tracker-valkey-node-1
+    command: >
+      valkey-server
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+      --appendonly yes
+      --cluster-enabled yes
+      --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000
+      --cluster-announce-hostname valkey-node-1
+      --cluster-announce-port 6379
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey-node-1-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey-node-2:
+    image: valkey/valkey:8-alpine
+    container_name: link-tracker-valkey-node-2
+    command: >
+      valkey-server
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+      --appendonly yes
+      --cluster-enabled yes
+      --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000
+      --cluster-announce-hostname valkey-node-2
+      --cluster-announce-port 6379
+    ports:
+      - "6380:6379"
+    volumes:
+      - valkey-node-2-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey-node-3:
+    image: valkey/valkey:8-alpine
+    container_name: link-tracker-valkey-node-3
+    command: >
+      valkey-server
+      --port 6379
+      --bind 0.0.0.0
+      --protected-mode no
+      --appendonly yes
+      --cluster-enabled yes
+      --cluster-config-file nodes.conf
+      --cluster-node-timeout 5000
+      --cluster-announce-hostname valkey-node-3
+      --cluster-announce-port 6379
+    ports:
+      - "6381:6379"
+    volumes:
+      - valkey-node-3-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey-cluster-init:
+    image: valkey/valkey:8-alpine
+    container_name: link-tracker-valkey-cluster-init
+    depends_on:
+      valkey-node-1:
+        condition: service_healthy
+      valkey-node-2:
+        condition: service_healthy
+      valkey-node-3:
+        condition: service_healthy
+    restart: "no"
+    command: >
+      sh -c "
+      if valkey-cli -h valkey-node-1 cluster info | grep -q 'cluster_state:ok'; then
+        echo 'Valkey cluster is already initialized';
+      else
+        valkey-cli --cluster create
+        valkey-node-1:6379
+        valkey-node-2:6379
+        valkey-node-3:6379
+        --cluster-replicas 2
+        --cluster-yes;
+      fi
+      "
+
 volumes:
   kafka-1-data:
   kafka-2-data:
   kafka-3-data:
+  valkey-node-1-data:
+  valkey-node-2-data:
+  valkey-node-3-data:
