@@ -19,6 +19,8 @@ public final class ValkeyClusterTestcontainers {
 
     private static final DockerImageName VALKEY_IMAGE = DockerImageName.parse("valkey/valkey:8.1-alpine");
     private static final int VALKEY_PORT = 6379;
+    private static final int CLUSTER_READY_TIMEOUT_MS = 15_000;
+    private static final int CLUSTER_READY_POLL_INTERVAL_MS = 200;
 
     private static final Network NETWORK = Network.newNetwork();
     private static final GenericContainer<?> NODE_1 = createNode("valkey-node-1");
@@ -156,8 +158,30 @@ public final class ValkeyClusterTestcontainers {
             if (result.getExitCode() != 0) {
                 throw new IllegalStateException("Unable to initialize Valkey cluster: " + result.getStderr());
             }
+            waitUntilClusterReady();
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to initialize Valkey cluster", exception);
         }
+    }
+
+    /**
+     * Ждет, пока кластер полностью поднимется и перейдет в `cluster_state:ok`.
+     *
+     * <p>Без этого первые запросы из тестов могут получить `CLUSTERDOWN`, даже если
+     * команда `cluster create` уже завершилась успешно.
+     */
+    private static void waitUntilClusterReady() throws Exception {
+        long deadline = System.currentTimeMillis() + CLUSTER_READY_TIMEOUT_MS;
+        String lastClusterInfo = "";
+        while (System.currentTimeMillis() < deadline) {
+            var result = NODE_1.execInContainer(
+                    "sh", "-c", "valkey-cli -h valkey-node-1 -p " + VALKEY_PORT + " cluster info");
+            if (result.getExitCode() == 0 && result.getStdout().contains("cluster_state:ok")) {
+                return;
+            }
+            lastClusterInfo = result.getStdout() + result.getStderr();
+            Thread.sleep(CLUSTER_READY_POLL_INTERVAL_MS);
+        }
+        throw new IllegalStateException("Valkey cluster did not become ready. Last cluster info: " + lastClusterInfo);
     }
 }
