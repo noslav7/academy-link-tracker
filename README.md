@@ -43,17 +43,20 @@ Unix/macOS:
 
 ## Запуск из IDE
 
-Приложение можно запускать напрямую из IDE без дополнительных зависимостей, кроме заранее поднятых сервисов через Docker Compose.
+Приложение запускается напрямую из IDE без дополнительных зависимостей, кроме заранее поднятой инфраструктуры через Docker Compose.
 
-1. Поднимите необходимые инфраструктурные сервисы:
+1. Поднимите инфраструктуру одним набором сервисов:
 
 ```powershell
-docker compose up -d postgresql liquibase-migrations
+docker compose up -d `
+  postgresql liquibase-migrations `
+  kafka-1 kafka-2 kafka-3 schema-registry `
+  valkey-node-1 valkey-node-2 valkey-node-3 valkey-cluster-init
 ```
 
 2. Запустите `scrapper` и `bot` из IDE (классы `ScrapperApplication` и `BotApplication`) или через Maven-команды из модульных README.
 
-3. Для Kafka-режима убедитесь, что доступны брокеры и Schema Registry из конфигурации окружения.
+3. Для локальной отказоустойчивости Valkey используется кластер из 3 нод; данные хранятся в именованных volumes `valkey-node-*-data` (переживают рестарты контейнеров).
 
 ## Поведение при старте и Kafka
 
