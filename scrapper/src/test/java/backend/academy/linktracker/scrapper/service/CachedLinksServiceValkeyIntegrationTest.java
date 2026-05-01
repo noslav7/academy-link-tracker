@@ -11,11 +11,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import backend.academy.linktracker.scrapper.ValkeyClusterTestcontainers;
 import backend.academy.linktracker.scrapper.configuration.LinksCacheConfiguration;
 import backend.academy.linktracker.scrapper.dto.AddLinkRequest;
 import backend.academy.linktracker.scrapper.dto.LinkResponse;
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
-import backend.academy.linktracker.scrapper.ValkeyClusterTestcontainers;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;

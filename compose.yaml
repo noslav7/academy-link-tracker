@@ -32,7 +32,7 @@ services:
       - ./migrations:/changesets
 
   kafka-1:
-    image: bitnami/kafka:latest
+    image: bitnamilegacy/kafka:4.0.0-debian-12-r10
     container_name: link-tracker-kafka-1
     environment:
       KAFKA_ENABLE_KRAFT: "yes"
@@ -57,7 +57,7 @@ services:
       - kafka-1-data:/bitnami/kafka
 
   kafka-2:
-    image: bitnami/kafka:latest
+    image: bitnamilegacy/kafka:4.0.0-debian-12-r10
     container_name: link-tracker-kafka-2
     environment:
       KAFKA_ENABLE_KRAFT: "yes"
@@ -82,7 +82,7 @@ services:
       - kafka-2-data:/bitnami/kafka
 
   kafka-3:
-    image: bitnami/kafka:latest
+    image: bitnamilegacy/kafka:4.0.0-debian-12-r10
     container_name: link-tracker-kafka-3
     environment:
       KAFKA_ENABLE_KRAFT: "yes"
