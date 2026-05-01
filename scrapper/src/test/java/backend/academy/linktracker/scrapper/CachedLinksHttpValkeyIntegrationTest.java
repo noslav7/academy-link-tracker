@@ -138,6 +138,37 @@ class CachedLinksHttpValkeyIntegrationTest {
         assertEquals(2, afterAdd.size());
     }
 
+    @Test
+    void givenCacheCreatedViaHttpWhenLinkRemovedThenCacheEvictedAndListRebuilt()
+            throws IOException, InterruptedException {
+        // Проверяет инвалидацию через API: после delete кэш удаляется, а следующий /list возвращает обновленный список.
+        long chatId = 4103L;
+        String firstLink = "https://github.com/user/repo-4103-a";
+        String secondLink = "https://github.com/user/repo-4103-b";
+
+        assertEquals(200, postWithoutBody("/tg-chat/" + chatId).statusCode());
+        assertEquals(200, postLink(chatId, firstLink).statusCode());
+        assertEquals(200, postLink(chatId, secondLink).statusCode());
+        HttpResponse<String> cachedList = getLinks(chatId);
+        assertEquals(200, cachedList.statusCode());
+        ListLinksResponse beforeDelete = objectMapper.readValue(cachedList.body(), ListLinksResponse.class);
+        assertEquals(2, beforeDelete.size());
+
+        await().atMost(3, TimeUnit.SECONDS)
+                .pollInterval(50, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> assertNotNull(cachedValue(chatId)));
+
+        assertEquals(200, deleteLink(chatId, secondLink).statusCode());
+        await().atMost(3, TimeUnit.SECONDS)
+                .pollInterval(50, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> assertNull(cachedValue(chatId)));
+
+        HttpResponse<String> rebuiltList = getLinks(chatId);
+        assertEquals(200, rebuiltList.statusCode());
+        ListLinksResponse afterDelete = objectMapper.readValue(rebuiltList.body(), ListLinksResponse.class);
+        assertEquals(1, afterDelete.size());
+    }
+
     private byte[] cachedValue(long chatId) {
         byte[] key = (LinksCacheConfiguration.LINKS_LIST_CACHE + "::" + chatId).getBytes(StandardCharsets.UTF_8);
         try (var connection = redisConnectionFactory.getConnection()) {
@@ -165,6 +196,20 @@ class CachedLinksHttpValkeyIntegrationTest {
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
                 .header(TG_CHAT_ID_HEADER, String.valueOf(chatId))
                 .GET()
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> deleteLink(long chatId, String link) throws IOException, InterruptedException {
+        String body = """
+                {
+                  "link": "%s"
+                }
+                """.formatted(link);
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
+                .header(TG_CHAT_ID_HEADER, String.valueOf(chatId))
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .method("DELETE", HttpRequest.BodyPublishers.ofString(body))
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
