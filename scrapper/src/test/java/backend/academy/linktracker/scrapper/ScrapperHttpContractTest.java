@@ -6,6 +6,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,9 +16,13 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
@@ -50,7 +55,7 @@ class ScrapperHttpContractTest {
     }
 
     @Test
-    void GivenRegisteredChatAndAddedLinkWhenListRequestedThenReturnsExactListResponse()
+    void givenRegisteredChatAndAddedLinkWhenListRequestedThenReturnsExactListResponse()
             throws IOException, InterruptedException {
         // Проверяет HTTP-контракт add/list: ответ списка полностью совпадает с эталонным JSON.
         long chatId = 1001L;
@@ -72,7 +77,7 @@ class ScrapperHttpContractTest {
     }
 
     @Test
-    void GivenAddedLinkWhenDeletedAndListRequestedThenReturnsEmptyListResponse()
+    void givenAddedLinkWhenDeletedAndListRequestedThenReturnsEmptyListResponse()
             throws IOException, InterruptedException {
         // Проверяет HTTP-контракт delete/list: после удаления список должен быть строго пустым.
         long chatId = 1002L;
@@ -94,19 +99,31 @@ class ScrapperHttpContractTest {
     }
 
     @Test
-    void GivenMissingChatWhenDeleteRequestedThenReturnsNotFoundAndKeepsExistingSubscription()
-            throws IOException, InterruptedException {
-        // Проверяет, что удаление по несуществующему чату возвращает 404 и не затрагивает чужую подписку.
+    void givenMissingChatWhenDeleteRequestedThenReturnsNotFound() throws IOException, InterruptedException {
+        // Проверяет контракт 404: удаление ссылки из несуществующего чата возвращает Not Found.
         long existingChatId = 1003L;
         long missingChatId = 1999L;
         String link = "https://github.com/user/repo-1003";
 
         assertEquals(200, postWithoutBody("/tg-chat/" + existingChatId).statusCode());
-        HttpResponse<String> addResponse = postLink(existingChatId, link);
-        assertEquals(200, addResponse.statusCode());
+        assertEquals(200, postLink(existingChatId, link).statusCode());
 
         HttpResponse<String> deleteResponse = deleteLink(missingChatId, link);
         assertEquals(404, deleteResponse.statusCode());
+    }
+
+    @Test
+    void givenMissingChatWhenDeleteRequestedThenExistingSubscriptionIsKept() throws IOException, InterruptedException {
+        // Проверяет изоляцию состояния: неуспешное удаление в другом чате не затрагивает существующую подписку.
+        long existingChatId = 1007L;
+        long missingChatId = 1999L;
+        String link = "https://github.com/user/repo-1007";
+
+        assertEquals(200, postWithoutBody("/tg-chat/" + existingChatId).statusCode());
+        HttpResponse<String> addResponse = postLink(existingChatId, link);
+        assertEquals(200, addResponse.statusCode());
+
+        assertEquals(404, deleteLink(missingChatId, link).statusCode());
 
         HttpResponse<String> listResponse = getLinks(existingChatId);
         assertEquals(200, listResponse.statusCode());
@@ -119,31 +136,20 @@ class ScrapperHttpContractTest {
         assertEquals(expected, parseJson(listResponse.body()));
     }
 
-    @Test
-    void GivenMissingChatWhenAddLinkRequestedThenReturnsNotFound() throws IOException, InterruptedException {
-        // Проверяет контракт 404: код и тело ошибки для add link в несуществующем чате.
-        assertEquals(200, postWithoutBody("/tg-chat/1004").statusCode());
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("addLinkNotFoundCases")
+    void givenChatIsNotAvailableWhenAddLinkRequestedThenReturnsNotFound(
+            String ignoredCaseName, long chatId, AddLinkSetup setupAction) throws IOException, InterruptedException {
+        // Проверяет контракт 404 add link для разных сценариев недоступного чата через параметризацию.
+        setupAction.prepare(this, chatId);
 
-        HttpResponse<String> addResponse = postLink(2004L, "https://github.com/user/repo-2004");
+        HttpResponse<String> addResponse = postLink(chatId, "https://github.com/user/repo-" + chatId);
         assertEquals(404, addResponse.statusCode());
-        assertApiError(addResponse.body(), "404", "ChatNotFoundException", "Chat not found: 2004");
+        assertApiError(addResponse.body(), "404", "ChatNotFoundException", "Chat not found: " + chatId);
     }
 
     @Test
-    void GivenDeletedChatWhenAddLinkRequestedThenReturnsNotFound() throws IOException, InterruptedException {
-        // Проверяет контракт 404: код и тело ошибки для add link в удалённом чате.
-        long chatId = 1005L;
-
-        assertEquals(200, postWithoutBody("/tg-chat/" + chatId).statusCode());
-        assertEquals(200, deleteWithoutBody("/tg-chat/" + chatId).statusCode());
-
-        HttpResponse<String> addResponse = postLink(chatId, "https://github.com/user/repo-1005");
-        assertEquals(404, addResponse.statusCode());
-        assertApiError(addResponse.body(), "404", "ChatNotFoundException", "Chat not found: 1005");
-    }
-
-    @Test
-    void GivenMissingChatWhenDeleteChatRequestedThenReturnsNotFound() throws IOException, InterruptedException {
+    void givenMissingChatWhenDeleteChatRequestedThenReturnsNotFound() throws IOException, InterruptedException {
         // Проверяет контракт 404: код и тело ошибки для удаления несуществующего чата.
         HttpResponse<String> deleteResponse = deleteWithoutBody("/tg-chat/1006");
 
@@ -153,6 +159,25 @@ class ScrapperHttpContractTest {
 
     private JsonNode parseJson(String body) throws IOException {
         return objectMapper.readTree(body);
+    }
+
+    private static Stream<Arguments> addLinkNotFoundCases() {
+        return Stream.of(
+                Arguments.of("givenMissingChatWhenAddLinkRequestedThenReturnsNotFound", 2004L, (AddLinkSetup)
+                        (test, chatId) -> {
+                            // Готовим независимое состояние: в системе есть другой чат, но целевого чата нет.
+                            assertEquals(
+                                    200, test.postWithoutBody("/tg-chat/1004").statusCode());
+                        }),
+                Arguments.of("givenDeletedChatWhenAddLinkRequestedThenReturnsNotFound", 1005L, (AddLinkSetup)
+                        (test, chatId) -> {
+                            assertEquals(
+                                    200,
+                                    test.postWithoutBody("/tg-chat/" + chatId).statusCode());
+                            assertEquals(
+                                    200,
+                                    test.deleteWithoutBody("/tg-chat/" + chatId).statusCode());
+                        }));
     }
 
     private void assertApiError(String body, String expectedCode, String expectedException, String expectedMessage)
@@ -165,7 +190,7 @@ class ScrapperHttpContractTest {
                 () -> assertEquals(
                         expectedMessage, error.path("exceptionMessage").asText()),
                 () -> assertTrue(error.path("stacktrace").isArray()),
-                () -> assertTrue(error.path("stacktrace").size() > 0));
+                () -> assertNotEquals(0, error.path("stacktrace").size()));
     }
 
     private HttpResponse<String> postLink(long chatId, String link) throws IOException, InterruptedException {
@@ -221,5 +246,10 @@ class ScrapperHttpContractTest {
 
     private String baseUrl() {
         return "http://localhost:" + port;
+    }
+
+    @FunctionalInterface
+    private interface AddLinkSetup {
+        void prepare(ScrapperHttpContractTest test, long chatId) throws IOException, InterruptedException;
     }
 }

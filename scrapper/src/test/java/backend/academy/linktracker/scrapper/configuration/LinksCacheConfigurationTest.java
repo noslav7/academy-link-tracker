@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.mock;
 
 import backend.academy.linktracker.scrapper.properties.LinksCacheProperties;
+import backend.academy.linktracker.scrapper.properties.LinksCacheProperties.CacheMode;
 import backend.academy.linktracker.scrapper.service.cache.LinksListCache;
 import backend.academy.linktracker.scrapper.service.cache.NoOpLinksListCache;
 import backend.academy.linktracker.scrapper.service.cache.ValkeyLinksListCache;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
 @Tag("unit")
+@Tag("sanity")
 class LinksCacheConfigurationTest {
 
     @Test
@@ -26,13 +28,42 @@ class LinksCacheConfigurationTest {
     }
 
     @Test
-    void givenUnsupportedConnectionFactoryWhenCreatingValkeyBeanThenInMemoryCacheIsReturned() {
-        // Проверяет безопасную деградацию: без LettuceConnectionFactory включается локальный кэш.
+    void givenNoneModeWhenCreatingCacheBeanThenNoOpCacheIsReturned() {
+        // Проверяет mode=NONE: кэш отключается даже при включенном флаге app.cache.links.enabled.
+        LinksCacheConfiguration configuration = new LinksCacheConfiguration();
+        RedisConnectionFactory connectionFactory = mock(RedisConnectionFactory.class);
+        LinksCacheProperties properties = new LinksCacheProperties();
+        properties.setTtl(Duration.ofSeconds(5));
+        properties.setMode(CacheMode.NONE);
+
+        LinksListCache cache = configuration.linksListCache(connectionFactory, properties);
+
+        assertInstanceOf(NoOpLinksListCache.class, cache);
+    }
+
+    @Test
+    void givenValkeyModeWhenCreatingCacheBeanThenValkeyCacheIsReturned() {
+        // Проверяет mode=VALKEY: используется серверный Valkey-кэш без client-side логики.
+        LinksCacheConfiguration configuration = new LinksCacheConfiguration();
+        RedisConnectionFactory connectionFactory = mock(RedisConnectionFactory.class);
+        LinksCacheProperties properties = new LinksCacheProperties();
+        properties.setTtl(Duration.ofSeconds(5));
+        properties.setMode(CacheMode.VALKEY);
+
+        LinksListCache cache = configuration.linksListCache(connectionFactory, properties);
+
+        assertInstanceOf(ValkeyLinksListCache.class, cache);
+    }
+
+    @Test
+    void givenClientSideModeAndUnsupportedFactoryWhenCreatingCacheBeanThenFallbackToValkeyCache() {
+        // Проверяет деградацию mode=CLIENT_SIDE: без LettuceConnectionFactory включается fallback на
+        // ValkeyLinksListCache.
         LinksCacheConfiguration configuration = new LinksCacheConfiguration();
         RedisConnectionFactory unsupportedConnectionFactory = mock(RedisConnectionFactory.class);
         LinksCacheProperties properties = new LinksCacheProperties();
         properties.setTtl(Duration.ofSeconds(5));
-        properties.setMode(LinksCacheProperties.CacheMode.CLIENT_SIDE);
+        properties.setMode(CacheMode.CLIENT_SIDE);
 
         LinksListCache cache = configuration.linksListCache(unsupportedConnectionFactory, properties);
 

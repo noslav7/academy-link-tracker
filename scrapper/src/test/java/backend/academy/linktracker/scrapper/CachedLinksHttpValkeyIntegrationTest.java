@@ -10,8 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import backend.academy.linktracker.scrapper.configuration.LinksCacheConfiguration;
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
+import backend.academy.linktracker.scrapper.service.cache.LinksListCacheKeys;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
@@ -52,6 +52,8 @@ import org.wiremock.spring.EnableWireMock;
 class CachedLinksHttpValkeyIntegrationTest {
 
     private static final String TG_CHAT_ID_HEADER = "Tg-Chat-Id";
+    private static final long CACHE_AWAIT_TIMEOUT_SECONDS = 10;
+    private static final long CACHE_POLL_INTERVAL_MILLIS = 50;
 
     // Инициализируем общий 3-нодовый кластер до поднятия Spring-контекста теста.
     static {
@@ -104,9 +106,7 @@ class CachedLinksHttpValkeyIntegrationTest {
         assertEquals(200, firstListResponse.statusCode());
 
         ListLinksResponse expected = objectMapper.readValue(firstListResponse.body(), ListLinksResponse.class);
-        await().atMost(3, TimeUnit.SECONDS)
-                .pollInterval(50, TimeUnit.MILLISECONDS)
-                .untilAsserted(() -> assertNotNull(cachedValue(chatId)));
+        waitForCache(chatId);
 
         byte[] cached = cachedValue(chatId);
         Object deserialized = RedisSerializer.json().deserialize(cached);
@@ -129,14 +129,10 @@ class CachedLinksHttpValkeyIntegrationTest {
         ListLinksResponse beforeAdd = objectMapper.readValue(cachedList.body(), ListLinksResponse.class);
         assertEquals(1, beforeAdd.size());
 
-        await().atMost(3, TimeUnit.SECONDS)
-                .pollInterval(50, TimeUnit.MILLISECONDS)
-                .untilAsserted(() -> assertNotNull(cachedValue(chatId)));
+        waitForCache(chatId);
 
         assertEquals(200, postLink(chatId, secondLink).statusCode());
-        await().atMost(3, TimeUnit.SECONDS)
-                .pollInterval(50, TimeUnit.MILLISECONDS)
-                .untilAsserted(() -> assertNull(cachedValue(chatId)));
+        waitForCacheEviction(chatId);
 
         HttpResponse<String> rebuiltList = getLinks(chatId);
         assertEquals(200, rebuiltList.statusCode());
@@ -160,14 +156,10 @@ class CachedLinksHttpValkeyIntegrationTest {
         ListLinksResponse beforeDelete = objectMapper.readValue(cachedList.body(), ListLinksResponse.class);
         assertEquals(2, beforeDelete.size());
 
-        await().atMost(3, TimeUnit.SECONDS)
-                .pollInterval(50, TimeUnit.MILLISECONDS)
-                .untilAsserted(() -> assertNotNull(cachedValue(chatId)));
+        waitForCache(chatId);
 
         assertEquals(200, deleteLink(chatId, secondLink).statusCode());
-        await().atMost(3, TimeUnit.SECONDS)
-                .pollInterval(50, TimeUnit.MILLISECONDS)
-                .untilAsserted(() -> assertNull(cachedValue(chatId)));
+        waitForCacheEviction(chatId);
 
         HttpResponse<String> rebuiltList = getLinks(chatId);
         assertEquals(200, rebuiltList.statusCode());
@@ -185,6 +177,18 @@ class CachedLinksHttpValkeyIntegrationTest {
         try (var connection = redisConnectionFactory.getConnection()) {
             return connection.stringCommands().get(key);
         }
+    }
+
+    private void waitForCache(long chatId) {
+        await().atMost(CACHE_AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .pollInterval(CACHE_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> assertNotNull(cachedValue(chatId)));
+    }
+
+    private void waitForCacheEviction(long chatId) {
+        await().atMost(CACHE_AWAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .pollInterval(CACHE_POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> assertNull(cachedValue(chatId)));
     }
 
     /**

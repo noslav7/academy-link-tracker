@@ -46,6 +46,9 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+### JMeter ###
+jmeter.log
+
 ### VS Code ###
 .vscode/
 

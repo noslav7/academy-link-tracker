@@ -68,7 +68,8 @@ public final class JmeterMarkdownReportGenerator {
                 continue;
             }
             List<String> values = parseCsvLine(line);
-            if (values.size() <= Math.max(Math.max(labelIndex, elapsedIndex), Math.max(responseCodeIndex, timestampIndex))) {
+            if (values.size()
+                    <= Math.max(Math.max(labelIndex, elapsedIndex), Math.max(responseCodeIndex, timestampIndex))) {
                 continue;
             }
 
@@ -90,7 +91,8 @@ public final class JmeterMarkdownReportGenerator {
             }
 
             String normalizedEndpoint = normalizeEndpoint(label);
-            EndpointMetrics endpointMetrics = endpointMetricsMap.computeIfAbsent(normalizedEndpoint, ignored -> new EndpointMetrics());
+            EndpointMetrics endpointMetrics =
+                    endpointMetricsMap.computeIfAbsent(normalizedEndpoint, ignored -> new EndpointMetrics());
             endpointMetrics.record(elapsedMs, responseCode, responseMessage);
         }
 
@@ -137,12 +139,15 @@ public final class JmeterMarkdownReportGenerator {
         return report.toString();
     }
 
-    private static void appendEndpoint(StringBuilder report, String endpoint, EndpointMetrics metrics, long durationMs) {
+    private static void appendEndpoint(
+            StringBuilder report, String endpoint, EndpointMetrics metrics, long durationMs) {
         report.append("### ").append(endpoint).append(System.lineSeparator()).append(System.lineSeparator());
         if (metrics == null || metrics.total() == 0) {
             report.append("- Request: `").append(endpoint).append("`").append(System.lineSeparator());
             report.append("- Total calls: 0").append(System.lineSeparator());
-            report.append("- Most frequent errors: none").append(System.lineSeparator()).append(System.lineSeparator());
+            report.append("- Most frequent errors: none")
+                    .append(System.lineSeparator())
+                    .append(System.lineSeparator());
             return;
         }
 
@@ -263,7 +268,8 @@ public final class JmeterMarkdownReportGenerator {
             statusCounters.put(normalizedStatus, statusCounters.getOrDefault(normalizedStatus, 0L) + 1L);
 
             if (!"200".equals(normalizedStatus)) {
-                String message = (responseMessage == null || responseMessage.isBlank()) ? "<no message>" : responseMessage;
+                String message =
+                        (responseMessage == null || responseMessage.isBlank()) ? "<no message>" : responseMessage;
                 String errorKey = normalizedStatus + " / " + message;
                 errors.put(errorKey, errors.getOrDefault(errorKey, 0L) + 1L);
             }

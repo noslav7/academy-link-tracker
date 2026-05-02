@@ -49,6 +49,8 @@ public class LinksCacheProperties {
      * @return {@code true}, если TTL больше нуля
      * @implNote Нужно, чтобы приложение не запускалось с некорректной конфигурацией времени жизни кэша.
      */
+    // Метод вызывается Bean Validation через рефлексию, поэтому PMD не видит прямого использования.
+    @SuppressWarnings("PMD.UnusedPrivateMethod")
     @AssertTrue(message = "app.cache.links.ttl must be positive")
     private boolean isTtlPositive() {
         return ttl != null && !ttl.isNegative() && !ttl.isZero();

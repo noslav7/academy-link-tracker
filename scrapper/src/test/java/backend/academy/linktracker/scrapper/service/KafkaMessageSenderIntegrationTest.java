@@ -60,7 +60,7 @@ class KafkaMessageSenderIntegrationTest {
     }
 
     @Test
-    void GivenKafkaTransportWhenMessageSenderSendsThenMessageAppearsInExpectedAvroFormat() throws Exception {
+    void givenKafkaTransportWhenMessageSenderSendsThenMessageAppearsInExpectedAvroFormat() throws Exception {
         // Проверяет: KafkaMessageSender публикует Avro-событие с ожидаемыми полями.
         createTopicIfMissing();
         NotificationDispatcher sender = createKafkaMessageSender();

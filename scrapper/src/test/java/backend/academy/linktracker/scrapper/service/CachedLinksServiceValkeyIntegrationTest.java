@@ -117,7 +117,7 @@ class CachedLinksServiceValkeyIntegrationTest {
 
     @Test
     void givenExpiredCacheWhenListCalledAgainThenValueIsReloadedFromDomainService() {
-        // Проверяет TTL: после истечения записи ключ удаляется из Valkey и list снова вызывает доменный сервис.
+        // Проверяет TTL: после истечения записи list повторно обращается в доменный сервис.
         long chatId = 3004L;
         List<LinkResponse> links = List.of(new LinkResponse(100L, "https://example.com/ttl", List.of(), List.of()));
         when(linkService.list(chatId)).thenReturn(links);
@@ -127,9 +127,12 @@ class CachedLinksServiceValkeyIntegrationTest {
         await().atMost(3, TimeUnit.SECONDS)
                 .pollInterval(50, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> assertNull(cachedValue(chatId)));
-
-        cachedLinksService.list(chatId);
-        verify(linkService, times(2)).list(chatId);
+        await().atMost(3, TimeUnit.SECONDS)
+                .pollInterval(50, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> {
+                    cachedLinksService.list(chatId);
+                    verify(linkService, times(2)).list(chatId);
+                });
     }
 
     @Test
