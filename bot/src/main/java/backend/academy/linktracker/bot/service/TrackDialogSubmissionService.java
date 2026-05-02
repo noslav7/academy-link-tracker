@@ -34,6 +34,8 @@ public class TrackDialogSubmissionService {
      * @param tags список тегов
      * @param filters список фильтров
      * @return результат отправки для дальнейшего отображения пользователю
+     * @implNote Нужно, чтобы изолировать преобразование ошибок scrapper-клиента в пользовательский результат
+     *     сценария `/track` и не дублировать `try/catch` в диалоговом сервисе.
      */
     public TrackSubmissionResult submit(long chatId, String link, List<String> tags, List<String> filters) {
         try {

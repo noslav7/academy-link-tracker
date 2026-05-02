@@ -1,5 +1,6 @@
 package backend.academy.linktracker.scrapper.properties;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -30,9 +31,32 @@ public class LinksCacheProperties {
     private boolean enabled = true;
 
     /**
+     * Режим кэширования.
+     */
+    @NotNull
+    private CacheMode mode = CacheMode.CLIENT_SIDE;
+
+    /**
      * TTL хранения ответа в кэше.
      */
     @NotNull
     @DurationUnit(ChronoUnit.SECONDS)
     private Duration ttl = Duration.ofMinutes(5);
+
+    /**
+     * Проверяет, что TTL кэша задан положительным значением.
+     *
+     * @return {@code true}, если TTL больше нуля
+     * @implNote Нужно, чтобы приложение не запускалось с некорректной конфигурацией времени жизни кэша.
+     */
+    @AssertTrue(message = "app.cache.links.ttl must be positive")
+    private boolean isTtlPositive() {
+        return ttl != null && !ttl.isNegative() && !ttl.isZero();
+    }
+
+    public enum CacheMode {
+        NONE,
+        VALKEY,
+        CLIENT_SIDE
+    }
 }

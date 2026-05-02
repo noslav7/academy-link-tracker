@@ -1,5 +1,8 @@
 package backend.academy.linktracker.bot.properties;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -35,10 +38,13 @@ public class ScrapperProperties {
     /**
      * Хост gRPC-сервера scrapper.
      */
+    @NotBlank
     private String grpcHost = "localhost";
 
     /**
      * Порт gRPC-сервера scrapper.
      */
+    @Min(1)
+    @Max(65535)
     private int grpcPort = 9091;
 }

@@ -63,4 +63,5 @@ app:
   cache:
     links:
       enabled: ${LINKS_CACHE_ENABLED:true}
+      mode: ${LINKS_CACHE_MODE:CLIENT_SIDE}
       ttl: ${LINKS_CACHE_TTL:5m}

@@ -16,10 +16,19 @@ import backend.academy.linktracker.scrapper.configuration.LinksCacheConfiguratio
 import backend.academy.linktracker.scrapper.dto.AddLinkRequest;
 import backend.academy.linktracker.scrapper.dto.LinkResponse;
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
+import backend.academy.linktracker.scrapper.service.cache.LinksListCache;
+import backend.academy.linktracker.scrapper.service.cache.ValkeyClientSideLinksListCache;
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.RedisURI;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.codec.ByteArrayCodec;
+import io.lettuce.core.codec.RedisCodec;
+import io.lettuce.core.codec.StringCodec;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -27,17 +36,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.data.redis.cache.RedisCacheConfiguration;
-import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
-import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -63,7 +67,7 @@ class CachedLinksServiceValkeyIntegrationTest {
     private LinkService linkService;
 
     @Autowired
-    private CacheManager cacheManager;
+    private LinksListCache linksListCache;
 
     @Autowired
     private RedisConnectionFactory redisConnectionFactory;
@@ -74,13 +78,8 @@ class CachedLinksServiceValkeyIntegrationTest {
     @BeforeEach
     void setUp() {
         reset(linkService);
-        Objects.requireNonNull(
-                        cacheManager.getCache(LinksCacheConfiguration.LINKS_LIST_CACHE),
-                        "Cache 'links-list' must be configured for the test context")
-                .clear();
-        try (var connection = redisConnectionFactory.getConnection()) {
-            connection.serverCommands().flushDb();
-        }
+        linksListCache.clear();
+        deleteLinksListKeysFromValkey();
     }
 
     @Test
@@ -191,6 +190,65 @@ class CachedLinksServiceValkeyIntegrationTest {
                 });
     }
 
+    @Test
+    void givenNearCachePrimedWhenValkeyValueChangedExternallyThenNextReadReturnsUpdatedValueWithoutDomainCall() {
+        // Проверяет server-assisted invalidation: внешнее обновление ключа в Valkey сбрасывает near-cache клиента.
+        long chatId = 3006L;
+        List<LinkResponse> initialLinks =
+                List.of(new LinkResponse(1L, "https://example.com/old", List.of(), List.of()));
+        List<LinkResponse> updatedLinks =
+                List.of(new LinkResponse(2L, "https://example.com/new", List.of(), List.of()));
+        ListLinksResponse updatedResponse = new ListLinksResponse(updatedLinks, updatedLinks.size());
+        when(linkService.list(chatId)).thenReturn(initialLinks);
+
+        ListLinksResponse firstRead = cachedLinksService.list(chatId);
+        assertEquals(new ListLinksResponse(initialLinks, initialLinks.size()), firstRead);
+        awaitCachedEntry(chatId);
+
+        byte[] key = cacheKey(chatId);
+        byte[] updatedPayload = RedisSerializer.json().serialize(updatedResponse);
+        assertNotNull(updatedPayload);
+        try (var connection = redisConnectionFactory.getConnection()) {
+            connection.stringCommands().set(key, updatedPayload);
+        }
+
+        reset(linkService);
+        await().atMost(3, TimeUnit.SECONDS)
+                .pollInterval(50, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> assertEquals(updatedResponse, cachedLinksService.list(chatId)));
+        verifyNoInteractions(linkService);
+    }
+
+    @Test
+    void givenNearCachePrimedWhenConnectionReconnectedThenNearCacheIsDroppedAndFreshValueLoaded() {
+        // Проверяет реконнект: после lifecycle-событий disconnect/connect near-cache очищается и не отдает
+        // stale-данные.
+        long chatId = 3007L;
+        List<LinkResponse> initialLinks =
+                List.of(new LinkResponse(10L, "https://example.com/initial", List.of(), List.of()));
+        List<LinkResponse> updatedLinks =
+                List.of(new LinkResponse(11L, "https://example.com/updated", List.of(), List.of()));
+        ListLinksResponse updatedResponse = new ListLinksResponse(updatedLinks, updatedLinks.size());
+        when(linkService.list(chatId)).thenReturn(initialLinks);
+
+        ListLinksResponse firstRead = cachedLinksService.list(chatId);
+        assertEquals(new ListLinksResponse(initialLinks, initialLinks.size()), firstRead);
+        awaitCachedEntry(chatId);
+
+        simulateReconnectLifecycle();
+        byte[] updatedPayload = RedisSerializer.json().serialize(updatedResponse);
+        assertNotNull(updatedPayload);
+        try (var connection = redisConnectionFactory.getConnection()) {
+            connection.stringCommands().set(cacheKey(chatId), updatedPayload);
+        }
+
+        reset(linkService);
+        await().atMost(3, TimeUnit.SECONDS)
+                .pollInterval(50, TimeUnit.MILLISECONDS)
+                .untilAsserted(() -> assertEquals(updatedResponse, cachedLinksService.list(chatId)));
+        verifyNoInteractions(linkService);
+    }
+
     /**
      * Ожидает появления записи в Valkey для конкретного chatId.
      *
@@ -208,27 +266,59 @@ class CachedLinksServiceValkeyIntegrationTest {
      * <p>Нужно для проверок наличия/отсутствия данных и формата сериализации.
      */
     private byte[] cachedValue(long chatId) {
-        byte[] cacheKey = (LinksCacheConfiguration.LINKS_LIST_CACHE + "::" + chatId).getBytes(StandardCharsets.UTF_8);
+        byte[] cacheKey = cacheKey(chatId);
         try (var connection = redisConnectionFactory.getConnection()) {
             return connection.stringCommands().get(cacheKey);
         }
     }
 
-    @Configuration
-    @EnableCaching(proxyTargetClass = true)
+    private void deleteLinksListKeysFromValkey() {
+        byte[] pattern = (LinksCacheConfiguration.LINKS_LIST_CACHE + "::*").getBytes(StandardCharsets.UTF_8);
+        try (var connection = redisConnectionFactory.getConnection()) {
+            Set<byte[]> keys = connection.keyCommands().keys(pattern);
+            if (keys == null || keys.isEmpty()) {
+                return;
+            }
+            connection.keyCommands().del(keys.toArray(new byte[0][]));
+        }
+    }
+
+    private static byte[] cacheKey(long chatId) {
+        return (LinksCacheConfiguration.LINKS_LIST_CACHE + "::" + chatId).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private void simulateReconnectLifecycle() {
+        if (!(linksListCache instanceof ValkeyClientSideLinksListCache valkeyCache)) {
+            throw new IllegalStateException("Reconnect simulation requires ValkeyClientSideLinksListCache");
+        }
+        invokeLifecycleMethod(valkeyCache, "handleRedisDisconnected");
+        invokeLifecycleMethod(valkeyCache, "handleRedisConnected");
+    }
+
+    private static void invokeLifecycleMethod(ValkeyClientSideLinksListCache valkeyCache, String methodName) {
+        try {
+            var method = ValkeyClientSideLinksListCache.class.getDeclaredMethod(methodName);
+            method.setAccessible(true);
+            method.invoke(valkeyCache);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Unable to invoke lifecycle callback: " + methodName, exception);
+        }
+    }
+
     /**
      * Минимальный Spring-контекст для тестирования `CachedLinksService`.
      *
-     * <p>Содержит mock доменного сервиса, подключение к тестовому Valkey и CacheManager с коротким TTL.
+     * <p>Содержит mock доменного сервиса, подключение к тестовому Valkey и LinksListCache с коротким TTL.
      */
+    @Configuration
     static class TestConfig {
 
         /**
-         * Регистрирует тестируемый сервис с кэш-аннотациями.
+         * Регистрирует тестируемый сервис кэширования ссылок.
          */
         @Bean
-        CachedLinksService cachedLinksService(LinkService linkService) {
-            return new CachedLinksService(linkService);
+        CachedLinksService cachedLinksService(LinkService linkService, LinksListCache linksListCache) {
+            return new CachedLinksService(linkService, linksListCache);
         }
 
         /**
@@ -255,19 +345,27 @@ class CachedLinksServiceValkeyIntegrationTest {
         }
 
         /**
-         * Конфигурирует Redis CacheManager с коротким TTL и JSON-сериализацией.
+         * Создает LinksListCache через Lettuce Client Side Caching с коротким TTL.
          *
-         * <p>Короткий TTL нужен для быстрого воспроизведения сценария автоматического истечения кэша.
+         * <p>Используется отдельное состояние соединения, чтобы получать invalidation-события от Valkey.
          */
-        @Bean
-        CacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
-            RedisCacheConfiguration configuration = RedisCacheConfiguration.defaultCacheConfig()
-                    .entryTtl(CACHE_TTL)
-                    .serializeValuesWith(
-                            RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.json()));
-            return RedisCacheManager.builder(redisConnectionFactory)
-                    .cacheDefaults(configuration)
-                    .build();
+        @Bean(destroyMethod = "close")
+        LinksListCache linksListCache(RedisConnectionFactory redisConnectionFactory) {
+            Objects.requireNonNull(redisConnectionFactory);
+            if (!(redisConnectionFactory instanceof LettuceConnectionFactory lettuceConnectionFactory)) {
+                throw new IllegalStateException("LettuceConnectionFactory is required for client-side caching tests");
+            }
+            if (!(lettuceConnectionFactory.getNativeClient() instanceof RedisClient redisClient)) {
+                throw new IllegalStateException("RedisClient is required for client-side caching tests");
+            }
+            RedisURI redisUri = RedisURI.create("redis://%s:%d/%d"
+                    .formatted(
+                            lettuceConnectionFactory.getHostName(),
+                            lettuceConnectionFactory.getPort(),
+                            lettuceConnectionFactory.getDatabase()));
+            RedisCodec<String, byte[]> codec = RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE);
+            StatefulRedisConnection<String, byte[]> connection = redisClient.connect(codec, redisUri);
+            return new ValkeyClientSideLinksListCache(connection, CACHE_TTL);
         }
     }
 }

@@ -182,6 +182,63 @@ Unix/macOS:
 4. Добавьте ссылку через `POST /links`.
 5. Подождите один-два интервала scheduler и проверьте, что в `bot` ушло уведомление при изменении источника (при Kafka убедитесь в доступности брокера и топика).
 
+## Нагрузочное тестирование в Apache JMeter
+
+Для соответствия рекомендациям можно запускать нагрузочный сценарий через Apache JMeter:
+
+- План теста: `scrapper/src/test/jmeter/links-cache-load-test.jmx`
+- SQL-подготовка данных: `scrapper/src/test/jmeter/sql/seed-load-data.sql`
+- Профиль нагрузки в плане: примерно `1 x GET /list` на `100 x (POST/DELETE) /links`
+- Параметры запуска вынесены в `-J...` свойства (`host`, `port`, `users`, `rampUpSeconds`, `durationSeconds`, `chatCount`)
+
+### Подготовка датасета (1000 чатов x 100 ссылок)
+
+Перед прогоном JMeter заполните БД тестовыми данными SQL-скриптом:
+
+```powershell
+Get-Content .\scrapper\src\test\jmeter\sql\seed-load-data.sql | docker compose exec -T postgresql psql -U postgres -d link_tracker
+```
+
+Если не используете Docker Compose, выполните тот же SQL через локальный `psql`.
+
+### Прогон в non-GUI режиме
+
+```powershell
+jmeter -n `
+  -t .\scrapper\src\test\jmeter\links-cache-load-test.jmx `
+  -l .\scrapper\target\jmeter\results.jtl `
+  -e -o .\scrapper\target\jmeter\html-report `
+  -Jjmeter.save.saveservice.output_format=csv `
+  -Jjmeter.save.saveservice.print_field_names=true `
+  -Jjmeter.save.saveservice.label=true `
+  -Jjmeter.save.saveservice.response_code=true `
+  -Jjmeter.save.saveservice.response_message=true `
+  -Jjmeter.save.saveservice.elapsed=true `
+  -Jjmeter.save.saveservice.timestamp_format=ms `
+  -Jhost=localhost `
+  -Jport=8081 `
+  -Jusers=16 `
+  -JrampUpSeconds=60 `
+  -JdurationSeconds=300 `
+  -JchatCount=1000
+```
+
+После выполнения откройте HTML-отчёт: `scrapper/target/jmeter/html-report/index.html`.
+
+### Генерация markdown-отчёта (`LOAD_TEST_REPORT.md`) из JMeter
+
+```powershell
+.\mvnw.cmd -pl scrapper -DskipTests test-compile
+.\mvnw.cmd -pl scrapper org.codehaus.mojo:exec-maven-plugin:3.5.0:java `
+  -Dexec.classpathScope=test `
+  -Dexec.mainClass=backend.academy.linktracker.scrapper.performance.JmeterMarkdownReportGenerator `
+  -Djmeter.report.input=scrapper/target/jmeter/results.jtl `
+  -Djmeter.report.output=scrapper/LOAD_TEST_REPORT.md `
+  -Djmeter.report.scenario="JMeter run"
+```
+
+Итоговый markdown-отчёт будет сохранён в `scrapper/LOAD_TEST_REPORT.md`.
+
 ## Контейнерный E2E
 
 В модуле есть контейнерные E2E-тесты в `BotScrapperContainersE2ETest`.

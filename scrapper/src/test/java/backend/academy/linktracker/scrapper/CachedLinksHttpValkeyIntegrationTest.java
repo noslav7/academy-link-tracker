@@ -181,7 +181,7 @@ class CachedLinksHttpValkeyIntegrationTest {
      * <p>Нужно для явной проверки формата хранения данных в Valkey.
      */
     private byte[] cachedValue(long chatId) {
-        byte[] key = (LinksCacheConfiguration.LINKS_LIST_CACHE + "::" + chatId).getBytes(StandardCharsets.UTF_8);
+        byte[] key = LinksListCacheKeys.byChatId(chatId).getBytes(StandardCharsets.UTF_8);
         try (var connection = redisConnectionFactory.getConnection()) {
             return connection.stringCommands().get(key);
         }

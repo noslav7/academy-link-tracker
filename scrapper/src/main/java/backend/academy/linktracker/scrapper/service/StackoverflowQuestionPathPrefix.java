@@ -1,6 +1,7 @@
 package backend.academy.linktracker.scrapper.service;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -54,6 +55,6 @@ enum StackoverflowQuestionPathPrefix {
         if (symbol == null || symbol.isBlank()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(BY_SYMBOL.get(symbol));
+        return Optional.ofNullable(BY_SYMBOL.get(symbol.trim().toLowerCase(Locale.ROOT)));
     }
 }

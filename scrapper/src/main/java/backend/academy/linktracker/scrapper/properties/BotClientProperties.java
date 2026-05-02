@@ -1,5 +1,7 @@
 package backend.academy.linktracker.scrapper.properties;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -41,5 +43,7 @@ public class BotClientProperties {
     /**
      * Порт gRPC-сервера bot.
      */
+    @Min(1)
+    @Max(65535)
     private int grpcPort = 9090;
 }

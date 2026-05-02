@@ -22,6 +22,7 @@ enum TrackSubmissionResult {
      * Создает enum-значение с готовым сообщением для ответа пользователю.
      *
      * @param responseMessage текст ответа пользователю
+     * @implNote Нужно, чтобы соответствие "результат отправки -> сообщение в чате" задавалось централизованно.
      */
     TrackSubmissionResult(String responseMessage) {
         this.responseMessage = responseMessage;
@@ -31,6 +32,7 @@ enum TrackSubmissionResult {
      * Возвращает сообщение, которое нужно показать пользователю.
      *
      * @return текст ответа пользователю
+     * @implNote Нужно, чтобы вызывающий код не дублировал выбор текстов по enum-значениям.
      */
     String responseMessage() {
         return responseMessage;

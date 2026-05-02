@@ -13,9 +13,9 @@ import org.springframework.stereotype.Service;
 public class TrackDialogService {
 
     /**
-     * Активные диалоги по идентификатору чата.
+     * Активные сессии диалога по идентификатору чата.
      */
-    private final Map<Long, TrackState> activeDialogs = new ConcurrentHashMap<>();
+    private final Map<Long, TrackDialogSession> activeDialogs = new ConcurrentHashMap<>();
     /**
      * Компонент валидации и разбора текстового ввода пользователя.
      */
@@ -41,9 +41,11 @@ public class TrackDialogService {
      *
      * @param chatId идентификатор чата
      * @return текст следующего шага диалога
+     * @implNote Нужно, чтобы при повторном запуске `/track` сбрасывать незавершенную сессию и начать сценарий
+     *     заново в предсказуемом состоянии.
      */
     public String start(long chatId) {
-        activeDialogs.put(chatId, TrackState.initial());
+        activeDialogs.put(chatId, TrackDialogSession.initial());
         return BotMessages.TRACK_ENTER_LINK;
     }
 
@@ -52,6 +54,7 @@ public class TrackDialogService {
      *
      * @param chatId идентификатор чата
      * @return {@code true}, если диалог активен
+     * @implNote Нужно, чтобы обработчик команд корректно различал обычные сообщения и шаги активного диалога.
      */
     public boolean isActive(long chatId) {
         return activeDialogs.containsKey(chatId);
@@ -62,6 +65,8 @@ public class TrackDialogService {
      *
      * @param chatId идентификатор чата
      * @return сообщение о результате отмены
+     * @implNote Нужно, чтобы пользователь мог безопасно выйти из сценария и не отправлять устаревшие данные в
+     *     scrapper.
      */
     public String cancel(long chatId) {
         return activeDialogs.remove(chatId) == null ? BotMessages.CANCEL_NO_ACTIVE : BotMessages.TRACK_CANCELLED;
@@ -73,38 +78,40 @@ public class TrackDialogService {
      * @param chatId идентификатор чата
      * @param messageText текст сообщения пользователя
      * @return сообщение следующего шага или итог диалога
+     * @implNote Нужно, чтобы вся логика пошагового сценария была централизована в одном месте и не дублировалась
+     *     в обработчиках команд.
      */
     public String consume(long chatId, String messageText) {
-        TrackState state = activeDialogs.get(chatId);
-        if (state == null) {
+        TrackDialogSession session = activeDialogs.get(chatId);
+        if (session == null) {
             return BotMessages.CANCEL_NO_ACTIVE;
         }
 
-        if (state.stage == TrackDialogStage.AWAIT_LINK) {
+        if (session.stage == TrackDialogStage.AWAIT_LINK) {
             if (!inputParser.isValidUrl(messageText)) {
                 return BotMessages.TRACK_INVALID_LINK;
             }
-            state.link = messageText.trim();
-            state.stage = TrackDialogStage.AWAIT_TAGS;
+            session.link = messageText.trim();
+            session.stage = TrackDialogStage.AWAIT_TAGS;
             return BotMessages.TRACK_ENTER_TAGS;
         }
 
-        if (state.stage == TrackDialogStage.AWAIT_TAGS) {
-            state.tags = inputParser.parseCsvValues(messageText);
-            state.stage = TrackDialogStage.AWAIT_FILTERS;
+        if (session.stage == TrackDialogStage.AWAIT_TAGS) {
+            session.tags = inputParser.parseCsvValues(messageText);
+            session.stage = TrackDialogStage.AWAIT_FILTERS;
             return BotMessages.TRACK_ENTER_FILTERS;
         }
 
         List<String> filters = inputParser.parseCsvValues(messageText);
-        TrackSubmissionResult submitResult = submissionService.submit(chatId, state.link, state.tags, filters);
+        TrackSubmissionResult submitResult = submissionService.submit(chatId, session.link, session.tags, filters);
         activeDialogs.remove(chatId);
         return submitResult.responseMessage();
     }
 
     /**
-     * Внутреннее состояние диалога для конкретного чата.
+     * Внутренняя сессия диалога для конкретного чата.
      */
-    static final class TrackState {
+    static final class TrackDialogSession {
         /**
          * Текущий шаг диалога.
          */
@@ -119,21 +126,23 @@ public class TrackDialogService {
         private List<String> tags;
 
         /**
-         * Создает состояние диалога с заданной стадией.
+         * Создает сессию диалога с заданной стадией.
          *
          * @param stage стартовая стадия диалога
+         * @implNote Нужно, чтобы гарантировать создание сессии только в корректной начальной/промежуточной стадии.
          */
-        private TrackState(TrackDialogStage stage) {
+        private TrackDialogSession(TrackDialogStage stage) {
             this.stage = stage;
         }
 
         /**
-         * Создает начальное состояние для нового диалога.
+         * Создает начальную сессию для нового диалога.
          *
          * @return состояние с шагом ввода ссылки
+         * @implNote Нужно, чтобы все новые сценарии `/track` стартовали единообразно с этапа ввода ссылки.
          */
-        private static TrackState initial() {
-            return new TrackState(TrackDialogStage.AWAIT_LINK);
+        private static TrackDialogSession initial() {
+            return new TrackDialogSession(TrackDialogStage.AWAIT_LINK);
         }
     }
 }
