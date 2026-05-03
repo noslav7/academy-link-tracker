@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,8 +62,10 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
@@ -103,6 +106,9 @@ class LinkUpdateListenerKafkaIntegrationTest {
     @Autowired
     private EmbeddedKafkaBroker embeddedKafka;
 
+    @Autowired
+    private KafkaListenerEndpointRegistry kafkaListenerEndpointRegistry;
+
     @BeforeEach
     void setUp() {
         WireMock.reset();
@@ -111,6 +117,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
                         .withStatus(200)
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"ok\":true,\"result\":{\"message_id\":1}}")));
+        waitForKafkaListenerAssignment();
     }
 
     @Test
@@ -203,6 +210,18 @@ class LinkUpdateListenerKafkaIntegrationTest {
             producer.send(new ProducerRecord<>(TOPIC, key, payload));
             producer.flush();
         }
+    }
+
+    private void waitForKafkaListenerAssignment() {
+        await().atMost(30, SECONDS).untilAsserted(() -> {
+            Collection<MessageListenerContainer> containers = kafkaListenerEndpointRegistry.getListenerContainers();
+            assertEquals(1, containers.size());
+            int assignedPartitions = containers.stream()
+                    .map(MessageListenerContainer::getAssignedPartitions)
+                    .mapToInt(partitions -> partitions == null ? 0 : partitions.size())
+                    .sum();
+            assertEquals(1, assignedPartitions);
+        });
     }
 
     private void verifySendMessage(long chatId) {
