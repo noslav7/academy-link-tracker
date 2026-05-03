@@ -277,8 +277,8 @@ class CachedLinksServiceValkeyIntegrationTest {
     }
 
     private void deleteLinksListKeysFromValkey() {
-        byte[] pattern = ("{cached-links}:" + LinksCacheConfiguration.LINKS_LIST_CACHE + "::*")
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] pattern =
+                ("{cached-links}:" + LinksCacheConfiguration.LINKS_LIST_CACHE + "::*").getBytes(StandardCharsets.UTF_8);
         try (var connection = redisConnectionFactory.getConnection()) {
             Set<byte[]> keys = connection.keyCommands().keys(pattern);
             if (keys == null || keys.isEmpty()) {
