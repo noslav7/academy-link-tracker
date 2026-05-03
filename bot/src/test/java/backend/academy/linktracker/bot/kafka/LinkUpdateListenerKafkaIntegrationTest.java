@@ -11,7 +11,6 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import backend.academy.linktracker.bot.command.BotMessages;
@@ -207,12 +206,11 @@ class LinkUpdateListenerKafkaIntegrationTest {
     }
 
     private void verifySendMessage(long chatId) {
-        assertAll(
-                () -> verify(
-                        1,
-                        postRequestedFor(urlPathTemplate("/bot{token}/sendMessage"))
-                                .withPathParam("token", equalTo(telegramProperties.getToken()))),
-                () -> assertEquals(String.valueOf(chatId), sentFormData().get("chat_id")));
+        verify(
+                1,
+                postRequestedFor(urlPathTemplate("/bot{token}/sendMessage"))
+                        .withPathParam("token", equalTo(telegramProperties.getToken())));
+        assertEquals(String.valueOf(chatId), sentFormData().get("chat_id"));
     }
 
     private ConsumerRecord<String, String> pollSingleRecord(String topic) {
@@ -260,6 +258,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
             config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
             config.put(ConsumerConfig.GROUP_ID_CONFIG, kafkaProperties.getGroupId());
             config.put(ConsumerConfig.CLIENT_ID_CONFIG, kafkaProperties.getClientId());
+            config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
             config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
             config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
             config.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, GenericRecordBinaryDeserializer.class);
