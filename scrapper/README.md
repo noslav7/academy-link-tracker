@@ -188,7 +188,7 @@ Unix/macOS:
 
 - План теста: `scrapper/src/test/jmeter/links-cache-load-test.jmx`
 - SQL-подготовка данных: `scrapper/src/test/jmeter/sql/seed-load-data.sql`
-- Профиль нагрузки в плане: примерно `1 x GET /list` на `100 x (POST/DELETE) /links`
+- Профиль нагрузки в плане: примерно `1 x GET /list` на `100 x (POST/DELETE) /links`; `POST /links` и `DELETE /links` сохраняются отдельными sampler labels для отчета.
 - Параметры запуска вынесены в `-J...` свойства (`host`, `port`, `users`, `rampUpSeconds`, `durationSeconds`, `chatCount`)
 
 ### Подготовка датасета (1000 чатов x 100 ссылок)

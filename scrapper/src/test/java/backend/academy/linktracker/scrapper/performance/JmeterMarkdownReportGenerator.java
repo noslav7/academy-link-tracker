@@ -19,7 +19,7 @@ public final class JmeterMarkdownReportGenerator {
 
     private static final DateTimeFormatter UTC_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'").withZone(ZoneOffset.UTC);
-    private static final List<String> SUMMARY_ENDPOINTS = List.of("GET /list", "POST/DELETE /links");
+    private static final List<String> SUMMARY_ENDPOINTS = List.of("GET /list", "POST /links", "DELETE /links");
 
     private JmeterMarkdownReportGenerator() {}
 
@@ -90,9 +90,8 @@ public final class JmeterMarkdownReportGenerator {
                 maxTimestamp = Math.max(maxTimestamp, timestamp);
             }
 
-            String normalizedEndpoint = normalizeEndpoint(label);
             EndpointMetrics endpointMetrics =
-                    endpointMetricsMap.computeIfAbsent(normalizedEndpoint, ignored -> new EndpointMetrics());
+                    endpointMetricsMap.computeIfAbsent(label, ignored -> new EndpointMetrics());
             endpointMetrics.record(elapsedMs, responseCode, responseMessage);
         }
 
@@ -100,16 +99,6 @@ public final class JmeterMarkdownReportGenerator {
                 ? 1_000L
                 : Math.max(1_000L, maxTimestamp - minTimestamp);
         return new ScenarioMetrics(endpointMetricsMap, durationMs);
-    }
-
-    private static String normalizeEndpoint(String label) {
-        if ("GET /list".equals(label)) {
-            return "GET /list";
-        }
-        if ("POST /links".equals(label) || "DELETE /links".equals(label)) {
-            return "POST/DELETE /links";
-        }
-        return label;
     }
 
     private static String buildReport(String scenarioName, Path inputPath, ScenarioMetrics scenarioMetrics) {
@@ -144,6 +133,13 @@ public final class JmeterMarkdownReportGenerator {
         report.append("### ").append(endpoint).append(System.lineSeparator()).append(System.lineSeparator());
         if (metrics == null || metrics.total() == 0) {
             report.append("- Request: `").append(endpoint).append("`").append(System.lineSeparator());
+            report.append("- RPS: 0.00").append(System.lineSeparator());
+            report.append("- Average latency, ms: 0.00").append(System.lineSeparator());
+            report.append("- P50, ms: 0.00").append(System.lineSeparator());
+            report.append("- P99, ms: 0.00").append(System.lineSeparator());
+            report.append("- HTTP 200 count: 0").append(System.lineSeparator());
+            report.append("- HTTP 502/504 count: 0").append(System.lineSeparator());
+            report.append("- HTTP 500 count: 0").append(System.lineSeparator());
             report.append("- Total calls: 0").append(System.lineSeparator());
             report.append("- Most frequent errors: none")
                     .append(System.lineSeparator())

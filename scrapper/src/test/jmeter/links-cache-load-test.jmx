@@ -73,7 +73,7 @@
           <collectionProp name="HeaderManager.headers">
             <elementProp name="Tg-Chat-Id" elementType="Header">
               <stringProp name="Header.name">Tg-Chat-Id</stringProp>
-              <stringProp name="Header.value">${chatId}</stringProp>
+              <stringProp name="Header.value">${__jexl3(1 + ((${__threadNum} - 1) % ${chatCount}),)}</stringProp>
             </elementProp>
             <elementProp name="Content-Type" elementType="Header">
               <stringProp name="Header.name">Content-Type</stringProp>
@@ -82,30 +82,8 @@
           </collectionProp>
         </HeaderManager>
         <hashTree/>
-        <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="Request Router Variables">
-          <stringProp name="cacheKey">true</stringProp>
-          <stringProp name="filename"></stringProp>
-          <stringProp name="parameters"></stringProp>
-          <stringProp name="scriptLanguage">groovy</stringProp>
-          <stringProp name="script">int requestIndex = (vars.get("requestIndex") == null) ? 0 : Integer.parseInt(vars.get("requestIndex"));
-vars.put("requestIndex", String.valueOf(requestIndex + 1));
-
-int chatCountValue = Integer.parseInt(vars.get("chatCount"));
-int chatIdValue = 1 + (int) (Math.random() * chatCountValue);
-vars.put("chatId", String.valueOf(chatIdValue));
-
-boolean isGet = (requestIndex % 101) == 0;
-boolean isPost = !isGet &amp;&amp; (requestIndex % 2) == 0;
-boolean isDelete = !isGet &amp;&amp; !isPost;
-
-vars.put("runGet", String.valueOf(isGet));
-vars.put("runPost", String.valueOf(isPost));
-vars.put("runDelete", String.valueOf(isDelete));
-vars.put("mutationLink", "https://github.com/load/jmeter/" + ctx.getThreadNum());</stringProp>
-        </JSR223PreProcessor>
-        <hashTree/>
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="GET /list branch">
-          <stringProp name="IfController.condition">${__groovy(vars.get("runGet") == "true")}</stringProp>
+          <stringProp name="IfController.condition">${__jexl3(${__counter(TRUE,requestIndex)} % 101 == 0,)}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -129,13 +107,13 @@ vars.put("mutationLink", "https://github.com/load/jmeter/" + ctx.getThreadNum())
               <stringProp name="Assertion.custom_message">GET /list must return HTTP 200</stringProp>
               <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
               <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">8</intProp>
+              <intProp name="Assertion.test_type">40</intProp>
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
         </hashTree>
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="POST /links branch">
-          <stringProp name="IfController.condition">${__groovy(vars.get("runPost") == "true")}</stringProp>
+          <stringProp name="IfController.condition">${__jexl3(${requestIndex} % 101 != 0 &amp;&amp; ${requestIndex} % 202 &lt;= 100,)}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -145,7 +123,7 @@ vars.put("mutationLink", "https://github.com/load/jmeter/" + ctx.getThreadNum())
               <collectionProp name="Arguments.arguments">
                 <elementProp name="" elementType="HTTPArgument">
                   <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                  <stringProp name="Argument.value">{"link":"${mutationLink}","tags":[],"filters":[]}</stringProp>
+                  <stringProp name="Argument.value">{"link":"https://github.com/load/jmeter/${__threadNum}/${requestIndex}","tags":[],"filters":[]}</stringProp>
                   <stringProp name="Argument.metadata">=</stringProp>
                 </elementProp>
               </collectionProp>
@@ -162,18 +140,17 @@ vars.put("mutationLink", "https://github.com/load/jmeter/" + ctx.getThreadNum())
             <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="POST status assertion">
               <collectionProp name="Asserion.test_strings">
                 <stringProp name="200">200</stringProp>
-                <stringProp name="409">409</stringProp>
               </collectionProp>
-              <stringProp name="Assertion.custom_message">POST /links must return 200 or 409 under contention</stringProp>
+              <stringProp name="Assertion.custom_message">POST /links must return HTTP 200</stringProp>
               <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
               <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">2</intProp>
+              <intProp name="Assertion.test_type">40</intProp>
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
         </hashTree>
         <IfController guiclass="IfControllerPanel" testclass="IfController" testname="DELETE /links branch">
-          <stringProp name="IfController.condition">${__groovy(vars.get("runDelete") == "true")}</stringProp>
+          <stringProp name="IfController.condition">${__jexl3(${requestIndex} % 101 != 0 &amp;&amp; ${requestIndex} % 202 &gt; 100,)}</stringProp>
           <boolProp name="IfController.evaluateAll">false</boolProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
@@ -183,7 +160,7 @@ vars.put("mutationLink", "https://github.com/load/jmeter/" + ctx.getThreadNum())
               <collectionProp name="Arguments.arguments">
                 <elementProp name="" elementType="HTTPArgument">
                   <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                  <stringProp name="Argument.value">{"link":"${mutationLink}"}</stringProp>
+                  <stringProp name="Argument.value">{"link":"https://github.com/load/jmeter/${__threadNum}/${__jexl3(${requestIndex} - 101,)}"}</stringProp>
                   <stringProp name="Argument.metadata">=</stringProp>
                 </elementProp>
               </collectionProp>
@@ -200,12 +177,11 @@ vars.put("mutationLink", "https://github.com/load/jmeter/" + ctx.getThreadNum())
             <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="DELETE status assertion">
               <collectionProp name="Asserion.test_strings">
                 <stringProp name="200">200</stringProp>
-                <stringProp name="404">404</stringProp>
               </collectionProp>
-              <stringProp name="Assertion.custom_message">DELETE /links must return 200 or 404 under contention</stringProp>
+              <stringProp name="Assertion.custom_message">DELETE /links must return HTTP 200</stringProp>
               <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
               <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">2</intProp>
+              <intProp name="Assertion.test_type">40</intProp>
             </ResponseAssertion>
             <hashTree/>
           </hashTree>

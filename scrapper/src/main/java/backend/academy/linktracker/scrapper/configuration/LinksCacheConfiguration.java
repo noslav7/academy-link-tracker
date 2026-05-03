@@ -11,6 +11,7 @@ import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
 import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.cluster.RedisClusterClient;
 import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
@@ -47,6 +48,14 @@ public class LinksCacheConfiguration {
             return new NoOpLinksListCache();
         }
         if (properties.getMode() == CacheMode.VALKEY) {
+            if (connectionFactory instanceof LettuceConnectionFactory lettuceConnectionFactory
+                    && lettuceConnectionFactory.getNativeClient() instanceof RedisClusterClient) {
+                RedisURI redisUri = firstClusterNodeRedisUri(lettuceConnectionFactory);
+                RedisClient redisClient = RedisClient.create(redisUri);
+                StatefulRedisConnection<String, byte[]> connection = redisClient.connect(STRING_BYTE_ARRAY_CODEC);
+                LOGGER.info("Valkey cache enabled via cluster node {}:{}", redisUri.getHost(), redisUri.getPort());
+                return new ValkeyLinksListCache(connection, properties.getTtl(), redisClient);
+            }
             return new ValkeyLinksListCache(connectionFactory, properties.getTtl());
         }
 
@@ -56,18 +65,26 @@ public class LinksCacheConfiguration {
         }
 
         AbstractRedisClient nativeClient = lettuceConnectionFactory.getNativeClient();
-        if (!(nativeClient instanceof RedisClient redisClient)) {
-            LOGGER.warn("Client-side caching disabled: current Valkey topology does not support Lettuce CacheFrontend");
-            return new ValkeyLinksListCache(connectionFactory, properties.getTtl());
+        if (nativeClient instanceof RedisClient redisClient) {
+            RedisURI redisUri = standaloneRedisUri(lettuceConnectionFactory);
+            StatefulRedisConnection<String, byte[]> connection = redisClient.connect(STRING_BYTE_ARRAY_CODEC, redisUri);
+            LOGGER.info("Client-side caching enabled via Valkey node {}:{}", redisUri.getHost(), redisUri.getPort());
+            return new ValkeyClientSideLinksListCache(connection, properties.getTtl());
         }
 
-        RedisURI redisUri = RedisURI.create("redis://%s:%d/%d"
-                .formatted(
-                        lettuceConnectionFactory.getHostName(),
-                        lettuceConnectionFactory.getPort(),
-                        lettuceConnectionFactory.getDatabase()));
-        StatefulRedisConnection<String, byte[]> connection = redisClient.connect(STRING_BYTE_ARRAY_CODEC, redisUri);
-        return new ValkeyClientSideLinksListCache(connection, properties.getTtl());
+        if (nativeClient instanceof RedisClusterClient) {
+            RedisURI redisUri = firstClusterNodeRedisUri(lettuceConnectionFactory);
+            RedisClient redisClient = RedisClient.create(redisUri);
+            StatefulRedisConnection<String, byte[]> connection = redisClient.connect(STRING_BYTE_ARRAY_CODEC);
+            LOGGER.info(
+                    "Client-side caching enabled via Valkey cluster node {}:{}",
+                    redisUri.getHost(),
+                    redisUri.getPort());
+            return new ValkeyClientSideLinksListCache(connection, properties.getTtl(), redisClient);
+        }
+
+        LOGGER.warn("Client-side caching disabled: unsupported Lettuce native client {}", nativeClient.getClass());
+        return new ValkeyLinksListCache(connectionFactory, properties.getTtl());
     }
 
     /**
@@ -77,5 +94,23 @@ public class LinksCacheConfiguration {
     @ConditionalOnProperty(prefix = "app.cache.links", name = "enabled", havingValue = "false")
     LinksListCache noOpLinksCache() {
         return new NoOpLinksListCache();
+    }
+
+    private static RedisURI standaloneRedisUri(LettuceConnectionFactory lettuceConnectionFactory) {
+        return RedisURI.create("redis://%s:%d/%d"
+                .formatted(
+                        lettuceConnectionFactory.getHostName(),
+                        lettuceConnectionFactory.getPort(),
+                        lettuceConnectionFactory.getDatabase()));
+    }
+
+    private static RedisURI firstClusterNodeRedisUri(LettuceConnectionFactory lettuceConnectionFactory) {
+        var clusterConfiguration = lettuceConnectionFactory.getClusterConfiguration();
+        if (clusterConfiguration == null
+                || clusterConfiguration.getClusterNodes().isEmpty()) {
+            throw new IllegalStateException("Redis cluster nodes must be configured for client-side cache");
+        }
+        var node = clusterConfiguration.getClusterNodes().iterator().next();
+        return RedisURI.create("redis://%s:%d".formatted(node.getHost(), node.getPort()));
     }
 }

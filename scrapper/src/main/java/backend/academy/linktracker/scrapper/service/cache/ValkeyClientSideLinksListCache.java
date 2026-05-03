@@ -1,6 +1,7 @@
 package backend.academy.linktracker.scrapper.service.cache;
 
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
+import io.lettuce.core.AbstractRedisClient;
 import io.lettuce.core.RedisChannelHandler;
 import io.lettuce.core.RedisConnectionStateAdapter;
 import io.lettuce.core.SetArgs;
@@ -42,6 +43,10 @@ public final class ValkeyClientSideLinksListCache implements LinksListCache, Aut
      */
     private final StatefulRedisConnection<String, byte[]> connection;
     /**
+     * Клиент, созданный специально для client-side cache, если соединение не принадлежит Spring.
+     */
+    private final AbstractRedisClient ownedClient;
+    /**
      * Время жизни записи в кэше.
      */
     private final Duration ttl;
@@ -59,8 +64,21 @@ public final class ValkeyClientSideLinksListCache implements LinksListCache, Aut
      *     латентности чтений.
      */
     public ValkeyClientSideLinksListCache(StatefulRedisConnection<String, byte[]> connection, Duration ttl) {
+        this(connection, ttl, null);
+    }
+
+    /**
+     * Создает реализацию кэша списка ссылок и владеет переданным Lettuce-клиентом.
+     *
+     * @param connection активное соединение с Valkey
+     * @param ttl время жизни записей в кэше
+     * @param ownedClient клиент, который нужно закрыть вместе с кэшем
+     */
+    public ValkeyClientSideLinksListCache(
+            StatefulRedisConnection<String, byte[]> connection, Duration ttl, AbstractRedisClient ownedClient) {
         this.nearCache = new ExpiringNearCache(ttl);
         this.connection = connection;
+        this.ownedClient = ownedClient;
         this.ttl = ttl;
         this.trackingArgs = TrackingArgs.Builder.enabled().noloop();
         this.cacheFrontend = ClientSideCaching.enable(nearCache, connection, trackingArgs);
@@ -133,6 +151,9 @@ public final class ValkeyClientSideLinksListCache implements LinksListCache, Aut
         clear();
         cacheFrontend.close();
         connection.close();
+        if (ownedClient != null) {
+            ownedClient.shutdown();
+        }
     }
 
     /**

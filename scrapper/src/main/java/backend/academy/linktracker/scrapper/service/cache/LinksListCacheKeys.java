@@ -6,7 +6,7 @@ package backend.academy.linktracker.scrapper.service.cache;
 public final class LinksListCacheKeys {
 
     public static final String CACHE_NAME = "links-list";
-    private static final String CACHE_KEY_PREFIX = CACHE_NAME + "::";
+    private static final String CACHE_KEY_PREFIX = "{cached-links}:" + CACHE_NAME + "::";
 
     private LinksListCacheKeys() {}
 

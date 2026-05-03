@@ -17,6 +17,7 @@ import backend.academy.linktracker.scrapper.dto.AddLinkRequest;
 import backend.academy.linktracker.scrapper.dto.LinkResponse;
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
 import backend.academy.linktracker.scrapper.service.cache.LinksListCache;
+import backend.academy.linktracker.scrapper.service.cache.LinksListCacheKeys;
 import backend.academy.linktracker.scrapper.service.cache.ValkeyClientSideLinksListCache;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisURI;
@@ -264,7 +265,7 @@ class CachedLinksServiceValkeyIntegrationTest {
     }
 
     /**
-     * Возвращает сырое значение кэша из Valkey по ключу `links-list::<chatId>`.
+     * Возвращает сырое значение кэша из Valkey по ключу `LinksListCacheKeys.byChatId(chatId)`.
      *
      * <p>Нужно для проверок наличия/отсутствия данных и формата сериализации.
      */
@@ -276,7 +277,8 @@ class CachedLinksServiceValkeyIntegrationTest {
     }
 
     private void deleteLinksListKeysFromValkey() {
-        byte[] pattern = (LinksCacheConfiguration.LINKS_LIST_CACHE + "::*").getBytes(StandardCharsets.UTF_8);
+        byte[] pattern = ("{cached-links}:" + LinksCacheConfiguration.LINKS_LIST_CACHE + "::*")
+                .getBytes(StandardCharsets.UTF_8);
         try (var connection = redisConnectionFactory.getConnection()) {
             Set<byte[]> keys = connection.keyCommands().keys(pattern);
             if (keys == null || keys.isEmpty()) {
@@ -287,7 +289,7 @@ class CachedLinksServiceValkeyIntegrationTest {
     }
 
     private static byte[] cacheKey(long chatId) {
-        return (LinksCacheConfiguration.LINKS_LIST_CACHE + "::" + chatId).getBytes(StandardCharsets.UTF_8);
+        return LinksListCacheKeys.byChatId(chatId).getBytes(StandardCharsets.UTF_8);
     }
 
     private void simulateReconnectLifecycle() {

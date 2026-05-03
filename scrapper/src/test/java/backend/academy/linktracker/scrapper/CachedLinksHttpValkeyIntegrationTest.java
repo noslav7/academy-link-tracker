@@ -168,7 +168,7 @@ class CachedLinksHttpValkeyIntegrationTest {
     }
 
     /**
-     * Возвращает сырое значение кэша по chatId из `links-list::<chatId>`.
+     * Возвращает сырое значение кэша по chatId из `LinksListCacheKeys.byChatId(chatId)`.
      *
      * <p>Нужно для явной проверки формата хранения данных в Valkey.
      */
