@@ -32,21 +32,17 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.wiremock.spring.EnableWireMock;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"app.telegram.polling-enabled=false", "app.telegram.set-my-commands-on-startup=false"})
-@Import(TestcontainersConfiguration.class)
 @ActiveProfiles("test")
 @EnableWireMock
 @Tag("integration")
-@Testcontainers(disabledWithoutDocker = true)
 class UpdatesControllerContractTest {
 
     @LocalServerPort

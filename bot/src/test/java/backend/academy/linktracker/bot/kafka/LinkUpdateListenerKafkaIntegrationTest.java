@@ -52,6 +52,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -62,12 +63,13 @@ import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 import org.wiremock.spring.EnableWireMock;
 
-@SpringBootTest(properties = {"app.kafka.topic=link-updates-bot-it"})
+@SpringBootTest(properties = {"app.kafka.enabled=true", "app.kafka.topic=link-updates-bot-it"})
 @ActiveProfiles("test")
 @EnableWireMock
 @Testcontainers(disabledWithoutDocker = true)
 @Tag("integration")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class LinkUpdateListenerKafkaIntegrationTest {
 
     private static final String LINK_UPDATE_EVENT_SCHEMA_RESOURCE = "LinkUpdateEvent.avsc";

@@ -9,6 +9,8 @@ app:
   scrapper:
     base-url: ${wiremock.server.baseUrl}
     transport: HTTP
+  kafka:
+    enabled: false
   grpc:
     server:
       enabled: false
