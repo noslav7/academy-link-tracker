@@ -10,8 +10,9 @@ public class TestcontainersConfiguration {
 
     @Bean
     @ServiceConnection
+    @SuppressWarnings("resource")
     PostgreSQLContainer postgreSqlContainer() {
-        return new PostgreSQLContainer("postgres:17")
+        return new PostgreSQLContainer("postgres:17-alpine")
                 .withDatabaseName("link_tracker")
                 .withUsername("postgres")
                 .withPassword("postgres");

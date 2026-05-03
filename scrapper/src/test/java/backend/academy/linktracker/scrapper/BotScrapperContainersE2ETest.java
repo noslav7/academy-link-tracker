@@ -63,7 +63,7 @@ class BotScrapperContainersE2ETest {
 
     @SuppressWarnings("resource")
     @Container
-    private static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17")
+    private static final PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine")
             .withNetwork(NETWORK)
             .withNetworkAliases("postgres")
             .withDatabaseName("link_tracker")

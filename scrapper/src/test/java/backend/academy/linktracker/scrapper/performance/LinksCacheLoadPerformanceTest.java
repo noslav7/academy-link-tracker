@@ -63,7 +63,7 @@ class LinksCacheLoadPerformanceTest {
     private static final Path REPORT_PATH = Path.of(System.getProperty("user.dir"), "LOAD_TEST_REPORT.md");
 
     @SuppressWarnings("resource")
-    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17")
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
             .withDatabaseName("link_tracker")
             .withUsername("postgres")
             .withPassword("postgres");

@@ -18,7 +18,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 class DatabaseMigrationRunnerIntegrationTest {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17")
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17-alpine")
             .withDatabaseName("link_tracker_migration_test")
             .withUsername("postgres")
             .withPassword("postgres");
