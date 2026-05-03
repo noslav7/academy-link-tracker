@@ -15,16 +15,17 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import backend.academy.linktracker.bot.command.BotMessages;
+import backend.academy.linktracker.bot.properties.KafkaProperties;
 import backend.academy.linktracker.bot.properties.TelegramProperties;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
-import io.apicurio.registry.serde.avro.AvroKafkaSerdeConfig;
-import io.apicurio.registry.serde.avro.AvroKafkaSerializer;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,14 +33,21 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.io.EncoderFactory;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,23 +58,34 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
+import org.springframework.kafka.test.EmbeddedKafkaBroker;
+import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.kafka.KafkaContainer;
-import org.testcontainers.utility.DockerImageName;
 import org.wiremock.spring.EnableWireMock;
 
-@SpringBootTest(properties = {"app.kafka.enabled=true", "app.kafka.topic=link-updates-bot-it"})
+@SpringBootTest(
+        properties = {
+            "spring.main.allow-bean-definition-overriding=true",
+            "app.kafka.enabled=true",
+            "app.kafka.topic=link-updates-bot-it",
+            "app.kafka.group-id=bot-link-update-listener-it-group",
+            "app.kafka.client-id=bot-it",
+            "app.kafka.dlq-topic=link-updates-bot-it-dlq",
+            "app.kafka.retry-attempts=2",
+            "app.kafka.retry-backoff-ms=50",
+            "app.kafka.schema-registry-url=http://localhost:0/apis/registry/v2"
+        })
 @ActiveProfiles("test")
 @EnableWireMock
-@Testcontainers(disabledWithoutDocker = true)
+@EmbeddedKafka(partitions = 1, topics = "link-updates-bot-it", bootstrapServersProperty = "app.kafka.bootstrap-servers")
 @Tag("integration")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -77,32 +96,13 @@ class LinkUpdateListenerKafkaIntegrationTest {
 
     private static final String TOPIC = "link-updates-bot-it";
     private static final String DLQ_TOPIC = "link-updates-bot-it-dlq";
-    private static final String GROUP_ID = "bot-link-update-listener-it-group";
     private static final AtomicInteger DLQ_CONSUMER_ID_SEQUENCE = new AtomicInteger();
-
-    @SuppressWarnings("resource")
-    @Container
-    private static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse("apache/kafka:4.1.1"));
-
-    @SuppressWarnings("resource")
-    @Container
-    private static final GenericContainer<?> SCHEMA_REGISTRY = new GenericContainer<>(
-                    DockerImageName.parse("apicurio/apicurio-registry-mem:2.6.13.Final"))
-            .withExposedPorts(8080);
 
     @Autowired
     private TelegramProperties telegramProperties;
 
-    @DynamicPropertySource
-    static void kafkaProperties(DynamicPropertyRegistry registry) {
-        registry.add("app.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
-        registry.add("app.kafka.group-id", () -> GROUP_ID);
-        registry.add("app.kafka.client-id", () -> "bot-it");
-        registry.add("app.kafka.dlq-topic", () -> DLQ_TOPIC);
-        registry.add("app.kafka.retry-attempts", () -> 2);
-        registry.add("app.kafka.retry-backoff-ms", () -> 50L);
-        registry.add("app.kafka.schema-registry-url", LinkUpdateListenerKafkaIntegrationTest::schemaRegistryUrl);
-    }
+    @Autowired
+    private EmbeddedKafkaBroker embeddedKafka;
 
     @BeforeEach
     void setUp() {
@@ -164,13 +164,9 @@ class LinkUpdateListenerKafkaIntegrationTest {
 
     private void publishAvro(String key, GenericRecord event) {
         Properties config = new Properties();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, AvroKafkaSerializer.class.getName());
-        config.put("apicurio.registry.url", schemaRegistryUrl());
-        config.put("apicurio.registry.auto-register", true);
-        config.put("apicurio.registry.find-latest", true);
-        config.put(AvroKafkaSerdeConfig.AVRO_ENCODING, AvroKafkaSerdeConfig.AVRO_ENCODING_BINARY);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, GenericRecordBinarySerializer.class.getName());
         try (KafkaProducer<String, GenericRecord> producer = new KafkaProducer<>(config)) {
             producer.send(new ProducerRecord<>(TOPIC, key, event));
             producer.flush();
@@ -201,18 +197,13 @@ class LinkUpdateListenerKafkaIntegrationTest {
 
     private void publishMalformedBytes(String key, byte[] payload) {
         Properties config = new Properties();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
         try (KafkaProducer<String, byte[]> producer = new KafkaProducer<>(config)) {
             producer.send(new ProducerRecord<>(TOPIC, key, payload));
             producer.flush();
         }
-    }
-
-    private static String schemaRegistryUrl() {
-        return "http://%s:%d/apis/registry/v2"
-                .formatted(SCHEMA_REGISTRY.getHost(), SCHEMA_REGISTRY.getMappedPort(8080));
     }
 
     private void verifySendMessage(long chatId) {
@@ -226,7 +217,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
 
     private ConsumerRecord<String, String> pollSingleRecord(String topic) {
         Properties config = new Properties();
-        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString());
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "bot-it-dlq-check-" + DLQ_CONSUMER_ID_SEQUENCE.incrementAndGet());
@@ -258,5 +249,52 @@ class LinkUpdateListenerKafkaIntegrationTest {
             result.put(key, value);
         }
         return result;
+    }
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class KafkaTestConfiguration {
+
+        @Bean
+        ConsumerFactory<String, GenericRecord> linkUpdateConsumerFactory(KafkaProperties kafkaProperties) {
+            Map<String, Object> config = new HashMap<>();
+            config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
+            config.put(ConsumerConfig.GROUP_ID_CONFIG, kafkaProperties.getGroupId());
+            config.put(ConsumerConfig.CLIENT_ID_CONFIG, kafkaProperties.getClientId());
+            config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+            config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
+            config.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, GenericRecordBinaryDeserializer.class);
+
+            return new DefaultKafkaConsumerFactory<>(config);
+        }
+    }
+
+    public static class GenericRecordBinarySerializer implements Serializer<GenericRecord> {
+
+        @Override
+        public byte[] serialize(String topic, GenericRecord data) {
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                var writer = new GenericDatumWriter<GenericRecord>(LINK_UPDATE_EVENT_SCHEMA);
+                var encoder = EncoderFactory.get().binaryEncoder(outputStream, null);
+                writer.write(data, encoder);
+                encoder.flush();
+                return outputStream.toByteArray();
+            } catch (IOException exception) {
+                throw new SerializationException("Failed to serialize test Avro payload", exception);
+            }
+        }
+    }
+
+    public static class GenericRecordBinaryDeserializer implements Deserializer<GenericRecord> {
+
+        @Override
+        public GenericRecord deserialize(String topic, byte[] data) {
+            try {
+                var reader = new GenericDatumReader<GenericRecord>(LINK_UPDATE_EVENT_SCHEMA);
+                var decoder = DecoderFactory.get().binaryDecoder(data, null);
+                return reader.read(null, decoder);
+            } catch (IOException | RuntimeException exception) {
+                throw new SerializationException("Failed to deserialize test Avro payload", exception);
+            }
+        }
     }
 }
