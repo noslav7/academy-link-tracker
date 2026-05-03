@@ -34,14 +34,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @Tag("performance")
+@EnabledIfSystemProperty(named = "run.performance.tests", matches = "true")
 @Testcontainers(disabledWithoutDocker = true)
 class LinksCacheLoadPerformanceTest {
 
@@ -60,11 +62,13 @@ class LinksCacheLoadPerformanceTest {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(5);
     private static final Path REPORT_PATH = Path.of(System.getProperty("user.dir"), "LOAD_TEST_REPORT.md");
 
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17")
+    @SuppressWarnings("resource")
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17")
             .withDatabaseName("link_tracker")
             .withUsername("postgres")
             .withPassword("postgres");
 
+    @SuppressWarnings("resource")
     private static final GenericContainer<?> VALKEY =
             new GenericContainer<>(DockerImageName.parse("valkey/valkey:8-alpine")).withExposedPorts(6379);
 

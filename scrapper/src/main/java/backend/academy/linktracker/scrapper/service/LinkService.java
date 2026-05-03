@@ -7,6 +7,7 @@ import backend.academy.linktracker.scrapper.exception.LinkAlreadyTrackedExceptio
 import backend.academy.linktracker.scrapper.repository.TrackedLinkRepository;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,7 +65,12 @@ public class LinkService {
         List<String> normalizedTags = RequestFieldNormalizer.normalizeTags(request.tags());
         List<String> normalizedFilters = RequestFieldNormalizer.normalizeFilters(request.filters());
         Instant lastUpdated = linkMetadataResolver.resolveLastUpdated(normalizedLink);
-        TrackedLink saved = repository.save(chatId, normalizedLink, normalizedTags, normalizedFilters, lastUpdated);
+        TrackedLink saved;
+        try {
+            saved = repository.save(chatId, normalizedLink, normalizedTags, normalizedFilters, lastUpdated);
+        } catch (DataIntegrityViolationException ex) {
+            throw new LinkAlreadyTrackedException(normalizedLink, ex);
+        }
         return toResponse(saved);
     }
 

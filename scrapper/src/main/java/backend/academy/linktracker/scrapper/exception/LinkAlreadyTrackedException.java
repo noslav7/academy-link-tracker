@@ -12,4 +12,14 @@ public class LinkAlreadyTrackedException extends RuntimeException {
     public LinkAlreadyTrackedException(String link) {
         super("Link already tracked: " + link);
     }
+
+    /**
+     * Создает исключение повторного добавления ссылки с исходной причиной.
+     *
+     * @param link URL ссылки
+     * @param cause исходная ошибка хранения
+     */
+    public LinkAlreadyTrackedException(String link, Throwable cause) {
+        super("Link already tracked: " + link, cause);
+    }
 }
