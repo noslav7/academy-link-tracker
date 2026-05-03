@@ -16,12 +16,16 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import backend.academy.linktracker.bot.command.BotMessages;
 import backend.academy.linktracker.bot.properties.TelegramProperties;
+import backend.academy.linktracker.bot.telegram.TelegramUpdateProcessor;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
+import com.pengrad.telegrambot.TelegramBot;
+import com.pengrad.telegrambot.UpdatesListener;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -35,7 +39,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.wiremock.spring.EnableWireMock;
 
-@SpringBootTest(properties = {"app.telegram.polling-enabled=true", "app.telegram.set-my-commands-on-startup=false"})
+@SpringBootTest(properties = "app.telegram.set-my-commands-on-startup=false")
 @Import(TestcontainersConfiguration.class)
 @ActiveProfiles("test")
 @EnableWireMock
@@ -56,13 +60,32 @@ class TelegramCommandFlowIntegrationTest {
     @Autowired
     TelegramProperties telegramProperties;
 
+    @Autowired
+    TelegramBot telegramBot;
+
+    @Autowired
+    TelegramUpdateProcessor updateProcessor;
+
+    @AfterEach
+    void clearUpdatesListener() {
+        telegramBot.removeGetUpdatesListener();
+    }
+
     @ParameterizedTest
     @MethodSource("commandScenarios")
     void givenCommandUpdateWhenPollingProcessesItThenSendMessageEqualsExpectedText(
             String scenarioName, long chatId, String command, String expectedText) {
         // Проверяет: для каждой входной команды бот отправляет ожидаемый текст ответа.
         stubFlowForSingleUpdate(scenarioName, chatId, command);
+        startPolling();
         await().atMost(10, SECONDS).untilAsserted(() -> verifySendMessage(chatId, expectedText));
+    }
+
+    private void startPolling() {
+        telegramBot.setUpdatesListener(updates -> {
+            updates.forEach(updateProcessor::process);
+            return UpdatesListener.CONFIRMED_UPDATES_ALL;
+        });
     }
 
     private void stubFlowForSingleUpdate(String scenarioName, long chatId, String command) {
