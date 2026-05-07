@@ -32,6 +32,14 @@ spring:
 app:
   database:
     access-type: ${ACCESS_TYPE:SQL}
+  http-resilience:
+    timeout: ${HTTP_CLIENT_TIMEOUT:2s}
+    retry:
+      max-attempts: ${HTTP_RETRY_MAX_ATTEMPTS:3}
+      delay: ${HTTP_RETRY_DELAY:200ms}
+      backoff-strategy: ${HTTP_RETRY_BACKOFF_STRATEGY:CONSTANT}
+      exponential-multiplier: ${HTTP_RETRY_EXPONENTIAL_MULTIPLIER:2.0}
+      retryable-statuses: ${HTTP_RETRYABLE_STATUSES:500,502,503,504}
   stackoverflow:
     key: ${STACKOVERFLOW_KEY:} # Use env variable. DO NOT KEEP TOKEN HERE
     access-token: ${STACKOVERFLOW_ACCESS_KEY:} # Use env variable. DO NOT KEEP TOKEN HERE

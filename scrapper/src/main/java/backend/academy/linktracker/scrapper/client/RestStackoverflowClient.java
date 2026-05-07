@@ -19,6 +19,14 @@ public class RestStackoverflowClient implements StackoverflowClient {
      * Значение параметра {@code site} для StackOverflow API.
      */
     private static final String SITE = "stackoverflow";
+    /**
+     * Резервное имя автора события, используемое при пустом имени в ответе API.
+     */
+    private static final String UNKNOWN_AUTHOR = "unknown";
+    /**
+     * Резервный заголовок вопроса, используемый для корректного текста уведомления.
+     */
+    private static final String UNTITLED_QUESTION = "Без названия";
 
     /**
      * Клиент HTTP-запросов к Stack Overflow API.
@@ -28,107 +36,127 @@ public class RestStackoverflowClient implements StackoverflowClient {
      * Настройки подключения к Stack Overflow API.
      */
     private final StackoverflowProperties properties;
+    /**
+     * Единый блок устойчивости HTTP-вызовов (retry).
+     */
+    private final ResilientHttpExecutor resilientHttpExecutor;
 
     /**
      * Создает REST-клиент Stack Overflow API.
      *
      * @param restClient HTTP-клиент Stack Overflow
      * @param properties настройки подключения
+     * @param resilientHttpExecutor компонент применения retry/fallback-политики
      */
     public RestStackoverflowClient(
-            @Qualifier("stackoverflowRestClient") RestClient restClient, StackoverflowProperties properties) {
+            @Qualifier("stackoverflowRestClient") RestClient restClient,
+            StackoverflowProperties properties,
+            ResilientHttpExecutor resilientHttpExecutor) {
         this.restClient = restClient;
         this.properties = properties;
+        this.resilientHttpExecutor = resilientHttpExecutor;
     }
 
     /**
-     * {@inheritDoc}
+     * Получает время последней активности вопроса.
+     * Нужно для быстрой проверки изменений вопроса без загрузки событий.
+     *
+     * @param questionId идентификатор вопроса
+     * @return время последней активности или {@link Instant#EPOCH} при невалидном входе/ошибке API
      */
     @Override
     public Instant fetchQuestionUpdatedAt(long questionId) {
-        LinkedMultiValueMap<String, String> params = defaultParams();
-
-        try {
-            StackoverflowResponse response = restClient
-                    .get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/questions/{id}")
-                            .queryParams(params)
-                            .build(questionId))
-                    .retrieve()
-                    .body(StackoverflowResponse.class);
-
-            Optional<StackoverflowItem> firstItem = firstItem(response);
-            if (firstItem.isEmpty()) {
-                return Instant.EPOCH;
-            }
-            Long lastActivity = firstItem.orElseThrow().lastActivityDate();
-            return lastActivity == null ? Instant.EPOCH : Instant.ofEpochSecond(lastActivity);
-        } catch (RuntimeException ex) {
+        if (!isValidQuestionId(questionId)) {
             return Instant.EPOCH;
         }
+        LinkedMultiValueMap<String, String> params = defaultParams();
+
+        return resilientHttpExecutor.executeOrFallback(
+                () -> extractQuestionUpdatedAtOrEpoch(fetchResponse("/questions/{id}", params, questionId)),
+                () -> Instant.EPOCH);
     }
 
     /**
-     * {@inheritDoc}
+     * Получает последний ответ или комментарий для вопроса.
+     * Нужно для формирования информативного описания обновления.
+     *
+     * @param questionId идентификатор вопроса
+     * @return данные последнего события или пустой результат при невалидном входе/ошибке API
      */
     @Override
     public Optional<StackoverflowAnswerOrCommentUpdate> fetchLatestAnswerOrCommentUpdate(long questionId) {
-        try {
-            LinkedMultiValueMap<String, String> questionParams = defaultParams();
-            questionParams.add("filter", "withbody");
-            StackoverflowResponse questionResponse = restClient
-                    .get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/questions/{id}")
-                            .queryParams(questionParams)
-                            .build(questionId))
-                    .retrieve()
-                    .body(StackoverflowResponse.class);
-
-            Optional<StackoverflowItem> questionItem = firstItem(questionResponse);
-            if (questionItem.isEmpty()) {
-                return Optional.empty();
-            }
-            StackoverflowItem question = questionItem.orElseThrow();
-            String questionTitle = question.title() == null ? "Без названия" : question.title();
-
-            Optional<StackoverflowEvent> latestAnswer = fetchLatestEvent(questionId, "/questions/{id}/answers", true);
-            Optional<StackoverflowEvent> latestComment =
-                    fetchLatestEvent(questionId, "/questions/{id}/comments", false);
-
-            Optional<StackoverflowEvent> latestEvent = selectLatest(latestAnswer, latestComment);
-            if (latestEvent.isEmpty()) {
-                return Optional.empty();
-            }
-            StackoverflowEvent event = latestEvent.orElseThrow();
-            return Optional.of(new StackoverflowAnswerOrCommentUpdate(
-                    questionTitle, event.answer(), event.authorDisplayName(), event.createdAt(), event.body()));
-        } catch (RuntimeException ex) {
+        if (!isValidQuestionId(questionId)) {
             return Optional.empty();
         }
+        return resilientHttpExecutor.executeOrFallback(
+                () -> extractLatestAnswerOrCommentUpdate(questionId), Optional::empty);
+    }
+
+    /**
+     * Нормализует ответ вопроса к времени последней активности.
+     * Нужен для единообразного fallback-поведения в одном месте.
+     *
+     * @param response ответ API по вопросу
+     * @return время последней активности или {@link Instant#EPOCH}
+     */
+    private Instant extractQuestionUpdatedAtOrEpoch(StackoverflowResponse response) {
+        Optional<StackoverflowItem> firstItem = firstItem(response);
+        if (firstItem.isEmpty()) {
+            return Instant.EPOCH;
+        }
+        Long lastActivity = firstItem.orElseThrow().lastActivityDate();
+        return lastActivity == null ? Instant.EPOCH : Instant.ofEpochSecond(lastActivity);
+    }
+
+    /**
+     * Собирает доменную модель последнего события (ответ/комментарий) по вопросу.
+     * Нужен для разделения сетевых вызовов и логики выбора события.
+     *
+     * @param questionId идентификатор вопроса
+     * @return модель последнего события либо пустой результат
+     */
+    private Optional<StackoverflowAnswerOrCommentUpdate> extractLatestAnswerOrCommentUpdate(long questionId) {
+        LinkedMultiValueMap<String, String> questionParams = defaultParams();
+        questionParams.add("filter", "withbody");
+        StackoverflowResponse questionResponse = fetchResponse("/questions/{id}", questionParams, questionId);
+
+        Optional<StackoverflowItem> questionItem = firstItem(questionResponse);
+        if (questionItem.isEmpty()) {
+            return Optional.empty();
+        }
+        StackoverflowItem question = questionItem.orElseThrow();
+        String questionTitle = normalizeOrFallback(question.title(), UNTITLED_QUESTION);
+
+        Optional<StackoverflowEvent> latestAnswer =
+                fetchLatestEvent(questionId, "/questions/{id}/answers", StackoverflowEventType.ANSWER);
+        Optional<StackoverflowEvent> latestComment =
+                fetchLatestEvent(questionId, "/questions/{id}/comments", StackoverflowEventType.COMMENT);
+
+        Optional<StackoverflowEvent> latestEvent = selectLatest(latestAnswer, latestComment);
+        if (latestEvent.isEmpty()) {
+            return Optional.empty();
+        }
+        StackoverflowEvent event = latestEvent.orElseThrow();
+        return Optional.of(new StackoverflowAnswerOrCommentUpdate(
+                questionTitle,
+                event.type() == StackoverflowEventType.ANSWER,
+                event.authorDisplayName(),
+                event.createdAt(),
+                event.body()));
     }
 
     /**
      * Загружает последнее событие (ответ или комментарий) по указанному endpoint.
+     * Нужен как единый шаг чтения события для двух разных endpoint'ов API.
      *
      * @param questionId идентификатор вопроса
      * @param path путь API для получения события
-     * @param answerEvent {@code true}, если обрабатывается событие-ответ; иначе комментарий
+     * @param eventType тип события (ответ или комментарий)
      * @return найденное событие или пустой результат
      */
-    private Optional<StackoverflowEvent> fetchLatestEvent(long questionId, String path, boolean answerEvent) {
-        LinkedMultiValueMap<String, String> params = defaultParams();
-        params.add("order", "desc");
-        params.add("sort", "creation");
-        params.add("filter", "withbody");
-        params.add("pagesize", "1");
-
-        StackoverflowResponse response = restClient
-                .get()
-                .uri(uriBuilder -> uriBuilder.path(path).queryParams(params).build(questionId))
-                .retrieve()
-                .body(StackoverflowResponse.class);
+    private Optional<StackoverflowEvent> fetchLatestEvent(
+            long questionId, String path, StackoverflowEventType eventType) {
+        StackoverflowResponse response = fetchResponse(path, latestEventParams(), questionId);
 
         Optional<StackoverflowItem> firstItem = firstItem(response);
         if (firstItem.isEmpty()) {
@@ -139,16 +167,15 @@ public class RestStackoverflowClient implements StackoverflowClient {
             return Optional.empty();
         }
         return Optional.of(new StackoverflowEvent(
-                answerEvent,
-                item.owner() != null && item.owner().displayName() != null
-                        ? item.owner().displayName()
-                        : "unknown",
+                eventType,
+                normalizeOrFallback(item.owner() == null ? null : item.owner().displayName(), UNKNOWN_AUTHOR),
                 Instant.ofEpochSecond(item.creationDate()),
                 item.body() == null ? "" : item.body()));
     }
 
     /**
      * Возвращает первый элемент ответа StackOverflow API, если он присутствует.
+     * Нужен для централизованной обработки пустых/неполных API-ответов.
      *
      * @param response ответ StackOverflow API
      * @return первый элемент ответа или пустой результат
@@ -162,6 +189,7 @@ public class RestStackoverflowClient implements StackoverflowClient {
 
     /**
      * Выбирает более позднее событие из пары «последний ответ / последний комментарий».
+     * Нужен для корректного выбора одного события для итогового уведомления.
      *
      * @param answer последнее событие-ответ
      * @param comment последнее событие-комментарий
@@ -182,6 +210,7 @@ public class RestStackoverflowClient implements StackoverflowClient {
 
     /**
      * Собирает базовые query-параметры для запросов к StackOverflow API.
+     * Нужен как единая точка формирования обязательных и опциональных ключей доступа.
      *
      * @return набор параметров с обязательным {@code site} и опциональными ключами доступа
      */
@@ -198,7 +227,81 @@ public class RestStackoverflowClient implements StackoverflowClient {
     }
 
     /**
+     * Собирает query-параметры для получения последнего ответа/комментария.
+     * Нужен для переиспользования одной и той же сортировки/фильтрации в двух endpoint'ах.
+     *
+     * @return параметры запроса последних событий
+     */
+    private LinkedMultiValueMap<String, String> latestEventParams() {
+        LinkedMultiValueMap<String, String> params = defaultParams();
+        params.add("order", "desc");
+        params.add("sort", "creation");
+        params.add("filter", "withbody");
+        params.add("pagesize", "1");
+        return params;
+    }
+
+    /**
+     * Выполняет HTTP-запрос к StackOverflow API и возвращает тело ответа.
+     * Нужен как единая точка запроса, чтобы не дублировать сетевую цепочку.
+     *
+     * @param path путь API
+     * @param params query-параметры запроса
+     * @param questionId идентификатор вопроса для подстановки в путь
+     * @return распарсенный ответ API
+     */
+    private StackoverflowResponse fetchResponse(
+            String path, LinkedMultiValueMap<String, String> params, long questionId) {
+        if (!hasTextValue(path)) {
+            throw new IllegalArgumentException("StackOverflow API path must not be blank");
+        }
+        return resilientHttpExecutor.execute(() -> restClient
+                .get()
+                .uri(uriBuilder -> uriBuilder.path(path).queryParams(params).build(questionId))
+                .retrieve()
+                .body(StackoverflowResponse.class));
+    }
+
+    /**
+     * Проверяет корректность идентификатора вопроса.
+     * Нужен для раннего отклонения заведомо невалидного входа.
+     *
+     * @param questionId идентификатор вопроса
+     * @return {@code true}, если идентификатор положительный
+     */
+    private static boolean isValidQuestionId(long questionId) {
+        return questionId > 0;
+    }
+
+    /**
+     * Возвращает нормализованное строковое значение либо fallback.
+     * Нужен для устранения null/blank значений из внешнего API.
+     *
+     * @param value исходное значение
+     * @param fallback значение по умолчанию
+     * @return исходное значение или fallback
+     */
+    private static String normalizeOrFallback(String value, String fallback) {
+        if (!hasTextValue(value)) {
+            return fallback;
+        }
+        return value;
+    }
+
+    /**
+     * Проверяет, что строка содержит непустой текст.
+     * Нужен как переиспользуемая проверка в локальных хелперах.
+     *
+     * @param value строковое значение
+     * @return {@code true}, если строка не null и не blank
+     */
+    private static boolean hasTextValue(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    /**
      * DTO ответа Stack Overflow API.
+     * Нужен для чтения списка элементов без привязки к полной схеме внешнего API.
      *
      * @param items список элементов ответа
      */
@@ -206,6 +309,7 @@ public class RestStackoverflowClient implements StackoverflowClient {
 
     /**
      * DTO элемента ответа Stack Overflow API.
+     * Нужен для маппинга минимального набора полей, используемых в уведомлениях.
      *
      * @param lastActivityDate время последней активности в epoch seconds
      */
@@ -216,8 +320,26 @@ public class RestStackoverflowClient implements StackoverflowClient {
             String body,
             StackoverflowOwner owner) {}
 
+    /**
+     * DTO автора события из Stack Overflow API.
+     * Нужен для извлечения отображаемого имени автора.
+     */
     private record StackoverflowOwner(
             @JsonProperty("display_name") String displayName) {}
 
-    private record StackoverflowEvent(boolean answer, String authorDisplayName, Instant createdAt, String body) {}
+    /**
+     * Тип события для определения, является ли обновление ответом или комментарием.
+     * Нужен для исключения неочевидных boolean-флагов в промежуточной модели.
+     */
+    private enum StackoverflowEventType {
+        ANSWER,
+        COMMENT
+    }
+
+    /**
+     * Внутренняя модель события ответа/комментария для выбора более позднего события.
+     * Нужна как нейтральный слой между API DTO и итоговой доменной моделью обновления.
+     */
+    private record StackoverflowEvent(
+            StackoverflowEventType type, String authorDisplayName, Instant createdAt, String body) {}
 }

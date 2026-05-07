@@ -57,6 +57,14 @@ OUTBOX_BATCH_SIZE=100
 GITHUB_TOKEN=
 STACKOVERFLOW_KEY=
 STACKOVERFLOW_ACCESS_KEY=
+
+# HTTP resilience для внешних API (GitHub/StackOverflow)
+HTTP_CLIENT_TIMEOUT=2s
+HTTP_RETRY_MAX_ATTEMPTS=3
+HTTP_RETRY_DELAY=200ms
+HTTP_RETRY_BACKOFF_STRATEGY=CONSTANT
+HTTP_RETRY_EXPONENTIAL_MULTIPLIER=2.0
+HTTP_RETRYABLE_STATUSES=500,502,503,504
 ```
 
 Если хотите сменить транспорт:
@@ -74,6 +82,17 @@ BOT_TRANSPORT=GRPC
 BOT_GRPC_HOST=localhost
 BOT_GRPC_PORT=9090
 ```
+
+### Настройка HTTP resilience
+
+Параметры `HTTP_*` управляют повторными попытками и timeout для внешних HTTP-вызовов:
+
+- `HTTP_CLIENT_TIMEOUT` — общий timeout connect/read для GitHub и StackOverflow;
+- `HTTP_RETRY_MAX_ATTEMPTS` — максимальное число попыток;
+- `HTTP_RETRY_DELAY` — базовая пауза между попытками;
+- `HTTP_RETRY_BACKOFF_STRATEGY` — `CONSTANT` или `EXPONENTIAL`;
+- `HTTP_RETRY_EXPONENTIAL_MULTIPLIER` — множитель для `EXPONENTIAL`;
+- `HTTP_RETRYABLE_STATUSES` — список HTTP-статусов, которые считаются временными и ретраятся.
 
 ### Поднять Postgres + миграции локально
 

@@ -32,9 +32,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.containers.GenericContainer;
@@ -43,7 +43,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @Tag("performance")
-@EnabledIfSystemProperty(named = "run.performance.tests", matches = "true")
 @Testcontainers(disabledWithoutDocker = true)
 class LinksCacheLoadPerformanceTest {
 
@@ -75,7 +74,10 @@ class LinksCacheLoadPerformanceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    void runLoadTestsAndGenerateReport() throws Exception {
+    void givenPerformanceTestsEnabledWhenLoadRunStartsThenReportIsGenerated() throws Exception {
+        // Проверяет, что нагрузочный прогон выполняется только по флагу и формирует итоговый отчет.
+        Assumptions.assumeTrue(Boolean.getBoolean("run.performance.tests"), "Performance tests are disabled");
+
         POSTGRES.start();
         VALKEY.start();
 
@@ -144,12 +146,13 @@ class LinksCacheLoadPerformanceTest {
             throws InterruptedException, ExecutionException {
         Duration totalDuration = RAMP_UP_DURATION.plus(STAGE_DURATION);
         Instant startedAt = Instant.now();
-        Instant deadline = startedAt.plus(totalDuration);
+        long totalDurationNanos = totalDuration.toNanos();
+        long deadlineNanos = System.nanoTime() + totalDurationNanos;
 
         ExecutorService executor = Executors.newFixedThreadPool(users);
         List<Future<WorkerMetrics>> futures = new ArrayList<>(users);
         for (int worker = 0; worker < users; worker++) {
-            futures.add(executor.submit(new Worker(worker, users, baseUri, deadline)));
+            futures.add(executor.submit(new Worker(worker, users, baseUri, deadlineNanos)));
         }
 
         WorkerMetrics merged = new WorkerMetrics();
@@ -348,16 +351,16 @@ class LinksCacheLoadPerformanceTest {
         private final int workerId;
         private final int users;
         private final URI baseUri;
-        private final Instant deadline;
+        private final long deadlineNanos;
         private final HttpClient httpClient;
         private boolean extraLinkAdded;
         private int loopCounter;
 
-        private Worker(int workerId, int users, URI baseUri, Instant deadline) {
+        private Worker(int workerId, int users, URI baseUri, long deadlineNanos) {
             this.workerId = workerId;
             this.users = users;
             this.baseUri = baseUri;
-            this.deadline = deadline;
+            this.deadlineNanos = deadlineNanos;
             this.httpClient = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(2))
                     .build();
@@ -370,7 +373,7 @@ class LinksCacheLoadPerformanceTest {
             Thread.sleep(rampDelayMs);
 
             long chatId = (workerId % CHAT_COUNT) + 1L;
-            while (Instant.now().isBefore(deadline)) {
+            while (System.nanoTime() < deadlineNanos) {
                 int positionInCycle = loopCounter % TOTAL_REQUESTS_PER_CYCLE;
                 if (positionInCycle < GET_REQUESTS_PER_CYCLE) {
                     executeGet(chatId, metrics);
@@ -519,10 +522,10 @@ class LinksCacheLoadPerformanceTest {
             metrics.record(durationMs, statusCode);
             if (statusCode != 200) {
                 String errorKey = statusCode + " / " + errorDetail;
-                errors.merge(errorKey, 1L, Long::sum);
+                incrementCounter(errors, errorKey, 1L);
                 Map<String, Long> endpointErrors =
                         errorsByEndpoint.computeIfAbsent(endpoint, ignored -> new HashMap<>());
-                endpointErrors.merge(errorKey, 1L, Long::sum);
+                incrementCounter(endpointErrors, errorKey, 1L);
             }
         }
 
@@ -532,15 +535,20 @@ class LinksCacheLoadPerformanceTest {
                 current.merge(entry.getValue());
             }
             for (Map.Entry<String, Long> entry : other.errors.entrySet()) {
-                errors.merge(entry.getKey(), entry.getValue(), Long::sum);
+                incrementCounter(errors, entry.getKey(), entry.getValue());
             }
             for (Map.Entry<String, Map<String, Long>> entry : other.errorsByEndpoint.entrySet()) {
                 Map<String, Long> endpointErrors =
                         errorsByEndpoint.computeIfAbsent(entry.getKey(), ignored -> new HashMap<>());
                 for (Map.Entry<String, Long> endpointError : entry.getValue().entrySet()) {
-                    endpointErrors.merge(endpointError.getKey(), endpointError.getValue(), Long::sum);
+                    incrementCounter(endpointErrors, endpointError.getKey(), endpointError.getValue());
                 }
             }
+        }
+
+        private static void incrementCounter(Map<String, Long> counters, String key, long delta) {
+            long current = counters.getOrDefault(key, 0L);
+            counters.put(key, current + delta);
         }
     }
 

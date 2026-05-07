@@ -7,11 +7,13 @@ import static org.mockito.Mockito.when;
 
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
 
+@Tag("unit")
 class RestBotNotificationsClientTest {
 
     @Test

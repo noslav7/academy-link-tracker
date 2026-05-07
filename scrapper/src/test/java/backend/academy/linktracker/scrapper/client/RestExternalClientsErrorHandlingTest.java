@@ -8,15 +8,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import backend.academy.linktracker.scrapper.client.GithubClient.GithubIssueOrPullRequestUpdate;
 import backend.academy.linktracker.scrapper.client.StackoverflowClient.StackoverflowAnswerOrCommentUpdate;
 import backend.academy.linktracker.scrapper.properties.GithubProperties;
+import backend.academy.linktracker.scrapper.properties.HttpResilienceProperties;
 import backend.academy.linktracker.scrapper.properties.StackoverflowProperties;
 import com.github.tomakehurst.wiremock.WireMockServer;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+@Tag("unit")
 class RestExternalClientsErrorHandlingTest {
 
     private WireMockServer wireMockServer;
@@ -30,16 +36,14 @@ class RestExternalClientsErrorHandlingTest {
 
         GithubProperties githubProperties = new GithubProperties();
         githubProperties.setBaseUrl("http://localhost:%d/github".formatted(wireMockServer.port()));
+        ResilientHttpExecutor resilientHttpExecutor = createResilientHttpExecutor();
         githubClient = new RestGithubClient(
-                RestClient.builder().baseUrl(githubProperties.getBaseUrl()).build(), githubProperties);
+                restClient(githubProperties.getBaseUrl()), githubProperties, resilientHttpExecutor);
 
         StackoverflowProperties stackoverflowProperties = new StackoverflowProperties();
         stackoverflowProperties.setBaseUrl("http://localhost:%d/so".formatted(wireMockServer.port()));
         stackoverflowClient = new RestStackoverflowClient(
-                RestClient.builder()
-                        .baseUrl(stackoverflowProperties.getBaseUrl())
-                        .build(),
-                stackoverflowProperties);
+                restClient(stackoverflowProperties.getBaseUrl()), stackoverflowProperties, resilientHttpExecutor);
     }
 
     @AfterEach
@@ -158,5 +162,26 @@ class RestExternalClientsErrorHandlingTest {
                 Optional.of(new StackoverflowAnswerOrCommentUpdate(
                         "How to test scheduler?", true, "alice", Instant.parse("2026-03-02T00:00:00Z"), "answer body")),
                 result);
+    }
+
+    private static ResilientHttpExecutor createResilientHttpExecutor() {
+        HttpResilienceProperties properties = new HttpResilienceProperties();
+        properties.setTimeout(Duration.ofSeconds(2));
+        HttpResilienceProperties.Retry retry = new HttpResilienceProperties.Retry();
+        retry.setMaxAttempts(3);
+        retry.setDelay(Duration.ofMillis(50));
+        retry.setRetryableStatuses(List.of(500, 502, 503, 504));
+        properties.setRetry(retry);
+        return new ResilientHttpExecutor(properties);
+    }
+
+    private static RestClient restClient(String baseUrl) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(2));
+        requestFactory.setReadTimeout(Duration.ofSeconds(2));
+        return RestClient.builder()
+                .requestFactory(requestFactory)
+                .baseUrl(baseUrl)
+                .build();
     }
 }
