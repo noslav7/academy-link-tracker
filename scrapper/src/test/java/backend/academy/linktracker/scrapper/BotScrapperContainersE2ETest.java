@@ -101,7 +101,8 @@ class BotScrapperContainersE2ETest {
             .withEnv("APP_TELEGRAM_POLLING_ENABLED", "false")
             .withEnv("APP_TELEGRAM_SET_MY_COMMANDS_ON_STARTUP", "false")
             .withEnv("BOT_GRPC_SERVER_ENABLED", "false")
-            .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8080));
+            .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8080))
+            .withStartupTimeout(Duration.ofMinutes(3));
 
     @SuppressWarnings("resource")
     @Container
@@ -121,11 +122,13 @@ class BotScrapperContainersE2ETest {
             .withEnv("SCRAPPER_GRPC_SERVER_ENABLED", "false")
             .withEnv("LINKS_CACHE_ENABLED", "false")
             .withEnv("MANAGEMENT_HEALTH_REDIS_ENABLED", "false")
+            .withEnv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9093")
             .withEnv("DATASOURCE_URL", "jdbc:postgresql://postgres:5432/link_tracker")
             .withEnv("DATASOURCE_USERNAME", "postgres")
             .withEnv("DATASOURCE_PASSWORD", "postgres")
             .withEnv("LIQUIBASE_ENABLED", "true")
-            .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8081));
+            .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8081))
+            .withStartupTimeout(Duration.ofMinutes(3));
 
     private static Path resolveProjectRoot() {
         String multiModuleRoot = System.getProperty("maven.multiModuleProjectDirectory");

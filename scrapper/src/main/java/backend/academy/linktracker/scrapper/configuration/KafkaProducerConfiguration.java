@@ -12,9 +12,11 @@ import java.util.Map;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.boot.autoconfigure.condition.AnyNestedCondition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
@@ -26,11 +28,7 @@ import org.springframework.kafka.core.ProducerFactory;
  */
 @Configuration
 @EnableKafka
-@ConditionalOnProperty(
-        prefix = "app.bot",
-        name = "transport",
-        havingValue = TransportMode.KAFKA_VALUE,
-        matchIfMissing = true)
+@Conditional(KafkaProducerConfiguration.KafkaProducerEnabledCondition.class)
 public class KafkaProducerConfiguration {
 
     /**
@@ -46,11 +44,9 @@ public class KafkaProducerConfiguration {
      * Фабрика Kafka-публикатора для LinkUpdateEvent с Avro-сериализацией через Schema Registry.
      */
     @Bean(destroyMethod = "destroy")
-    @SuppressWarnings("resource")
     ProducerFactory<String, GenericRecord> linkUpdateProducerFactory(
-            KafkaProperties kafkaProperties, KafkaInfrastructureValidator kafkaInfrastructureValidator) {
-        kafkaInfrastructureValidator.validateConnectivity(kafkaProperties, "linkUpdateProducerFactory");
-        kafkaInfrastructureValidator.ensureNotificationTopicExists(kafkaProperties);
+            KafkaProperties kafkaProperties, KafkaProducerInfrastructureInitializer initializer) {
+        initializer.initialize("linkUpdateProducerFactory");
 
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaProperties.getBootstrapServers());
@@ -67,11 +63,44 @@ public class KafkaProducerConfiguration {
     }
 
     /**
+     * Инициализатор Kafka-инфраструктуры для producer-бинов.
+     */
+    @Bean
+    @ConditionalOnMissingBean(KafkaProducerInfrastructureInitializer.class)
+    KafkaProducerInfrastructureInitializer kafkaProducerInfrastructureInitializer(KafkaProperties kafkaProperties) {
+        return new KafkaProducerInfrastructureInitializer(kafkaProperties);
+    }
+
+    /**
      * KafkaTemplate для публикации LinkUpdateEvent в топик уведомлений.
      */
     @Bean
     KafkaTemplate<String, GenericRecord> linkUpdateKafkaTemplate(
             ProducerFactory<String, GenericRecord> linkUpdateProducerFactory) {
         return new KafkaTemplate<>(linkUpdateProducerFactory);
+    }
+
+    /**
+     * Активирует Kafka producer для KAFKA-транспорта и HTTP-транспорта с fallback.
+     */
+    static final class KafkaProducerEnabledCondition extends AnyNestedCondition {
+        KafkaProducerEnabledCondition() {
+            super(org.springframework.context.annotation.ConfigurationCondition.ConfigurationPhase.PARSE_CONFIGURATION);
+        }
+
+        @ConditionalOnProperty(
+                prefix = "app.bot",
+                name = "transport",
+                havingValue = TransportMode.KAFKA_VALUE,
+                matchIfMissing = true)
+        static class KafkaTransportCondition {}
+
+        @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = TransportMode.HTTP_VALUE)
+        @ConditionalOnProperty(
+                prefix = "app.bot",
+                name = "http-fallback-to-kafka-enabled",
+                havingValue = "true",
+                matchIfMissing = true)
+        static class HttpTransportCondition {}
     }
 }

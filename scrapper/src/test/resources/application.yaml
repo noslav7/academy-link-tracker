@@ -6,3 +6,11 @@ app:
     base-url: http://localhost:8080
     # Для тестов оставляем HTTP-транспорт, чтобы поднимался REST-клиент и моковый bot через WireMock.
     transport: HTTP
+    # В интеграционных тестах fallback через Kafka включается точечно, чтобы не требовать Kafka в каждом контексте.
+    http-fallback-to-kafka-enabled: false
+    circuit-breaker:
+      sliding-window-size: 10
+      minimum-required-calls: 5
+      failure-rate-threshold: 100
+      permitted-calls-in-half-open-state: 5
+      wait-duration-in-open-state: 1s
