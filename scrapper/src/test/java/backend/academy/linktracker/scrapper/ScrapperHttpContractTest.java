@@ -16,6 +16,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -27,6 +28,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.testcontainers.junit.jupiter.Testcontainers;
 import org.wiremock.spring.EnableWireMock;
 
 @SpringBootTest(
@@ -39,13 +41,18 @@ import org.wiremock.spring.EnableWireMock;
             "app.scheduler.interval=365d"
         })
 @EnableWireMock
+@Testcontainers(disabledWithoutDocker = true)
 @Tag("integration")
 class ScrapperHttpContractTest {
+
+    private static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(3);
+    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(5);
 
     @LocalServerPort
     private int port;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient =
+            HttpClient.newBuilder().connectTimeout(HTTP_CONNECT_TIMEOUT).build();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
@@ -202,6 +209,7 @@ class ScrapperHttpContractTest {
                 }
                 """.formatted(link);
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
+                .timeout(HTTP_REQUEST_TIMEOUT)
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -211,6 +219,7 @@ class ScrapperHttpContractTest {
 
     private HttpResponse<String> getLinks(long chatId) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
+                .timeout(HTTP_REQUEST_TIMEOUT)
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .GET()
                 .build();
@@ -224,6 +233,7 @@ class ScrapperHttpContractTest {
                 }
                 """.formatted(link);
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
+                .timeout(HTTP_REQUEST_TIMEOUT)
                 .header("Tg-Chat-Id", String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .method("DELETE", HttpRequest.BodyPublishers.ofString(body))
@@ -233,14 +243,17 @@ class ScrapperHttpContractTest {
 
     private HttpResponse<String> postWithoutBody(String path) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + path))
+                .timeout(HTTP_REQUEST_TIMEOUT)
                 .POST(HttpRequest.BodyPublishers.noBody())
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> deleteWithoutBody(String path) throws IOException, InterruptedException {
-        HttpRequest request =
-                HttpRequest.newBuilder(URI.create(baseUrl() + path)).DELETE().build();
+        HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + path))
+                .timeout(HTTP_REQUEST_TIMEOUT)
+                .DELETE()
+                .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 

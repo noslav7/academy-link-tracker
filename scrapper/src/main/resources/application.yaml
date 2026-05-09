@@ -40,6 +40,12 @@ app:
       backoff-strategy: ${HTTP_RETRY_BACKOFF_STRATEGY:CONSTANT}
       exponential-multiplier: ${HTTP_RETRY_EXPONENTIAL_MULTIPLIER:2.0}
       retryable-statuses: ${HTTP_RETRYABLE_STATUSES:500,502,503,504}
+  rate-limiting:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    limit-for-period: ${RATE_LIMIT_FOR_PERIOD:100}
+    limit-refresh-period: ${RATE_LIMIT_REFRESH_PERIOD:1m}
+    timeout-duration: ${RATE_LIMIT_TIMEOUT_DURATION:0s}
+    public-paths: ${RATE_LIMIT_PUBLIC_PATHS:/tg-chat/**,/links,/list,/tags/**}
   stackoverflow:
     key: ${STACKOVERFLOW_KEY:} # Use env variable. DO NOT KEEP TOKEN HERE
     access-token: ${STACKOVERFLOW_ACCESS_KEY:} # Use env variable. DO NOT KEEP TOKEN HERE

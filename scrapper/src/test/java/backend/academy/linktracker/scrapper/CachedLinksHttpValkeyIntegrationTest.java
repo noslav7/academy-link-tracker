@@ -7,9 +7,11 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import backend.academy.linktracker.scrapper.dto.LinkResponse;
 import backend.academy.linktracker.scrapper.dto.ListLinksResponse;
 import backend.academy.linktracker.scrapper.service.cache.LinksListCacheKeys;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,6 +21,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -52,6 +56,8 @@ import org.wiremock.spring.EnableWireMock;
 class CachedLinksHttpValkeyIntegrationTest {
 
     private static final String TG_CHAT_ID_HEADER = "Tg-Chat-Id";
+    private static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(3);
+    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(5);
     private static final long CACHE_AWAIT_TIMEOUT_SECONDS = 10;
     private static final long CACHE_POLL_INTERVAL_MILLIS = 50;
 
@@ -66,7 +72,8 @@ class CachedLinksHttpValkeyIntegrationTest {
     @Autowired
     private RedisConnectionFactory redisConnectionFactory;
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final HttpClient httpClient =
+            HttpClient.newBuilder().connectTimeout(HTTP_CONNECT_TIMEOUT).build();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
@@ -110,8 +117,9 @@ class CachedLinksHttpValkeyIntegrationTest {
 
         byte[] cached = cachedValue(chatId);
         Object deserialized = RedisSerializer.json().deserialize(cached);
+        ListLinksResponse actualCachedPayload = assertInstanceOf(ListLinksResponse.class, deserialized);
 
-        assertAll(() -> assertNotNull(cached), () -> assertEquals(expected, deserialized));
+        assertAll(() -> assertNotNull(cached), () -> assertEquals(expected, actualCachedPayload));
     }
 
     @Test
@@ -137,7 +145,11 @@ class CachedLinksHttpValkeyIntegrationTest {
         HttpResponse<String> rebuiltList = getLinks(chatId);
         assertEquals(200, rebuiltList.statusCode());
         ListLinksResponse afterAdd = objectMapper.readValue(rebuiltList.body(), ListLinksResponse.class);
-        assertEquals(2, afterAdd.size());
+        assertAll(
+                () -> assertEquals(2, afterAdd.size()),
+                () -> assertEquals(
+                        List.of(firstLink, secondLink),
+                        afterAdd.links().stream().map(LinkResponse::url).toList()));
     }
 
     @Test
@@ -164,7 +176,11 @@ class CachedLinksHttpValkeyIntegrationTest {
         HttpResponse<String> rebuiltList = getLinks(chatId);
         assertEquals(200, rebuiltList.statusCode());
         ListLinksResponse afterDelete = objectMapper.readValue(rebuiltList.body(), ListLinksResponse.class);
-        assertEquals(1, afterDelete.size());
+        assertAll(
+                () -> assertEquals(1, afterDelete.size()),
+                () -> assertEquals(
+                        List.of(firstLink),
+                        afterDelete.links().stream().map(LinkResponse::url).toList()));
     }
 
     /**
@@ -205,6 +221,7 @@ class CachedLinksHttpValkeyIntegrationTest {
                 }
                 """.formatted(link);
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
+                .timeout(HTTP_REQUEST_TIMEOUT)
                 .header(TG_CHAT_ID_HEADER, String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .POST(HttpRequest.BodyPublishers.ofString(body))
@@ -219,6 +236,7 @@ class CachedLinksHttpValkeyIntegrationTest {
      */
     private HttpResponse<String> getLinks(long chatId) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/list"))
+                .timeout(HTTP_REQUEST_TIMEOUT)
                 .header(TG_CHAT_ID_HEADER, String.valueOf(chatId))
                 .GET()
                 .build();
@@ -237,6 +255,7 @@ class CachedLinksHttpValkeyIntegrationTest {
                 }
                 """.formatted(link);
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + "/links"))
+                .timeout(HTTP_REQUEST_TIMEOUT)
                 .header(TG_CHAT_ID_HEADER, String.valueOf(chatId))
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .method("DELETE", HttpRequest.BodyPublishers.ofString(body))
@@ -249,6 +268,7 @@ class CachedLinksHttpValkeyIntegrationTest {
      */
     private HttpResponse<String> postWithoutBody(String path) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(baseUrl() + path))
+                .timeout(HTTP_REQUEST_TIMEOUT)
                 .POST(HttpRequest.BodyPublishers.noBody())
                 .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());

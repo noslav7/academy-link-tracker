@@ -5,6 +5,7 @@ import backend.academy.linktracker.scrapper.exception.ChatAlreadyRegisteredExcep
 import backend.academy.linktracker.scrapper.exception.ChatNotFoundException;
 import backend.academy.linktracker.scrapper.exception.LinkAlreadyTrackedException;
 import backend.academy.linktracker.scrapper.exception.LinkNotFoundException;
+import backend.academy.linktracker.scrapper.exception.RateLimitExceededException;
 import backend.academy.linktracker.scrapper.exception.TagAlreadyExistsException;
 import backend.academy.linktracker.scrapper.exception.TagNotFoundException;
 import backend.academy.linktracker.scrapper.exception.UnsupportedLinkException;
@@ -52,6 +53,17 @@ public class ApiExceptionHandler {
     })
     public ResponseEntity<ApiErrorResponse> handleConflict(RuntimeException ex) {
         return build(HttpStatus.CONFLICT, ex);
+    }
+
+    /**
+     * Преобразует превышение лимита запросов в HTTP 429.
+     *
+     * @param ex исходное исключение
+     * @return стандартизированный ответ об ошибке
+     */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleTooManyRequests(RateLimitExceededException ex) {
+        return build(HttpStatus.TOO_MANY_REQUESTS, ex);
     }
 
     /**

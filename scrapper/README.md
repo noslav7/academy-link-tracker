@@ -97,6 +97,30 @@ BOT_GRPC_PORT=9090
 - `HTTP_RETRY_EXPONENTIAL_MULTIPLIER` — множитель для `EXPONENTIAL`;
 - `HTTP_RETRYABLE_STATUSES` — список HTTP-статусов, которые считаются временными и ретраятся.
 
+### Настройка rate limiting для публичных endpoint
+
+Параметры `RATE_LIMIT_*` управляют ограничением входящих запросов по IP:
+
+- `RATE_LIMIT_ENABLED` — включает/выключает ограничение (по умолчанию `true`);
+- `RATE_LIMIT_FOR_PERIOD` — число запросов за период (по умолчанию `100`);
+- `RATE_LIMIT_REFRESH_PERIOD` — длительность периода (по умолчанию `1m`);
+- `RATE_LIMIT_TIMEOUT_DURATION` — ожидание разрешения (по умолчанию `0s`, fail-fast);
+- `RATE_LIMIT_PUBLIC_PATHS` — список публичных endpoint через запятую
+  (по умолчанию `/tg-chat/**,/links,/list,/tags/**`).
+
+Пример настройки для локальной проверки:
+
+```properties
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_FOR_PERIOD=2
+RATE_LIMIT_REFRESH_PERIOD=1m
+RATE_LIMIT_TIMEOUT_DURATION=0s
+RATE_LIMIT_PUBLIC_PATHS=/tg-chat/**,/links,/list,/tags/**
+```
+
+При превышении лимита API возвращает HTTP `429 Too Many Requests`
+с `exceptionName=RateLimitExceededException`.
+
 ### Поднять Postgres + миграции локально
 
 Из корня репозитория:
