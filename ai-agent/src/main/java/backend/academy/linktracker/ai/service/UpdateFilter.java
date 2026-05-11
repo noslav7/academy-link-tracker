@@ -23,7 +23,8 @@ public class UpdateFilter {
     /**
      * Функция нормализации текста, нужна для единообразных сравнений без учета регистра и краевых пробелов.
      */
-    private static final UnaryOperator<String> NORMALIZE_TEXT = value -> value.trim().toLowerCase(Locale.ROOT);
+    private static final UnaryOperator<String> NORMALIZE_TEXT =
+            value -> value.trim().toLowerCase(Locale.ROOT);
 
     /**
      * Настройки фильтрации, нужны для применения правил без жестко заданных значений в коде.
@@ -70,7 +71,8 @@ public class UpdateFilter {
      */
     private boolean containsStopWord(String description) {
         String normalizedDescription = NORMALIZE_TEXT.apply(description);
-        Set<String> normalizedStopWords = normalizedConfiguredValues(aiAgentProperties.getFiltering().getStopWords());
+        Set<String> normalizedStopWords =
+                normalizedConfiguredValues(aiAgentProperties.getFiltering().getStopWords());
         return normalizedStopWords.stream().anyMatch(normalizedDescription::contains);
     }
 
