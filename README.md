@@ -29,6 +29,7 @@
 - Maven Wrapper из репозитория (`mvnw`, `mvnw.cmd`);
 - Kafka-кластер, доступный по `KAFKA_BOOTSTRAP_SERVERS` (по умолчанию `localhost:9092,localhost:9093,localhost:9094`) — уведомления теперь по умолчанию идут через Kafka;
 - Schema Registry, доступный по `KAFKA_SCHEMA_REGISTRY_URL` (по умолчанию `http://localhost:8085/apis/registry/v2`) для хранения Avro-схем сообщений;
+- AI API token для реальной суммаризации в `ai-agent` (`AI_AGENT_SUMMARIZATION_API_TOKEN`);
 - Docker Desktop (для Testcontainers/blackbox/E2E тестов).
 
 ## Быстрый старт
@@ -71,7 +72,7 @@ docker compose up -d `
 ## Поведение при старте и Kafka
 
 - Для `scrapper` при `BOT_TRANSPORT=KAFKA` включена проверка доступности Kafka на старте; при недоступности кластера запуск завершается с ошибкой.
-- В `ai-agent` на первой итерации реализовано core processing без Kafka listener, поэтому его можно запускать из IDE без Kafka-пайплайна.
+- В `ai-agent` на первой итерации реализовано core processing без Kafka listener; для суммаризации длинных обновлений используется внешний AI API.
 - Для `bot` при недоступности Kafka во время инициализации Kafka-инфраструктуры запуск завершается с `ERROR`-логом и исключением (fail-fast).
 - Kafka-консьюмер в `bot` можно отключить параметром `APP_KAFKA_ENABLED=false` (по умолчанию включен).
 

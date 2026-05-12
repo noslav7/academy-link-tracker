@@ -10,7 +10,7 @@
 - фильтрация обновлений по стоп-словам;
 - фильтрация по исключённым авторам;
 - фильтрация по минимальной длине текста;
-- суммаризация длинных обновлений через детерминированную заглушку AI API;
+- суммаризация длинных обновлений через внешний AI API;
 - подготовка DTO для будущего топика `link.processed-updates`.
 
 ## Конфигурация
@@ -29,6 +29,10 @@ ai-agent:
     min-length: 20
   summarization:
     threshold: 500
+    api-url: https://api-inference.huggingface.co/models/facebook/bart-large-cnn
+    api-token: ${AI_AGENT_SUMMARIZATION_API_TOKEN}
+    prompt: Summarize the following update in 2-3 sentences.
+    timeout: 30s
 ```
 
 Переменные окружения:
@@ -38,6 +42,10 @@ AI_AGENT_FILTERING_STOP_WORDS=spam,ads,promo
 AI_AGENT_FILTERING_EXCLUDED_AUTHORS=bot-user
 AI_AGENT_FILTERING_MIN_LENGTH=20
 AI_AGENT_SUMMARIZATION_THRESHOLD=500
+AI_AGENT_SUMMARIZATION_API_URL=https://api-inference.huggingface.co/models/facebook/bart-large-cnn
+AI_AGENT_SUMMARIZATION_API_TOKEN=hf_xxx
+AI_AGENT_SUMMARIZATION_PROMPT=Summarize the following update in 2-3 sentences.
+AI_AGENT_SUMMARIZATION_TIMEOUT=30s
 ```
 
 Правила:
@@ -45,7 +53,14 @@ AI_AGENT_SUMMARIZATION_THRESHOLD=500
 - `stop-words` — если `description` содержит хотя бы одно стоп-слово, обновление отбрасывается;
 - `excluded-authors` — если `author` совпадает с исключённым автором, обновление отбрасывается;
 - `min-length` — если очищенный от краевых пробелов текст короче значения, обновление отбрасывается;
-- `threshold` — если длина текста больше порога, вызывается `UpdateSummarizer`.
+- `threshold` — если длина текста больше порога, вызывается `UpdateSummarizer`;
+- `api-url` — endpoint внешнего AI API, по умолчанию Hugging Face Inference API;
+- `api-token` — Bearer token для AI API. Значение хранится только в `.env` или переменных окружения;
+- `prompt` — инструкция, которая отправляется перед текстом обновления;
+- `timeout` — таймаут подключения и чтения ответа AI API.
+
+Суммаризация-заглушка и суммаризация через AI API взаимоисключающие. В текущей реализации выбран AI API:
+`AiApiUpdateSummarizer` отправляет в API промпт вида `Summarize the following update in 2-3 sentences.` и исходный текст обновления.
 
 ## Контракты данных
 
@@ -62,7 +77,8 @@ Kafka listener в этой итерации ещё не подключён, по
 
 - main-класс: `backend.academy.linktracker.ai.AiAgentApplication`;
 - профиль не требуется;
-- порт по умолчанию: `8082`.
+- порт по умолчанию: `8082`;
+- для реальной суммаризации длинных обновлений задайте `AI_AGENT_SUMMARIZATION_API_TOKEN`.
 
 Из корня репозитория:
 
@@ -79,12 +95,13 @@ Unit-тесты покрывают сценарии TC-2.1, TC-2.2, TC-2.3, TC-2
 .\mvnw.cmd -pl ai-agent -am test
 ```
 
-Текущие тесты проверяют core processing без Docker и без Kafka:
+Текущие тесты проверяют core processing и HTTP-контракт AI API без Docker и без Kafka:
 
 - фильтрацию по стоп-словам;
 - фильтрацию по автору;
 - фильтрацию по минимальной длине;
 - пропуск валидного обновления;
 - суммаризацию длинного текста;
-- передачу короткого текста без изменений.
+- передачу короткого текста без изменений;
+- отправку prompt и текста обновления во внешний AI API через mock HTTP server.
 

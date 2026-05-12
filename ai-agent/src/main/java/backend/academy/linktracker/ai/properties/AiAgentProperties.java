@@ -1,8 +1,10 @@
 package backend.academy.linktracker.ai.properties;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.time.Duration;
 import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -76,5 +78,28 @@ public class AiAgentProperties {
          */
         @PositiveOrZero
         private int threshold = 500;
+
+        /**
+         * URL внешнего AI API, совместимый с Hugging Face Inference API.
+         */
+        @NotBlank
+        private String apiUrl = "https://api-inference.huggingface.co/models/facebook/bart-large-cnn";
+
+        /**
+         * Bearer token внешнего AI API. Пустое значение оставляет запрос без Authorization header.
+         */
+        private String apiToken = "";
+
+        /**
+         * Промпт, который добавляется перед исходным текстом обновления.
+         */
+        @NotBlank
+        private String prompt = "Summarize the following update in 2-3 sentences.";
+
+        /**
+         * Таймаут подключения и чтения ответа AI API.
+         */
+        @NotNull
+        private Duration timeout = Duration.ofSeconds(30);
     }
 }

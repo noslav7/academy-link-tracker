@@ -14,3 +14,7 @@ ai-agent:
     min-length: ${AI_AGENT_FILTERING_MIN_LENGTH:20}
   summarization:
     threshold: ${AI_AGENT_SUMMARIZATION_THRESHOLD:500}
+    api-url: ${AI_AGENT_SUMMARIZATION_API_URL:https://api-inference.huggingface.co/models/facebook/bart-large-cnn}
+    api-token: ${AI_AGENT_SUMMARIZATION_API_TOKEN:}
+    prompt: ${AI_AGENT_SUMMARIZATION_PROMPT:Summarize the following update in 2-3 sentences.}
+    timeout: ${AI_AGENT_SUMMARIZATION_TIMEOUT:30s}
