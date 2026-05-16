@@ -1,16 +1,18 @@
 package backend.academy.linktracker.ai.service;
 
 import backend.academy.linktracker.ai.properties.AiAgentProperties;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import backend.academy.linktracker.ai.service.exception.AiServiceUnavailableException;
+import backend.academy.linktracker.ai.service.exception.AiSummarizationBusinessException;
 import java.util.Map;
 import java.util.Objects;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -20,25 +22,57 @@ import org.springframework.web.client.RestClientException;
 @Service
 public class AiApiUpdateSummarizer implements UpdateSummarizer {
 
+    /**
+     * Флаг Hugging Face Inference API: дождаться загрузки модели перед ответом.
+     */
     private static final String WAIT_FOR_MODEL = "wait_for_model";
-    private static final String SUMMARY_TEXT = "summary_text";
-    private static final String GENERATED_TEXT = "generated_text";
-    private static final String ERROR = "error";
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /**
+     * Парсер ответа AI API, нужен для выделения summary и доменной семантики ошибок ответа.
+     */
+    private final AiApiSummarizationResponseParser responseParser;
+    /**
+     * HTTP-клиент интеграции, нужен для отправки запросов во внешний AI API.
+     */
     private final RestClient restClient;
+    /**
+     * Настройки суммаризации, нужны для URL, токена, таймаута и шаблона prompt.
+     */
     private final AiAgentProperties.Summarization summarizationProperties;
 
-    public AiApiUpdateSummarizer(RestClient.Builder restClientBuilder, AiAgentProperties aiAgentProperties) {
+    /**
+     * Создает суммаризатор с HTTP-клиентом на базе конфигурации, чтобы вызывать внешний AI API с заданными таймаутами.
+     *
+     * @param restClientBuilder фабрика HTTP-клиента
+     * @param responseParser парсер ответа AI API
+     * @param aiAgentProperties настройки модуля
+     */
+    @Autowired
+    public AiApiUpdateSummarizer(
+            RestClient.Builder restClientBuilder,
+            AiApiSummarizationResponseParser responseParser,
+            AiAgentProperties aiAgentProperties) {
         this(
                 restClientBuilder
                         .requestFactory(requestFactory(aiAgentProperties.getSummarization()))
                         .build(),
+                responseParser,
                 aiAgentProperties);
     }
 
-    AiApiUpdateSummarizer(RestClient restClient, AiAgentProperties aiAgentProperties) {
+    /**
+     * Создает суммаризатор с явно переданным HTTP-клиентом, чтобы поддержать package-local сценарии и тестовые подстановки.
+     *
+     * @param restClient HTTP-клиент внешней интеграции
+     * @param responseParser парсер ответа AI API
+     * @param aiAgentProperties настройки модуля
+     */
+    AiApiUpdateSummarizer(
+            RestClient restClient,
+            AiApiSummarizationResponseParser responseParser,
+            AiAgentProperties aiAgentProperties) {
         this.restClient = Objects.requireNonNull(restClient, "restClient");
+        this.responseParser = Objects.requireNonNull(responseParser, "responseParser");
         this.summarizationProperties =
                 Objects.requireNonNull(aiAgentProperties, "aiAgentProperties").getSummarization();
     }
@@ -59,15 +93,31 @@ public class AiApiUpdateSummarizer implements UpdateSummarizer {
             String response = requestSpec()
                     .body(new HuggingFaceSummarizationRequest(prompt(description), Map.of(WAIT_FOR_MODEL, true)))
                     .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, (request, clientResponse) -> {
+                        throw new AiSummarizationBusinessException("AI API rejected summarization request with status "
+                                + clientResponse.getStatusCode().value());
+                    })
+                    .onStatus(HttpStatusCode::is5xxServerError, (request, clientResponse) -> {
+                        throw new AiServiceUnavailableException("AI API is unavailable with status "
+                                + clientResponse.getStatusCode().value());
+                    })
                     .body(String.class);
-            return extractSummary(objectMapper.readTree(response));
+            return responseParser.parseSummary(response);
+        } catch (AiSummarizationBusinessException | AiServiceUnavailableException ex) {
+            throw ex;
+        } catch (ResourceAccessException ex) {
+            throw new AiServiceUnavailableException(
+                    "AI API is unavailable or timed out (timeout=" + summarizationProperties.getTimeout() + ")", ex);
         } catch (RestClientException ex) {
-            throw new IllegalStateException("Failed to summarize update through AI API", ex);
-        } catch (JsonProcessingException ex) {
-            throw new IllegalStateException("Failed to parse AI API response", ex);
+            throw new AiServiceUnavailableException("Failed to call AI API due to transport error", ex);
         }
     }
 
+    /**
+     * Формирует спецификацию POST-запроса, чтобы централизованно задать URI и заголовки внешнего вызова.
+     *
+     * @return спецификация тела запроса
+     */
     private RestClient.RequestBodySpec requestSpec() {
         RestClient.RequestBodySpec requestSpec = restClient
                 .post()
@@ -80,6 +130,12 @@ public class AiApiUpdateSummarizer implements UpdateSummarizer {
         return requestSpec;
     }
 
+    /**
+     * Строит prompt для AI API, чтобы сохранить общий инструктивный контекст и добавить пользовательский текст.
+     *
+     * @param description исходный текст обновления
+     * @return полный prompt запроса
+     */
     private String prompt(String description) {
         return summarizationProperties.getPrompt()
                 + System.lineSeparator()
@@ -87,28 +143,12 @@ public class AiApiUpdateSummarizer implements UpdateSummarizer {
                 + description.trim();
     }
 
-    private String extractSummary(JsonNode response) {
-        if (response == null || response.isNull()) {
-            throw new IllegalStateException("AI API returned an empty response");
-        }
-        if (response.isArray() && !response.isEmpty()) {
-            return extractSummary(response.get(0));
-        }
-        if (response.isObject()) {
-            if (response.hasNonNull(SUMMARY_TEXT)) {
-                return response.get(SUMMARY_TEXT).asText();
-            }
-            if (response.hasNonNull(GENERATED_TEXT)) {
-                return response.get(GENERATED_TEXT).asText();
-            }
-            if (response.hasNonNull(ERROR)) {
-                throw new IllegalStateException(
-                        "AI API returned an error: " + response.get(ERROR).asText());
-            }
-        }
-        throw new IllegalStateException("AI API response does not contain a summary");
-    }
-
+    /**
+     * Создает request factory с таймаутами из конфигурации, чтобы внешние HTTP-вызовы имели ограниченный deadline.
+     *
+     * @param summarizationProperties настройки суммаризации
+     * @return фабрика HTTP-запросов с таймаутами
+     */
     private static SimpleClientHttpRequestFactory requestFactory(
             AiAgentProperties.Summarization summarizationProperties) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
@@ -117,5 +157,11 @@ public class AiApiUpdateSummarizer implements UpdateSummarizer {
         return requestFactory;
     }
 
+    /**
+     * Тело запроса Hugging Face Summarization API.
+     *
+     * @param inputs итоговый prompt
+     * @param options флаги поведения модели
+     */
     private record HuggingFaceSummarizationRequest(String inputs, Map<String, Boolean> options) {}
 }

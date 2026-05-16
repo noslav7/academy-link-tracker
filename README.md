@@ -11,7 +11,7 @@
 Корневой `README` выступает индексом. Детализация по сборке, запуску, сценариям и примерам вынесена в модульные документы:
 
 - [`bot/README.md`](bot/README.md) — запуск `bot`, Telegram-команды, сценарии ручной проверки;
-- [`ai-agent/README.md`](ai-agent/README.md) — запуск `ai-agent`, конфиг фильтрации/суммаризации, unit-тесты;
+- [`ai-agent/README.md`](ai-agent/README.md) — запуск `ai-agent`, Kafka pipeline, конфиг фильтрации/суммаризации, семантика ошибок внешнего AI API, unit/integration-тесты;
 - [`scrapper/README.md`](scrapper/README.md) — запуск `scrapper`, HTTP API, примеры `curl`, контейнерные E2E-сценарии.
 
 ## Архитектура на уровне ролей
@@ -72,7 +72,7 @@ docker compose up -d `
 ## Поведение при старте и Kafka
 
 - Для `scrapper` при `BOT_TRANSPORT=KAFKA` включена проверка доступности Kafka на старте; при недоступности кластера запуск завершается с ошибкой.
-- В `ai-agent` на первой итерации реализовано core processing без Kafka listener; для суммаризации длинных обновлений используется внешний AI API.
+- `ai-agent` читает события из `link.raw-updates`, применяет фильтрацию/суммаризацию и публикует результат в `link.processed-updates`.
 - Для `bot` при недоступности Kafka во время инициализации Kafka-инфраструктуры запуск завершается с `ERROR`-логом и исключением (fail-fast).
 - Kafka-консьюмер в `bot` можно отключить параметром `APP_KAFKA_ENABLED=false` (по умолчанию включен).
 

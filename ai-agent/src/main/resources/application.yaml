@@ -7,6 +7,16 @@ spring:
   config:
     import: optional:file:./ai-agent/.env[.properties],optional:file:./.env[.properties]
 
+app:
+  kafka:
+    enabled: ${APP_KAFKA_ENABLED:true}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    raw-topic: ${KAFKA_RAW_TOPIC:link.raw-updates}
+    processed-topic: ${KAFKA_PROCESSED_TOPIC:link.processed-updates}
+    group-id: ${KAFKA_GROUP_ID:ai-agent-link-raw-updates}
+    client-id: ${KAFKA_CLIENT_ID:ai-agent}
+    auto-offset-reset: ${KAFKA_AUTO_OFFSET_RESET:earliest}
+
 ai-agent:
   filtering:
     stop-words: ${AI_AGENT_FILTERING_STOP_WORDS:spam,ads,promo}

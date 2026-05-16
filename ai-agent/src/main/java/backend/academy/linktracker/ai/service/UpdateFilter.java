@@ -30,6 +30,14 @@ public class UpdateFilter {
      * Настройки фильтрации, нужны для применения правил без жестко заданных значений в коде.
      */
     private final AiAgentProperties aiAgentProperties;
+    /**
+     * Нормализованные стоп-слова из конфигурации для переиспользуемых membership-проверок.
+     */
+    private final Set<String> normalizedStopWords;
+    /**
+     * Нормализованные исключенные авторы из конфигурации для membership-проверок.
+     */
+    private final Set<String> normalizedExcludedAuthors;
 
     /**
      * Создает фильтр с настройками AI Agent, чтобы правила можно было менять через конфигурацию.
@@ -38,6 +46,10 @@ public class UpdateFilter {
      */
     public UpdateFilter(AiAgentProperties aiAgentProperties) {
         this.aiAgentProperties = aiAgentProperties;
+        this.normalizedStopWords =
+                normalizedConfiguredValues(aiAgentProperties.getFiltering().getStopWords());
+        this.normalizedExcludedAuthors =
+                normalizedConfiguredValues(aiAgentProperties.getFiltering().getExcludedAuthors());
     }
 
     /**
@@ -71,9 +83,12 @@ public class UpdateFilter {
      */
     private boolean containsStopWord(String description) {
         String normalizedDescription = NORMALIZE_TEXT.apply(description);
-        Set<String> normalizedStopWords =
-                normalizedConfiguredValues(aiAgentProperties.getFiltering().getStopWords());
-        return normalizedStopWords.stream().anyMatch(normalizedDescription::contains);
+        for (String stopWord : normalizedStopWords) {
+            if (normalizedDescription.contains(stopWord)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -88,8 +103,6 @@ public class UpdateFilter {
         }
 
         String normalizedAuthor = NORMALIZE_TEXT.apply(author);
-        Set<String> normalizedExcludedAuthors =
-                normalizedConfiguredValues(aiAgentProperties.getFiltering().getExcludedAuthors());
         return normalizedExcludedAuthors.contains(normalizedAuthor);
     }
 
