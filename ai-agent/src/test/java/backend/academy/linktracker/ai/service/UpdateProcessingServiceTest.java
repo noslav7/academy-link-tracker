@@ -1,8 +1,8 @@
 package backend.academy.linktracker.ai.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.ai.dto.ProcessedLinkUpdate;
 import backend.academy.linktracker.ai.dto.RawLinkUpdate;
@@ -10,22 +10,28 @@ import backend.academy.linktracker.ai.dto.UpdatePriority;
 import backend.academy.linktracker.ai.properties.AiAgentProperties;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 @Tag("unit")
 class UpdateProcessingServiceTest {
 
     private AiAgentProperties properties;
     private CountingSummarizer summarizer;
+    private UpdatePrioritizer prioritizer;
     private UpdateProcessingService service;
 
     @BeforeEach
     void setUp() {
         properties = defaultProperties();
         summarizer = new CountingSummarizer("short summary");
-        service = new UpdateProcessingService(new UpdateFilter(properties), summarizer, properties);
+        prioritizer = new UpdatePrioritizer(properties);
+        service = new UpdateProcessingService(new UpdateFilter(properties), summarizer, prioritizer, properties);
     }
 
     @Test
@@ -35,7 +41,7 @@ class UpdateProcessingServiceTest {
 
         Optional<ProcessedLinkUpdate> result = service.process(update);
 
-        assertFalse(result.isPresent());
+        assertTrue(result.isEmpty());
     }
 
     @Test
@@ -45,7 +51,7 @@ class UpdateProcessingServiceTest {
 
         Optional<ProcessedLinkUpdate> result = service.process(update);
 
-        assertFalse(result.isPresent());
+        assertTrue(result.isEmpty());
     }
 
     @Test
@@ -55,7 +61,7 @@ class UpdateProcessingServiceTest {
 
         Optional<ProcessedLinkUpdate> result = service.process(update);
 
-        assertFalse(result.isPresent());
+        assertTrue(result.isEmpty());
     }
 
     @Test
@@ -78,8 +84,20 @@ class UpdateProcessingServiceTest {
         Optional<ProcessedLinkUpdate> result = service.process(update);
 
         assertEquals(
-                new ProcessedLinkUpdate(12345L, description, List.of(111L, 222L), UpdatePriority.HIGH),
+                new ProcessedLinkUpdate(12345L, description, List.of(111L, 222L), UpdatePriority.MEDIUM),
                 result.orElseThrow());
+    }
+
+    @ParameterizedTest(name = "[{index}] \"{0}\" -> {1}")
+    @MethodSource("priorityCases")
+    void givenDescriptionForPriorityRulesWhenProcessThenDetectsExpectedPriority(
+            String description, UpdatePriority expectedPriority) {
+        // Цель: компактно проверить все ветки приоритизации (HIGH/MEDIUM/LOW) на конкретных данных.
+        RawLinkUpdate update = update(description, "alice");
+
+        Optional<ProcessedLinkUpdate> result = service.process(update);
+
+        assertEquals(expectedPriority, result.orElseThrow().priority());
     }
 
     @Test
@@ -136,17 +154,47 @@ class UpdateProcessingServiceTest {
                         .getMessage());
     }
 
+    @Test
+    void givenLongUpdateWhenSummarizerFailsThenPropagatesException() {
+        // Цель: проверить проброс ошибки суммаризатора без подавления.
+        properties.getSummarization().setThreshold(10);
+        RuntimeException expected = new RuntimeException("summarizer unavailable");
+        UpdateProcessingService failingService = new UpdateProcessingService(
+                new UpdateFilter(properties),
+                description -> {
+                    throw expected;
+                },
+                prioritizer,
+                properties);
+
+        RuntimeException actual = assertThrows(
+                RuntimeException.class,
+                () -> failingService.process(
+                        update("Long update text with enough details to require summary", "alice")));
+
+        assertEquals(expected, actual);
+    }
+
     private static AiAgentProperties defaultProperties() {
         AiAgentProperties properties = new AiAgentProperties();
         properties.getFiltering().setStopWords(List.of("spam", "ads", "promo"));
         properties.getFiltering().setExcludedAuthors(List.of("bot-user"));
         properties.getFiltering().setMinLength(20);
+        properties.getPrioritization().setHighKeywords(List.of("critical", "urgent", "breaking", "security"));
+        properties.getPrioritization().setLowKeywords(List.of("minor", "typo", "chore", "docs"));
         properties.getSummarization().setThreshold(500);
         return properties;
     }
 
     private static RawLinkUpdate update(String description, String author) {
         return new RawLinkUpdate(12345L, description, author, List.of(111L, 222L));
+    }
+
+    private static Stream<Arguments> priorityCases() {
+        return Stream.of(
+                Arguments.of("Critical bug fix in release pipeline", UpdatePriority.HIGH),
+                Arguments.of("Regular status update for release plan", UpdatePriority.MEDIUM),
+                Arguments.of("Fix typo in readme docs section", UpdatePriority.LOW));
     }
 
     private static final class CountingSummarizer implements UpdateSummarizer {

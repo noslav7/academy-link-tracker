@@ -10,13 +10,18 @@
 2. фильтрует обновление по стоп-словам;
 3. фильтрует обновление по исключенным авторам;
 4. игнорирует обновления короче `min-length`;
-5. суммаризирует длинные обновления и публикует результат в `link.processed-updates`.
+5. суммаризирует длинные обновления;
+6. определяет приоритет (`HIGH` / `MEDIUM` / `LOW`) по ключевым словам;
+7. группирует обновления по `tgChatId` в рамках временного окна;
+8. публикует результат в `link.processed-updates`.
 
 ## Границы ответственности компонентов
 
 - `RawLinkUpdateListener` — прием Kafka-сообщения, проверка входного контракта и публикация результата;
-- `UpdateProcessingService` — оркестрация этапов фильтрации и суммаризации;
+- `UpdateProcessingService` — оркестрация этапов фильтрации, суммаризации и приоритизации;
 - `UpdateFilter` — правила отсечения шумных обновлений;
+- `UpdatePrioritizer` — вычисление приоритета по `high-keywords` / `low-keywords`;
+- `UpdateGroupingService` — оконная группировка сообщений по `tgChatId`;
 - `AiApiUpdateSummarizer` — внешний HTTP-вызов AI API с таймаутами из конфигурации;
 - `AiApiSummarizationResponseParser` — извлечение summary из JSON-ответа и валидация результата.
 
@@ -50,6 +55,19 @@ ai-agent:
     excluded-authors:
       - bot-user
     min-length: 20
+  prioritization:
+    high-keywords:
+      - critical
+      - urgent
+      - breaking
+      - security
+    low-keywords:
+      - minor
+      - typo
+      - chore
+      - docs
+  grouping:
+    window-ms: 30000
   summarization:
     threshold: 500
     api-url: https://api-inference.huggingface.co/models/facebook/bart-large-cnn
@@ -72,6 +90,9 @@ KAFKA_AUTO_OFFSET_RESET=earliest
 AI_AGENT_FILTERING_STOP_WORDS=spam,ads,promo
 AI_AGENT_FILTERING_EXCLUDED_AUTHORS=bot-user
 AI_AGENT_FILTERING_MIN_LENGTH=20
+AI_AGENT_PRIORITIZATION_HIGH_KEYWORDS=critical,urgent,breaking,security
+AI_AGENT_PRIORITIZATION_LOW_KEYWORDS=minor,typo,chore,docs
+AI_AGENT_GROUPING_WINDOW_MS=30000
 AI_AGENT_SUMMARIZATION_THRESHOLD=500
 AI_AGENT_SUMMARIZATION_API_URL=https://api-inference.huggingface.co/models/facebook/bart-large-cnn
 AI_AGENT_SUMMARIZATION_API_TOKEN=hf_xxx
@@ -99,6 +120,17 @@ AI_AGENT_SUMMARIZATION_TIMEOUT=30s
   "id": 42,
   "description": "Release notes: new integrations and fixes for API clients",
   "tgChatIds": [1001, 1002],
+  "priority": "MEDIUM"
+}
+```
+
+Пример сгруппированного сообщения для одного чата:
+
+```json
+{
+  "id": 42,
+  "description": "1. Critical security patch for auth flow\n2. Minor docs cleanup",
+  "tgChatIds": [1001],
   "priority": "HIGH"
 }
 ```
@@ -107,8 +139,8 @@ AI_AGENT_SUMMARIZATION_TIMEOUT=30s
 
 ## Семантика ошибок внешнего AI API
 
-- бизнес-ошибки (`4xx`, некорректная структура бизнес-ответа) маппятся в `AiSummarizationBusinessException`;
-- транспортные ошибки (`5xx`, timeout, отсутствие ответа) маппятся в `AiServiceUnavailableException`;
+- бизнес-ошибки (`4xx`, кроме транзиентных `408/429`) маппятся в `AiSummarizationBusinessException`;
+- транспортные ошибки (`5xx`, `408`, `429`, timeout, отсутствие или невалидный ответ) маппятся в `AiServiceUnavailableException`;
 - timeout задается через `AI_AGENT_SUMMARIZATION_TIMEOUT` / `ai-agent.summarization.timeout`.
 
 ## Запуск из IDE
@@ -143,8 +175,9 @@ java -jar .\ai-agent\target\ai-agent-0.0.1.jar
 Покрытие:
 
 - unit: фильтрация, пороги длины, суммаризация и контракт `UpdateProcessingService`;
+- unit: приоритизация (`HIGH`/`MEDIUM`/`LOW`) и группировка по `tgChatId`;
 - unit: HTTP-контракт `AiApiUpdateSummarizer` через WireMock;
 - integration (Testcontainers + Kafka):
-  - TC-1.1: корректное сообщение из `link.raw-updates` читается и публикуется в `link.processed-updates`;
-  - TC-1.2: некорректный формат сообщения не валит сервис, ошибка логируется, последующие валидные события обрабатываются.
+  - TC-3.1: корректное сообщение из `link.raw-updates` проходит обработку и публикуется в `link.processed-updates`;
+  - TC-3.2: отфильтрованное сообщение не публикуется в `link.processed-updates`.
 

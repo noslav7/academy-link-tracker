@@ -60,7 +60,7 @@ public class AiApiSummarizationResponseParser {
         try {
             return validateSummary(extractSummary(objectMapper.readTree(responseBody)));
         } catch (JsonProcessingException ex) {
-            throw new AiSummarizationBusinessException("Failed to parse AI API response", ex);
+            throw new AiServiceUnavailableException("AI API returned malformed response", ex);
         }
     }
 

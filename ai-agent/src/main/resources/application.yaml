@@ -22,6 +22,11 @@ ai-agent:
     stop-words: ${AI_AGENT_FILTERING_STOP_WORDS:spam,ads,promo}
     excluded-authors: ${AI_AGENT_FILTERING_EXCLUDED_AUTHORS:bot-user}
     min-length: ${AI_AGENT_FILTERING_MIN_LENGTH:20}
+  prioritization:
+    high-keywords: ${AI_AGENT_PRIORITIZATION_HIGH_KEYWORDS:critical,urgent,breaking,security}
+    low-keywords: ${AI_AGENT_PRIORITIZATION_LOW_KEYWORDS:minor,typo,chore,docs}
+  grouping:
+    window-ms: ${AI_AGENT_GROUPING_WINDOW_MS:30000}
   summarization:
     threshold: ${AI_AGENT_SUMMARIZATION_THRESHOLD:500}
     api-url: ${AI_AGENT_SUMMARIZATION_API_URL:https://api-inference.huggingface.co/models/facebook/bart-large-cnn}

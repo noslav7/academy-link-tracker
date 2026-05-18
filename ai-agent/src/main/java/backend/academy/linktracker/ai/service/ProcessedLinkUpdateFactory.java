@@ -17,10 +17,12 @@ public class ProcessedLinkUpdateFactory {
      *
      * @param update исходное входящее обновление
      * @param processedDescription описание после обработки
+     * @param priority вычисленный приоритет обновления
      * @return DTO для следующего этапа пайплайна
      */
-    public ProcessedLinkUpdate create(RawLinkUpdate update, String processedDescription) {
+    public ProcessedLinkUpdate create(RawLinkUpdate update, String processedDescription, UpdatePriority priority) {
         Objects.requireNonNull(update, "update");
-        return new ProcessedLinkUpdate(update.id(), processedDescription, update.tgChatIds(), UpdatePriority.HIGH);
+        Objects.requireNonNull(priority, "priority");
+        return new ProcessedLinkUpdate(update.id(), processedDescription, update.tgChatIds(), priority);
     }
 }

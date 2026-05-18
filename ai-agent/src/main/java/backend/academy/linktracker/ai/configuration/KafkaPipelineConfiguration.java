@@ -81,7 +81,7 @@ public class KafkaPipelineConfiguration {
     /**
      * Создает KafkaTemplate для публикации обработанных обновлений.
      */
-    @Bean(destroyMethod = "destroy")
+    @Bean
     KafkaTemplate<String, ProcessedLinkUpdate> processedLinkUpdateKafkaTemplate(
             ProducerFactory<String, ProcessedLinkUpdate> processedLinkUpdateProducerFactory) {
         return new KafkaTemplate<>(processedLinkUpdateProducerFactory);

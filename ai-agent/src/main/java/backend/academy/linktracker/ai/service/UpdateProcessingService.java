@@ -2,6 +2,7 @@ package backend.academy.linktracker.ai.service;
 
 import backend.academy.linktracker.ai.dto.ProcessedLinkUpdate;
 import backend.academy.linktracker.ai.dto.RawLinkUpdate;
+import backend.academy.linktracker.ai.dto.UpdatePriority;
 import backend.academy.linktracker.ai.properties.AiAgentProperties;
 import jakarta.validation.Valid;
 import java.util.Objects;
@@ -11,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Оркестрирует фильтрацию и суммаризацию входящего обновления.
+ * Оркестрирует фильтрацию, суммаризацию и приоритизацию входящего обновления.
  */
 @Service
 @Validated
@@ -26,6 +27,11 @@ public class UpdateProcessingService {
      * Компонент суммаризации, нужен для сокращения длинных описаний перед доставкой.
      */
     private final UpdateSummarizer updateSummarizer;
+
+    /**
+     * Компонент приоритизации, нужен для вычисления важности обновления по ключевым словам.
+     */
+    private final UpdatePrioritizer updatePrioritizer;
 
     /**
      * Фабрика результата, нужна для отделения сборки выходного DTO от логики оркестрации.
@@ -45,8 +51,11 @@ public class UpdateProcessingService {
      * @param aiAgentProperties настройки AI Agent
      */
     UpdateProcessingService(
-            UpdateFilter updateFilter, UpdateSummarizer updateSummarizer, AiAgentProperties aiAgentProperties) {
-        this(updateFilter, updateSummarizer, new ProcessedLinkUpdateFactory(), aiAgentProperties);
+            UpdateFilter updateFilter,
+            UpdateSummarizer updateSummarizer,
+            UpdatePrioritizer updatePrioritizer,
+            AiAgentProperties aiAgentProperties) {
+        this(updateFilter, updateSummarizer, updatePrioritizer, new ProcessedLinkUpdateFactory(), aiAgentProperties);
     }
 
     /**
@@ -54,6 +63,7 @@ public class UpdateProcessingService {
      *
      * @param updateFilter фильтр входящих обновлений
      * @param updateSummarizer суммаризатор описаний
+     * @param updatePrioritizer приоритизатор обновлений
      * @param processedLinkUpdateFactory фабрика результата обработки
      * @param aiAgentProperties настройки AI Agent
      */
@@ -61,10 +71,12 @@ public class UpdateProcessingService {
     public UpdateProcessingService(
             UpdateFilter updateFilter,
             UpdateSummarizer updateSummarizer,
+            UpdatePrioritizer updatePrioritizer,
             ProcessedLinkUpdateFactory processedLinkUpdateFactory,
             AiAgentProperties aiAgentProperties) {
         this.updateFilter = updateFilter;
         this.updateSummarizer = updateSummarizer;
+        this.updatePrioritizer = updatePrioritizer;
         this.processedLinkUpdateFactory = processedLinkUpdateFactory;
         this.aiAgentProperties = aiAgentProperties;
     }
@@ -84,7 +96,8 @@ public class UpdateProcessingService {
         String description = Objects.toString(update.description(), "");
         String processedDescription =
                 shouldSummarize(description) ? updateSummarizer.summarize(description) : description;
-        return Optional.of(processedLinkUpdateFactory.create(update, processedDescription));
+        UpdatePriority priority = updatePrioritizer.detectPriority(processedDescription);
+        return Optional.of(processedLinkUpdateFactory.create(update, processedDescription, priority));
     }
 
     /**

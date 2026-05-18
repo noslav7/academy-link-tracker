@@ -3,13 +3,8 @@ package backend.academy.linktracker.ai.service;
 import backend.academy.linktracker.ai.dto.RawLinkUpdate;
 import backend.academy.linktracker.ai.properties.AiAgentProperties;
 import jakarta.validation.Valid;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.UnaryOperator;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -19,12 +14,6 @@ import org.springframework.validation.annotation.Validated;
 @Service
 @Validated
 public class UpdateFilter {
-
-    /**
-     * Функция нормализации текста, нужна для единообразных сравнений без учета регистра и краевых пробелов.
-     */
-    private static final UnaryOperator<String> NORMALIZE_TEXT =
-            value -> value.trim().toLowerCase(Locale.ROOT);
 
     /**
      * Настройки фильтрации, нужны для применения правил без жестко заданных значений в коде.
@@ -46,10 +35,10 @@ public class UpdateFilter {
      */
     public UpdateFilter(AiAgentProperties aiAgentProperties) {
         this.aiAgentProperties = aiAgentProperties;
-        this.normalizedStopWords =
-                normalizedConfiguredValues(aiAgentProperties.getFiltering().getStopWords());
-        this.normalizedExcludedAuthors =
-                normalizedConfiguredValues(aiAgentProperties.getFiltering().getExcludedAuthors());
+        this.normalizedStopWords = TextNormalizationUtils.normalizedConfiguredValues(
+                aiAgentProperties.getFiltering().getStopWords());
+        this.normalizedExcludedAuthors = TextNormalizationUtils.normalizedConfiguredValues(
+                aiAgentProperties.getFiltering().getExcludedAuthors());
     }
 
     /**
@@ -82,13 +71,8 @@ public class UpdateFilter {
      * @return true, если описание содержит настроенное стоп-слово
      */
     private boolean containsStopWord(String description) {
-        String normalizedDescription = NORMALIZE_TEXT.apply(description);
-        for (String stopWord : normalizedStopWords) {
-            if (normalizedDescription.contains(stopWord)) {
-                return true;
-            }
-        }
-        return false;
+        String normalizedDescription = TextNormalizationUtils.normalize(description);
+        return TextNormalizationUtils.containsAnySubstring(normalizedDescription, normalizedStopWords);
     }
 
     /**
@@ -102,27 +86,7 @@ public class UpdateFilter {
             return false;
         }
 
-        String normalizedAuthor = NORMALIZE_TEXT.apply(author);
+        String normalizedAuthor = TextNormalizationUtils.normalize(author);
         return normalizedExcludedAuthors.contains(normalizedAuthor);
-    }
-
-    /**
-     * Нормализует значения конфигурации в неизменяемое множество, чтобы проверки были единообразными.
-     *
-     * @param values исходные значения из конфигурации
-     * @return нормализованные непустые значения
-     */
-    private static Set<String> normalizedConfiguredValues(Collection<String> values) {
-        if (values == null) {
-            return Collections.emptySet();
-        }
-
-        Set<String> normalizedValues = new HashSet<>();
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                normalizedValues.add(NORMALIZE_TEXT.apply(value));
-            }
-        }
-        return Collections.unmodifiableSet(normalizedValues);
     }
 }

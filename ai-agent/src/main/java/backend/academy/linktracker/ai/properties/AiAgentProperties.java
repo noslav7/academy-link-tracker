@@ -10,11 +10,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Настройки фильтрации и суммаризации AI Agent.
+ * Настройки фильтрации, суммаризации, приоритизации и группировки AI Agent.
  */
 @ConfigurationProperties(prefix = "ai-agent")
 @Validated
@@ -37,6 +38,20 @@ public class AiAgentProperties {
     @Valid
     @NotNull
     private Summarization summarization = new Summarization();
+
+    /**
+     * Настройки приоритизации, нужны для вычисления важности обновлений по ключевым словам.
+     */
+    @Valid
+    @NotNull
+    private Prioritization prioritization = new Prioritization();
+
+    /**
+     * Настройки группировки, нужны для объединения связанных обновлений в рамках временного окна.
+     */
+    @Valid
+    @NotNull
+    private Grouping grouping = new Grouping();
 
     /**
      * Правила отбрасывания входящих обновлений.
@@ -100,6 +115,43 @@ public class AiAgentProperties {
          * Таймаут подключения и чтения ответа AI API.
          */
         @NotNull
+        @DurationMin(millis = 1)
         private Duration timeout = Duration.ofSeconds(30);
+    }
+
+    /**
+     * Параметры приоритизации обновлений по содержимому текста.
+     */
+    @Getter
+    @Setter
+    @EqualsAndHashCode
+    @NoArgsConstructor
+    public static class Prioritization {
+
+        /**
+         * Ключевые слова высокого приоритета.
+         */
+        private List<String> highKeywords = List.of("critical", "urgent", "breaking", "security");
+
+        /**
+         * Ключевые слова низкого приоритета.
+         */
+        private List<String> lowKeywords = List.of("minor", "typo", "chore", "docs");
+    }
+
+    /**
+     * Параметры оконной группировки по tgChatId.
+     */
+    @Getter
+    @Setter
+    @EqualsAndHashCode
+    @NoArgsConstructor
+    public static class Grouping {
+
+        /**
+         * Размер окна группировки в миллисекундах.
+         */
+        @PositiveOrZero
+        private long windowMs = 30_000;
     }
 }

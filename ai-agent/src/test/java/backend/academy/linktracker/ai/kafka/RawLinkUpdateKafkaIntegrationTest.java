@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.ai.dto.ProcessedLinkUpdate;
 import backend.academy.linktracker.ai.dto.UpdatePriority;
@@ -31,7 +32,6 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -56,7 +56,8 @@ import org.testcontainers.utility.DockerImageName;
             "ai-agent.filtering.stop-words=spam",
             "ai-agent.filtering.excluded-authors=blocked-author",
             "ai-agent.filtering.min-length=5",
-            "ai-agent.summarization.threshold=10000"
+            "ai-agent.summarization.threshold=10000",
+            "ai-agent.grouping.window-ms=200"
         })
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
@@ -110,9 +111,9 @@ class RawLinkUpdateKafkaIntegrationTest {
         String payload = """
                 {
                   "id": 101,
-                  "description": "Useful release update with enough details",
+                  "description": "Critical release update with enough details",
                   "author": "alice",
-                  "tgChatIds": [1001, 1002]
+                  "tgChatIds": [1001]
                 }
                 """;
 
@@ -124,29 +125,37 @@ class RawLinkUpdateKafkaIntegrationTest {
             ProcessedLinkUpdate processed = objectMapper.readValue(recordPayload, ProcessedLinkUpdate.class);
             assertEquals(
                     new ProcessedLinkUpdate(
-                            101L,
-                            "Useful release update with enough details",
-                            List.of(1001L, 1002L),
-                            UpdatePriority.HIGH),
+                            101L, "Critical release update with enough details", List.of(1001L), UpdatePriority.HIGH),
                     processed);
         });
     }
 
     @Test
-    void givenMalformedRawUpdateWhenPublishedThenListenerLogsDeserializationErrorAndSkipsMessage() {
-        String malformedKey = "tc-1-2-malformed";
+    void givenMalformedRawUpdateWhenPublishedThenListenerSkipsMessage() {
+        // Цель: проверить, что невалидный JSON не приводит к публикации в processed topic.
+        String malformedKey = "tc-1-2-malformed-skip";
         publishRaw(malformedKey, MALFORMED_PAYLOAD);
 
         String malformedRecord = consumeProcessedValueByKey(malformedKey);
 
         assertNull(malformedRecord);
-        assertEquals(
-                "Failed to deserialize incoming raw update payload: " + MALFORMED_PAYLOAD,
-                firstListenerLogMessage("Failed to deserialize incoming raw update payload: "));
+    }
+
+    @Test
+    void givenMalformedRawUpdateWhenPublishedThenListenerLogsDeserializationError() {
+        // Цель: проверить, что при невалидном JSON listener пишет понятный log об ошибке десериализации.
+        String malformedKey = "tc-1-2-malformed-log";
+        publishRaw(malformedKey, MALFORMED_PAYLOAD);
+
+        await().atMost(20, SECONDS)
+                .untilAsserted(() -> assertEquals(
+                        "Failed to deserialize incoming raw update payload: " + MALFORMED_PAYLOAD,
+                        firstListenerLogMessage("Failed to deserialize incoming raw update payload: ")));
     }
 
     @Test
     void givenValidRawUpdateAfterMalformedWhenPublishedThenListenerContinuesProcessing() throws Exception {
+        // Цель: проверить, что после ошибочного сообщения listener продолжает обрабатывать валидные.
         publishRaw("tc-1-2-malformed", MALFORMED_PAYLOAD);
 
         String validKey = "tc-1-2-valid";
@@ -165,13 +174,17 @@ class RawLinkUpdateKafkaIntegrationTest {
             ProcessedLinkUpdate processed = objectMapper.readValue(recordPayload, ProcessedLinkUpdate.class);
             assertEquals(
                     new ProcessedLinkUpdate(
-                            202L, "Another useful update after malformed payload", List.of(2001L), UpdatePriority.HIGH),
+                            202L,
+                            "Another useful update after malformed payload",
+                            List.of(2001L),
+                            UpdatePriority.MEDIUM),
                     processed);
         });
     }
 
     @Test
-    void givenInvalidContractWhenPublishedThenListenerSkipsMessageAndLogsValidationWarning() {
+    void givenInvalidContractWhenPublishedThenListenerSkipsMessage() {
+        // Цель: проверить, что сообщение с нарушением контракта не публикуется в processed topic.
         String key = "tc-1-3-invalid-contract";
         publishRaw(key, """
                 {
@@ -185,15 +198,33 @@ class RawLinkUpdateKafkaIntegrationTest {
         String recordPayload = consumeProcessedValueByKey(key);
 
         assertNull(recordPayload);
-        assertEquals(
-                "Incoming raw update failed validation: [ConstraintViolationImpl{interpolatedMessage='must not be empty', "
-                        + "propertyPath=tgChatIds, rootBeanClass=class backend.academy.linktracker.ai.dto.RawLinkUpdate, "
-                        + "messageTemplate='{jakarta.validation.constraints.NotEmpty.message}'}]",
-                firstListenerLogMessage("Incoming raw update failed validation: "));
+    }
+
+    @Test
+    void givenInvalidContractWhenPublishedThenListenerLogsValidationWarning() {
+        // Цель: проверить, что при валидационной ошибке listener пишет предупреждение с деталями поля.
+        String key = "tc-1-3-invalid-contract-log";
+        publishRaw(key, """
+                {
+                  "id": 304,
+                  "description": "Valid length but empty recipients list",
+                  "author": "charlie",
+                  "tgChatIds": []
+                }
+                """);
+
+        await().atMost(20, SECONDS).untilAsserted(() -> {
+            String validationLog = firstListenerLogMessage("Incoming raw update failed validation: ");
+            assertAll(
+                    () -> assertTrue(validationLog.startsWith("Incoming raw update failed validation: ")),
+                    () -> assertTrue(validationLog.contains("propertyPath=tgChatIds")),
+                    () -> assertTrue(validationLog.contains("must not be empty")));
+        });
     }
 
     @Test
     void givenFilteredByStopWordWhenPublishedThenListenerDoesNotPublishProcessedMessage() {
+        // Цель: проверить фильтрацию по стоп-слову до публикации в processed topic.
         String key = "tc-1-4-stopword-filtered";
         publishRaw(key, """
                 {
@@ -211,6 +242,7 @@ class RawLinkUpdateKafkaIntegrationTest {
 
     @Test
     void givenNullMessageKeyWhenPublishedThenListenerUsesUpdateIdAsKafkaKey() throws Exception {
+        // Цель: проверить fallback ключа Kafka на id обновления при null key.
         String payload = """
                 {
                   "id": 505,
@@ -227,23 +259,32 @@ class RawLinkUpdateKafkaIntegrationTest {
             ProcessedLinkUpdate processed = objectMapper.readValue(recordPayload, ProcessedLinkUpdate.class);
             assertEquals(
                     new ProcessedLinkUpdate(
-                            505L, "Useful update with explicit id fallback key", List.of(5001L), UpdatePriority.HIGH),
+                            505L, "Useful update with explicit id fallback key", List.of(5001L), UpdatePriority.MEDIUM),
                     processed);
         });
     }
 
     @Test
-    @DisplayName("Empty payload is skipped with explicit warning")
-    void givenEmptyPayloadWhenPublishedThenListenerSkipsMessageAndLogsWarning() {
-        String key = "tc-sanity-empty";
+    void givenEmptyPayloadWhenPublishedThenListenerSkipsMessage() {
+        // Цель: проверить, что пустой payload не публикуется в processed topic.
+        String key = "tc-sanity-empty-skip";
         publishRaw(key, "   ");
 
         String recordPayload = consumeProcessedValueByKey(key);
 
         assertNull(recordPayload);
-        assertEquals(
-                "Incoming raw update payload is empty",
-                firstListenerLogMessage("Incoming raw update payload is empty"));
+    }
+
+    @Test
+    void givenEmptyPayloadWhenPublishedThenListenerLogsWarning() {
+        // Цель: проверить наличие явного warning лога для пустого payload.
+        String key = "tc-sanity-empty-log";
+        publishRaw(key, "   ");
+
+        await().atMost(20, SECONDS)
+                .untilAsserted(() -> assertEquals(
+                        "Incoming raw update payload is empty",
+                        firstListenerLogMessage("Incoming raw update payload is empty")));
     }
 
     private void createTopicIfMissing(String topic) throws ExecutionException, InterruptedException {

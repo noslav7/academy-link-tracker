@@ -3,6 +3,8 @@ package backend.academy.linktracker.ai.kafka;
 import backend.academy.linktracker.ai.dto.ProcessedLinkUpdate;
 import backend.academy.linktracker.ai.dto.RawLinkUpdate;
 import backend.academy.linktracker.ai.properties.KafkaProperties;
+import backend.academy.linktracker.ai.service.GroupedMessage;
+import backend.academy.linktracker.ai.service.UpdateGroupingService;
 import backend.academy.linktracker.ai.service.UpdateProcessingService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +16,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -32,6 +35,10 @@ public class RawLinkUpdateListener {
      * Оркестратор этапов фильтрации/суммаризации, нужен для применения бизнес-правил обработки.
      */
     private final UpdateProcessingService updateProcessingService;
+    /**
+     * Сервис оконной группировки, нужен для объединения обновлений одного чата в итоговое сообщение.
+     */
+    private final UpdateGroupingService updateGroupingService;
     /**
      * Kafka-клиент публикации, нужен для отправки обработанного события в выходной топик.
      */
@@ -57,11 +64,13 @@ public class RawLinkUpdateListener {
     public RawLinkUpdateListener(
             ObjectMapper objectMapper,
             UpdateProcessingService updateProcessingService,
+            UpdateGroupingService updateGroupingService,
             KafkaTemplate<String, ProcessedLinkUpdate> processedLinkUpdateKafkaTemplate,
             KafkaProperties kafkaProperties,
             Validator validator) {
         this.objectMapper = objectMapper;
         this.updateProcessingService = updateProcessingService;
+        this.updateGroupingService = updateGroupingService;
         this.processedLinkUpdateKafkaTemplate = processedLinkUpdateKafkaTemplate;
         this.kafkaProperties = kafkaProperties;
         this.validator = validator;
@@ -90,7 +99,17 @@ public class RawLinkUpdateListener {
             return;
         }
 
-        updateProcessingService.process(update).ifPresent(processed -> publishProcessedUpdate(processed, messageKey));
+        updateProcessingService
+                .process(update)
+                .ifPresent(processed -> publishGroupedMessages(updateGroupingService.accept(messageKey, processed)));
+    }
+
+    /**
+     * Периодически сбрасывает истекшие окна группировки, чтобы одиночные и агрегированные сообщения доходили до Kafka.
+     */
+    @Scheduled(fixedDelayString = "${ai-agent.grouping.window-ms:30000}")
+    public void flushExpiredGroups() {
+        publishGroupedMessages(updateGroupingService.flushExpired());
     }
 
     /**
@@ -126,7 +145,25 @@ public class RawLinkUpdateListener {
     /**
      * Публикует обработанное обновление в выходной топик, чтобы downstream-сервисы получили результат pipeline.
      *
-     * @param processed результат обработки
+     * @param groupedMessage сгруппированное сообщение с payload и ключом публикации
+     */
+    private void publishProcessedUpdate(GroupedMessage groupedMessage) {
+        publishProcessedUpdate(groupedMessage.processedUpdate(), groupedMessage.messageKey());
+    }
+
+    /**
+     * Публикует пачку сгруппированных сообщений, чтобы использовать единый путь отправки для real-time и scheduled flush.
+     *
+     * @param groupedMessages сообщения, готовые к отправке
+     */
+    private void publishGroupedMessages(Iterable<GroupedMessage> groupedMessages) {
+        groupedMessages.forEach(this::publishProcessedUpdate);
+    }
+
+    /**
+     * Отправляет итоговый payload в Kafka с fallback-ключом, чтобы сообщение не осталось без ключа партиционирования.
+     *
+     * @param processed обработанное обновление
      * @param messageKey исходный ключ сообщения
      */
     private void publishProcessedUpdate(ProcessedLinkUpdate processed, String messageKey) {

@@ -5,8 +5,10 @@ import backend.academy.linktracker.ai.service.exception.AiServiceUnavailableExce
 import backend.academy.linktracker.ai.service.exception.AiSummarizationBusinessException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -26,6 +28,9 @@ public class AiApiUpdateSummarizer implements UpdateSummarizer {
      * Флаг Hugging Face Inference API: дождаться загрузки модели перед ответом.
      */
     private static final String WAIT_FOR_MODEL = "wait_for_model";
+
+    private static final Set<Integer> TRANSIENT_CLIENT_FAILURE_STATUSES =
+            Set.of(HttpStatus.REQUEST_TIMEOUT.value(), HttpStatus.TOO_MANY_REQUESTS.value());
 
     /**
      * Парсер ответа AI API, нужен для выделения summary и доменной семантики ошибок ответа.
@@ -93,11 +98,11 @@ public class AiApiUpdateSummarizer implements UpdateSummarizer {
             String response = requestSpec()
                     .body(new HuggingFaceSummarizationRequest(prompt(description), Map.of(WAIT_FOR_MODEL, true)))
                     .retrieve()
-                    .onStatus(HttpStatusCode::is4xxClientError, (request, clientResponse) -> {
+                    .onStatus(this::isBusinessHttpStatus, (request, clientResponse) -> {
                         throw new AiSummarizationBusinessException("AI API rejected summarization request with status "
                                 + clientResponse.getStatusCode().value());
                     })
-                    .onStatus(HttpStatusCode::is5xxServerError, (request, clientResponse) -> {
+                    .onStatus(this::isServiceUnavailableHttpStatus, (request, clientResponse) -> {
                         throw new AiServiceUnavailableException("AI API is unavailable with status "
                                 + clientResponse.getStatusCode().value());
                     })
@@ -141,6 +146,24 @@ public class AiApiUpdateSummarizer implements UpdateSummarizer {
                 + System.lineSeparator()
                 + System.lineSeparator()
                 + description.trim();
+    }
+
+    /**
+     * 4xx-статусы трактуются как бизнес-ошибка, кроме транзиентных 408/429.
+     */
+    private boolean isBusinessHttpStatus(HttpStatusCode statusCode) {
+        return statusCode.is4xxClientError() && !isTransientClientFailure(statusCode);
+    }
+
+    /**
+     * Транспортная недоступность: 5xx и транзиентные клиентские 408/429.
+     */
+    private boolean isServiceUnavailableHttpStatus(HttpStatusCode statusCode) {
+        return statusCode.is5xxServerError() || isTransientClientFailure(statusCode);
+    }
+
+    private boolean isTransientClientFailure(HttpStatusCode statusCode) {
+        return TRANSIENT_CLIENT_FAILURE_STATUSES.contains(statusCode.value());
     }
 
     /**
