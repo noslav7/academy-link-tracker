@@ -1,6 +1,18 @@
 server:
   port: 8081
 
+management:
+  endpoint:
+    prometheus:
+      access: unrestricted
+  endpoints:
+    web:
+      base-path: /
+      path-mapping:
+        prometheus: metrics
+      exposure:
+        include: health,info,prometheus
+
 spring:
   application:
     name: scrapper
@@ -59,6 +71,7 @@ app:
     http-fallback-to-kafka-enabled: ${BOT_HTTP_FALLBACK_TO_KAFKA_ENABLED:true}
     grpc-host: ${BOT_GRPC_HOST:localhost}
     grpc-port: ${BOT_GRPC_PORT:9090}
+    timeout: ${BOT_CLIENT_TIMEOUT:2s}
     circuit-breaker:
       sliding-window-size: ${BOT_HTTP_CB_SLIDING_WINDOW_SIZE:10}
       minimum-required-calls: ${BOT_HTTP_CB_MINIMUM_REQUIRED_CALLS:5}

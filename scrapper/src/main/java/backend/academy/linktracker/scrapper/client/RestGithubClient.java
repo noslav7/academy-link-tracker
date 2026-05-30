@@ -1,10 +1,12 @@
 package backend.academy.linktracker.scrapper.client;
 
+import backend.academy.linktracker.scrapper.metrics.ScrapperMetricsRecorder;
 import backend.academy.linktracker.scrapper.properties.GithubProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -32,6 +34,9 @@ public class RestGithubClient implements GithubClient {
      */
     private static final int MAX_SEGMENT_LENGTH = 255;
 
+    private static final String SCOPE_EXTERNAL_SOURCE = "external_source";
+    private static final String SCOPE_TYPE_GITHUB = "github";
+
     /**
      * Клиент HTTP-запросов в GitHub API.
      */
@@ -44,6 +49,10 @@ public class RestGithubClient implements GithubClient {
      * Единый блок устойчивости HTTP-вызовов (retry).
      */
     private final ResilientHttpExecutor resilientHttpExecutor;
+    /**
+     * Recorder пользовательских метрик scrapper.
+     */
+    private final ScrapperMetricsRecorder metricsRecorder;
 
     /**
      * Создает REST-клиент GitHub API.
@@ -56,9 +65,19 @@ public class RestGithubClient implements GithubClient {
             @Qualifier("githubRestClient") RestClient restClient,
             GithubProperties properties,
             ResilientHttpExecutor resilientHttpExecutor) {
+        this(restClient, properties, resilientHttpExecutor, ScrapperMetricsRecorder.noop());
+    }
+
+    @Autowired
+    public RestGithubClient(
+            @Qualifier("githubRestClient") RestClient restClient,
+            GithubProperties properties,
+            ResilientHttpExecutor resilientHttpExecutor,
+            ScrapperMetricsRecorder metricsRecorder) {
         this.restClient = restClient;
         this.properties = properties;
         this.resilientHttpExecutor = resilientHttpExecutor;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -71,17 +90,19 @@ public class RestGithubClient implements GithubClient {
      */
     @Override
     public Instant fetchRepositoryUpdatedAt(String owner, String repository) {
-        if (!isValidRepositoryPathSegment(owner) || !isValidRepositoryPathSegment(repository)) {
-            return Instant.EPOCH;
-        }
-        return resilientHttpExecutor.executeOrFallback(
-                () -> extractUpdatedAtOrEpoch(restClient
-                        .get()
-                        .uri("/repos/{owner}/{repository}", owner, repository)
-                        .headers(this::applyAuthHeader)
-                        .retrieve()
-                        .body(GithubRepositoryResponse.class)),
-                () -> Instant.EPOCH);
+        return metricsRecorder.recordDuration(SCOPE_EXTERNAL_SOURCE, SCOPE_TYPE_GITHUB, () -> {
+            if (!isValidRepositoryPathSegment(owner) || !isValidRepositoryPathSegment(repository)) {
+                return Instant.EPOCH;
+            }
+            return resilientHttpExecutor.executeOrFallback(
+                    () -> extractUpdatedAtOrEpoch(restClient
+                            .get()
+                            .uri("/repos/{owner}/{repository}", owner, repository)
+                            .headers(this::applyAuthHeader)
+                            .retrieve()
+                            .body(GithubRepositoryResponse.class)),
+                    () -> Instant.EPOCH);
+        });
     }
 
     /**
@@ -94,20 +115,22 @@ public class RestGithubClient implements GithubClient {
      */
     @Override
     public Optional<GithubIssueOrPullRequestUpdate> fetchLatestIssueOrPullRequest(String owner, String repository) {
-        if (!isValidRepositoryPathSegment(owner) || !isValidRepositoryPathSegment(repository)) {
-            return Optional.empty();
-        }
-        return resilientHttpExecutor.executeOrFallback(
-                () -> mapLatestIssueOrPullRequest(restClient
-                        .get()
-                        .uri(
-                                "/repos/{owner}/{repository}/issues?state=all&sort=created&direction=desc&per_page=1",
-                                owner,
-                                repository)
-                        .headers(this::applyAuthHeader)
-                        .retrieve()
-                        .body(new ParameterizedTypeReference<List<GithubIssueResponse>>() {})),
-                Optional::empty);
+        return metricsRecorder.recordDuration(SCOPE_EXTERNAL_SOURCE, SCOPE_TYPE_GITHUB, () -> {
+            if (!isValidRepositoryPathSegment(owner) || !isValidRepositoryPathSegment(repository)) {
+                return Optional.empty();
+            }
+            return resilientHttpExecutor.executeOrFallback(
+                    () -> mapLatestIssueOrPullRequest(restClient
+                            .get()
+                            .uri(
+                                    "/repos/{owner}/{repository}/issues?state=all&sort=created&direction=desc&per_page=1",
+                                    owner,
+                                    repository)
+                            .headers(this::applyAuthHeader)
+                            .retrieve()
+                            .body(new ParameterizedTypeReference<List<GithubIssueResponse>>() {})),
+                    Optional::empty);
+        });
     }
 
     /**

@@ -1,10 +1,12 @@
 package backend.academy.linktracker.scrapper.client;
 
+import backend.academy.linktracker.scrapper.metrics.ScrapperMetricsRecorder;
 import backend.academy.linktracker.scrapper.properties.StackoverflowProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -28,6 +30,9 @@ public class RestStackoverflowClient implements StackoverflowClient {
      */
     private static final String UNTITLED_QUESTION = "Без названия";
 
+    private static final String SCOPE_EXTERNAL_SOURCE = "external_source";
+    private static final String SCOPE_TYPE_STACKOVERFLOW = "stackoverflow";
+
     /**
      * Клиент HTTP-запросов к Stack Overflow API.
      */
@@ -40,6 +45,10 @@ public class RestStackoverflowClient implements StackoverflowClient {
      * Единый блок устойчивости HTTP-вызовов (retry).
      */
     private final ResilientHttpExecutor resilientHttpExecutor;
+    /**
+     * Recorder пользовательских метрик scrapper.
+     */
+    private final ScrapperMetricsRecorder metricsRecorder;
 
     /**
      * Создает REST-клиент Stack Overflow API.
@@ -52,9 +61,19 @@ public class RestStackoverflowClient implements StackoverflowClient {
             @Qualifier("stackoverflowRestClient") RestClient restClient,
             StackoverflowProperties properties,
             ResilientHttpExecutor resilientHttpExecutor) {
+        this(restClient, properties, resilientHttpExecutor, ScrapperMetricsRecorder.noop());
+    }
+
+    @Autowired
+    public RestStackoverflowClient(
+            @Qualifier("stackoverflowRestClient") RestClient restClient,
+            StackoverflowProperties properties,
+            ResilientHttpExecutor resilientHttpExecutor,
+            ScrapperMetricsRecorder metricsRecorder) {
         this.restClient = restClient;
         this.properties = properties;
         this.resilientHttpExecutor = resilientHttpExecutor;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -66,14 +85,16 @@ public class RestStackoverflowClient implements StackoverflowClient {
      */
     @Override
     public Instant fetchQuestionUpdatedAt(long questionId) {
-        if (!isValidQuestionId(questionId)) {
-            return Instant.EPOCH;
-        }
-        LinkedMultiValueMap<String, String> params = defaultParams();
+        return metricsRecorder.recordDuration(SCOPE_EXTERNAL_SOURCE, SCOPE_TYPE_STACKOVERFLOW, () -> {
+            if (!isValidQuestionId(questionId)) {
+                return Instant.EPOCH;
+            }
+            LinkedMultiValueMap<String, String> params = defaultParams();
 
-        return resilientHttpExecutor.executeOrFallback(
-                () -> extractQuestionUpdatedAtOrEpoch(fetchResponse("/questions/{id}", params, questionId)),
-                () -> Instant.EPOCH);
+            return resilientHttpExecutor.executeOrFallback(
+                    () -> extractQuestionUpdatedAtOrEpoch(fetchResponse("/questions/{id}", params, questionId)),
+                    () -> Instant.EPOCH);
+        });
     }
 
     /**
@@ -85,11 +106,13 @@ public class RestStackoverflowClient implements StackoverflowClient {
      */
     @Override
     public Optional<StackoverflowAnswerOrCommentUpdate> fetchLatestAnswerOrCommentUpdate(long questionId) {
-        if (!isValidQuestionId(questionId)) {
-            return Optional.empty();
-        }
-        return resilientHttpExecutor.executeOrFallback(
-                () -> extractLatestAnswerOrCommentUpdate(questionId), Optional::empty);
+        return metricsRecorder.recordDuration(SCOPE_EXTERNAL_SOURCE, SCOPE_TYPE_STACKOVERFLOW, () -> {
+            if (!isValidQuestionId(questionId)) {
+                return Optional.empty();
+            }
+            return resilientHttpExecutor.executeOrFallback(
+                    () -> extractLatestAnswerOrCommentUpdate(questionId), Optional::empty);
+        });
     }
 
     /**

@@ -1,5 +1,6 @@
 package backend.academy.linktracker.scrapper.grpc;
 
+import backend.academy.linktracker.scrapper.metrics.ScrapperMetricsRecorder;
 import backend.academy.linktracker.scrapper.properties.GrpcServerProperties;
 import backend.academy.linktracker.scrapper.service.ChatService;
 import backend.academy.linktracker.scrapper.service.LinkService;
@@ -41,6 +42,8 @@ public class ScrapperGrpcServerLifecycle implements ApplicationRunner {
      * Сервис управления ссылками.
      */
     private final LinkService linkService;
+
+    private final ScrapperMetricsRecorder metricsRecorder;
     /**
      * Экземпляр gRPC-сервера.
      */
@@ -54,10 +57,14 @@ public class ScrapperGrpcServerLifecycle implements ApplicationRunner {
      * @param linkService сервис ссылок
      */
     public ScrapperGrpcServerLifecycle(
-            GrpcServerProperties grpcServerProperties, ChatService chatService, LinkService linkService) {
+            GrpcServerProperties grpcServerProperties,
+            ChatService chatService,
+            LinkService linkService,
+            ScrapperMetricsRecorder metricsRecorder) {
         this.grpcServerProperties = grpcServerProperties;
         this.chatService = chatService;
         this.linkService = linkService;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -74,7 +81,7 @@ public class ScrapperGrpcServerLifecycle implements ApplicationRunner {
 
         try {
             server = ServerBuilder.forPort(grpcServerProperties.getPort())
-                    .addService(new ScrapperGrpcService(chatService, linkService))
+                    .addService(new ScrapperGrpcService(chatService, linkService, metricsRecorder))
                     .build();
             server.start();
             log.atInfo()

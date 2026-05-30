@@ -1,6 +1,20 @@
 server:
   port: 8080
 
+management:
+  server:
+    port: ${BOT_METRICS_PORT:8011}
+  endpoint:
+    prometheus:
+      access: unrestricted
+  endpoints:
+    web:
+      base-path: /
+      path-mapping:
+        prometheus: metrics
+      exposure:
+        include: health,info,prometheus
+
 spring:
   application:
     name: bot
@@ -18,6 +32,7 @@ app:
     transport: ${SCRAPPER_TRANSPORT:HTTP}
     grpc-host: ${SCRAPPER_GRPC_HOST:localhost}
     grpc-port: ${SCRAPPER_GRPC_PORT:9091}
+    timeout: ${SCRAPPER_CLIENT_TIMEOUT:2s}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     schema-registry-url: ${KAFKA_SCHEMA_REGISTRY_URL:http://localhost:8085/apis/registry/v2}

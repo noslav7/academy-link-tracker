@@ -1,7 +1,7 @@
 package backend.academy.linktracker.scrapper.configuration;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
@@ -38,7 +38,7 @@ class KafkaProducerConfigurationTest {
 
     @Test
     void givenHttpTransportWhenContextStartsThenKafkaTemplateBeanIsCreated() {
-        // Проверяет создание KafkaTemplate при HTTP-транспорте.
+        // Проверяет, что при HTTP с fallback в контексте поднимается именно именованный KafkaTemplate-бин.
         KafkaProducerInfrastructureInitializer initializer = mock(KafkaProducerInfrastructureInitializer.class);
         doNothing().when(initializer).initialize(anyString());
 
@@ -46,7 +46,10 @@ class KafkaProducerConfigurationTest {
                 .withPropertyValues("app.bot.transport=HTTP")
                 .withBean(KafkaProperties.class, () -> kafkaProperties("localhost:9092", "http-fallback-test"))
                 .withBean(KafkaProducerInfrastructureInitializer.class, () -> initializer)
-                .run(context -> assertNotNull(context.getBean(KafkaTemplate.class)));
+                .run(context -> {
+                    assertTrue(context.containsBean("linkUpdateKafkaTemplate"));
+                    assertInstanceOf(KafkaTemplate.class, context.getBean("linkUpdateKafkaTemplate"));
+                });
     }
 
     @Test

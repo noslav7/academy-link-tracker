@@ -1,6 +1,7 @@
 package backend.academy.linktracker.scrapper.configuration;
 
 import backend.academy.linktracker.scrapper.client.BotNotificationsClient;
+import backend.academy.linktracker.scrapper.metrics.ScrapperMetricsRecorder;
 import backend.academy.linktracker.scrapper.properties.BotClientProperties;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
 import backend.academy.linktracker.scrapper.properties.TransportMode;
@@ -14,6 +15,7 @@ import backend.academy.linktracker.scrapper.service.outbox.NotificationOutboxRep
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import org.apache.avro.generic.GenericRecord;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -90,8 +92,11 @@ public class NotificationMessagingConfiguration {
     @Bean
     @ConditionalOnBean(KafkaTemplate.class)
     KafkaMessageSender kafkaMessageSender(
-            KafkaTemplate<String, GenericRecord> kafkaTemplate, KafkaProperties kafkaProperties) {
-        return new KafkaMessageSender(kafkaTemplate, kafkaProperties);
+            KafkaTemplate<String, GenericRecord> kafkaTemplate,
+            KafkaProperties kafkaProperties,
+            ObjectProvider<ScrapperMetricsRecorder> metricsRecorderProvider) {
+        ScrapperMetricsRecorder metricsRecorder = metricsRecorderProvider.getIfAvailable(ScrapperMetricsRecorder::noop);
+        return new KafkaMessageSender(kafkaTemplate, kafkaProperties, metricsRecorder);
     }
 
     /**

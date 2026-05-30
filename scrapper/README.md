@@ -41,6 +41,7 @@ BOT_BASE_URL=http://localhost:8080
 BOT_TRANSPORT=KAFKA
 BOT_GRPC_HOST=localhost
 BOT_GRPC_PORT=9090
+BOT_CLIENT_TIMEOUT=2s
 
 # Kafka (отправка уведомлений по умолчанию)
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092,localhost:9093,localhost:9094

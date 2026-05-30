@@ -1,6 +1,7 @@
 package backend.academy.linktracker.bot.kafka;
 
 import backend.academy.linktracker.bot.client.dto.LinkUpdate;
+import backend.academy.linktracker.bot.metrics.BotMetricsRecorder;
 import backend.academy.linktracker.bot.service.UpdateNotificationService;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -19,6 +20,8 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(prefix = "app.kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class LinkUpdateListener {
+    private static final String SCOPE_SCRAPPER_ASYNC_API = "scrapper_async_api";
+    private static final String SCOPE_TYPE_KAFKA_LISTENER = "kafkaLinkUpdate";
 
     /**
      * Логгер компонента.
@@ -34,15 +37,21 @@ public class LinkUpdateListener {
      */
     private final Validator validator;
 
+    private final BotMetricsRecorder metricsRecorder;
+
     /**
      * Создает Kafka-слушатель уведомлений.
      *
      * @param updateNotificationService сервис доставки уведомлений
      * @param validator валидатор входящих сообщений
      */
-    public LinkUpdateListener(UpdateNotificationService updateNotificationService, Validator validator) {
+    public LinkUpdateListener(
+            UpdateNotificationService updateNotificationService,
+            Validator validator,
+            BotMetricsRecorder metricsRecorder) {
         this.updateNotificationService = updateNotificationService;
         this.validator = validator;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -55,20 +64,22 @@ public class LinkUpdateListener {
             groupId = "${app.kafka.group-id}",
             containerFactory = "linkUpdateKafkaListenerContainerFactory")
     public void handleLinkUpdateMessage(GenericRecord event) {
-        LinkUpdate update = LinkUpdatePayloadMapper.toLinkUpdate(event);
-        if (update == null) {
-            throw new InvalidLinkUpdateException("Received null LinkUpdate payload");
-        }
+        metricsRecorder.recordDuration(SCOPE_SCRAPPER_ASYNC_API, SCOPE_TYPE_KAFKA_LISTENER, () -> {
+            LinkUpdate update = LinkUpdatePayloadMapper.toLinkUpdate(event);
+            if (update == null) {
+                throw new InvalidLinkUpdateException("Received null LinkUpdate payload");
+            }
 
-        Set<ConstraintViolation<LinkUpdate>> violations = validator.validate(update);
-        if (!violations.isEmpty()) {
-            throw new ConstraintViolationException("Invalid LinkUpdate payload", violations);
-        }
+            Set<ConstraintViolation<LinkUpdate>> violations = validator.validate(update);
+            if (!violations.isEmpty()) {
+                throw new ConstraintViolationException("Invalid LinkUpdate payload", violations);
+            }
 
-        updateNotificationService.notifyAboutUpdate(update);
-        log.atInfo()
-                .addKeyValue("linkId", update.id())
-                .addKeyValue("url", update.url())
-                .log("Link update notification consumed from Kafka");
+            updateNotificationService.notifyAboutUpdate(update);
+            log.atInfo()
+                    .addKeyValue("linkId", update.id())
+                    .addKeyValue("url", update.url())
+                    .log("Link update notification consumed from Kafka");
+        });
     }
 }

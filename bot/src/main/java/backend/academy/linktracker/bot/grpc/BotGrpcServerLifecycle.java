@@ -1,5 +1,6 @@
 package backend.academy.linktracker.bot.grpc;
 
+import backend.academy.linktracker.bot.metrics.BotMetricsRecorder;
 import backend.academy.linktracker.bot.properties.GrpcServerProperties;
 import backend.academy.linktracker.bot.service.UpdateNotificationService;
 import io.grpc.Server;
@@ -36,6 +37,8 @@ public class BotGrpcServerLifecycle implements ApplicationRunner {
      * Сервис отправки уведомлений.
      */
     private final UpdateNotificationService updateNotificationService;
+
+    private final BotMetricsRecorder metricsRecorder;
     /**
      * Экземпляр gRPC-сервера.
      */
@@ -48,9 +51,12 @@ public class BotGrpcServerLifecycle implements ApplicationRunner {
      * @param updateNotificationService сервис отправки уведомлений
      */
     public BotGrpcServerLifecycle(
-            GrpcServerProperties grpcServerProperties, UpdateNotificationService updateNotificationService) {
+            GrpcServerProperties grpcServerProperties,
+            UpdateNotificationService updateNotificationService,
+            BotMetricsRecorder metricsRecorder) {
         this.grpcServerProperties = grpcServerProperties;
         this.updateNotificationService = updateNotificationService;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -67,7 +73,7 @@ public class BotGrpcServerLifecycle implements ApplicationRunner {
 
         try {
             server = ServerBuilder.forPort(grpcServerProperties.getPort())
-                    .addService(new BotUpdatesGrpcService(updateNotificationService))
+                    .addService(new BotUpdatesGrpcService(updateNotificationService, metricsRecorder))
                     .build();
             server.start();
             log.atInfo()

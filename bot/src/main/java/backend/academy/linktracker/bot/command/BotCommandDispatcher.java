@@ -1,5 +1,6 @@
 package backend.academy.linktracker.bot.command;
 
+import backend.academy.linktracker.bot.metrics.BotMetricsRecorder;
 import backend.academy.linktracker.bot.service.TrackDialogService;
 import java.util.List;
 import java.util.Locale;
@@ -7,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -52,6 +54,10 @@ public class BotCommandDispatcher {
      * Сервис пошагового диалога команды {@code /track}.
      */
     private final TrackDialogService trackDialogService;
+    /**
+     * Recorder пользовательских метрик bot-сервиса.
+     */
+    private final BotMetricsRecorder metricsRecorder;
 
     /**
      * Создает диспетчер и индексирует обработчики по имени команды.
@@ -59,11 +65,20 @@ public class BotCommandDispatcher {
      * @param handlers список доступных обработчиков
      */
     public BotCommandDispatcher(List<BotCommandHandler> handlers, TrackDialogService trackDialogService) {
+        this(handlers, trackDialogService, BotMetricsRecorder.noop());
+    }
+
+    @Autowired
+    public BotCommandDispatcher(
+            List<BotCommandHandler> handlers,
+            TrackDialogService trackDialogService,
+            BotMetricsRecorder metricsRecorder) {
         this.handlersByCommand = handlers.stream()
                 .collect(Collectors.toUnmodifiableMap(
                         handler -> normalizeCommandToken(handler.command()).orElseThrow(), handler -> handler));
         this.supportedCommands = handlersByCommand.keySet();
         this.trackDialogService = trackDialogService;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -97,6 +112,7 @@ public class BotCommandDispatcher {
         }
 
         BotCommandHandler handler = handlersByCommand.get(command);
+        metricsRecorder.incrementCommandRequest(command);
         return handler.handle(chatId, messageText);
     }
 

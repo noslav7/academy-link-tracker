@@ -3,6 +3,7 @@ package backend.academy.linktracker.bot.configuration;
 import backend.academy.linktracker.bot.client.GrpcScrapperClient;
 import backend.academy.linktracker.bot.client.RestScrapperClient;
 import backend.academy.linktracker.bot.client.ScrapperClient;
+import backend.academy.linktracker.bot.metrics.BotMetricsRecorder;
 import backend.academy.linktracker.bot.properties.ScrapperProperties;
 import backend.academy.linktracker.bot.properties.TransportMode;
 import io.grpc.ManagedChannel;
@@ -10,6 +11,8 @@ import io.grpc.ManagedChannelBuilder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -27,7 +30,9 @@ public class ScrapperClientConfiguration {
      */
     @Bean
     RestClient scrapperRestClient(ScrapperProperties properties, RestClient.Builder builder) {
-        return builder.baseUrl(properties.getBaseUrl()).build();
+        return builder.requestFactory(clientHttpRequestFactory(properties))
+                .baseUrl(properties.getBaseUrl())
+                .build();
     }
 
     /**
@@ -55,8 +60,8 @@ public class ScrapperClientConfiguration {
             name = "transport",
             havingValue = TransportMode.HTTP_VALUE,
             matchIfMissing = true)
-    ScrapperClient restModeScrapperClient(RestClient scrapperRestClient) {
-        return new RestScrapperClient(scrapperRestClient);
+    ScrapperClient restModeScrapperClient(RestClient scrapperRestClient, BotMetricsRecorder metricsRecorder) {
+        return new RestScrapperClient(scrapperRestClient, metricsRecorder);
     }
 
     /**
@@ -67,7 +72,15 @@ public class ScrapperClientConfiguration {
      */
     @Bean
     @ConditionalOnProperty(prefix = "app.scrapper", name = "transport", havingValue = TransportMode.GRPC_VALUE)
-    ScrapperClient grpcModeScrapperClient(ManagedChannel scrapperGrpcChannel) {
-        return new GrpcScrapperClient(scrapperGrpcChannel);
+    ScrapperClient grpcModeScrapperClient(
+            ManagedChannel scrapperGrpcChannel, ScrapperProperties properties, BotMetricsRecorder metricsRecorder) {
+        return new GrpcScrapperClient(scrapperGrpcChannel, properties.getTimeout(), metricsRecorder);
+    }
+
+    private ClientHttpRequestFactory clientHttpRequestFactory(ScrapperProperties properties) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(properties.getTimeout());
+        requestFactory.setReadTimeout(properties.getTimeout());
+        return requestFactory;
     }
 }

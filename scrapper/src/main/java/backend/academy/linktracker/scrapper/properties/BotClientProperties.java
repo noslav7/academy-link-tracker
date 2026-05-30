@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.validator.constraints.URL;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -55,6 +56,13 @@ public class BotClientProperties {
     @Min(1)
     @Max(65535)
     private int grpcPort = 9090;
+
+    /**
+     * Timeout для HTTP-вызовов и gRPC deadline при отправке уведомлений в bot.
+     */
+    @NotNull
+    @DurationMin(millis = 1)
+    private Duration timeout = Duration.ofSeconds(2);
 
     /**
      * Флаг включения fallback на Kafka при HTTP-транспорте.

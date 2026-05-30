@@ -1,6 +1,7 @@
 package backend.academy.linktracker.scrapper.service;
 
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
+import backend.academy.linktracker.scrapper.metrics.ScrapperMetricsRecorder;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,9 +20,12 @@ public class KafkaMessageSender implements NotificationDispatcher {
     private static final Logger log = LoggerFactory.getLogger(KafkaMessageSender.class);
     private static final String LINK_UPDATE_EVENT_SCHEMA_RESOURCE = "LinkUpdateEvent.avsc";
     private static final Schema LINK_UPDATE_EVENT_SCHEMA = loadSchema();
+    private static final String SCOPE_EXTERNAL_SOURCE = "external_source";
+    private static final String SCOPE_TYPE_KAFKA = "kafka";
 
     private final KafkaTemplate<String, GenericRecord> kafkaTemplate;
     private final KafkaProperties kafkaProperties;
+    private final ScrapperMetricsRecorder metricsRecorder;
 
     /**
      * Создает отправитель, публикующий сообщения в Kafka.
@@ -30,8 +34,16 @@ public class KafkaMessageSender implements NotificationDispatcher {
      * @param kafkaProperties настройки подключения и топика
      */
     public KafkaMessageSender(KafkaTemplate<String, GenericRecord> kafkaTemplate, KafkaProperties kafkaProperties) {
+        this(kafkaTemplate, kafkaProperties, ScrapperMetricsRecorder.noop());
+    }
+
+    public KafkaMessageSender(
+            KafkaTemplate<String, GenericRecord> kafkaTemplate,
+            KafkaProperties kafkaProperties,
+            ScrapperMetricsRecorder metricsRecorder) {
         this.kafkaTemplate = kafkaTemplate;
         this.kafkaProperties = kafkaProperties;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -39,7 +51,10 @@ public class KafkaMessageSender implements NotificationDispatcher {
      */
     @Override
     public void dispatch(LinkUpdate update) {
-        kafkaTemplate.send(kafkaProperties.getTopic(), String.valueOf(update.id()), toEvent(update));
+        metricsRecorder.recordDuration(
+                SCOPE_EXTERNAL_SOURCE,
+                SCOPE_TYPE_KAFKA,
+                () -> kafkaTemplate.send(kafkaProperties.getTopic(), String.valueOf(update.id()), toEvent(update)));
         log.atDebug()
                 .addKeyValue("topic", kafkaProperties.getTopic())
                 .addKeyValue("key", update.id())

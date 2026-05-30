@@ -8,6 +8,7 @@ import backend.academy.linktracker.bot.repository.InMemoryUserRepository;
 import backend.academy.linktracker.bot.service.TrackDialogInputParser;
 import backend.academy.linktracker.bot.service.TrackDialogService;
 import backend.academy.linktracker.bot.service.TrackDialogSubmissionService;
+import backend.academy.linktracker.bot.service.TrackSubmissionResultMessageResolver;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -21,8 +22,10 @@ class StartHelpCommandsSeparateTest {
     @BeforeEach
     void setUp() {
         scrapperClient = new CountingScrapperClient();
-        var trackDialogService =
-                new TrackDialogService(new TrackDialogInputParser(), new TrackDialogSubmissionService(scrapperClient));
+        var trackDialogService = new TrackDialogService(
+                new TrackDialogInputParser(),
+                new TrackDialogSubmissionService(scrapperClient),
+                new TrackSubmissionResultMessageResolver());
         var startHandler = new StartCommandHandler(new InMemoryUserRepository(), scrapperClient);
         BotCommandDispatcher[] dispatcherHolder = new BotCommandDispatcher[1];
         var helpHandler = new HelpCommandHandler(() -> dispatcherHolder[0], new CommandHelpMessageFormatter());

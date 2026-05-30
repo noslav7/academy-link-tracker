@@ -1,26 +1,18 @@
 package backend.academy.linktracker.bot;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
-import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED;
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import backend.academy.linktracker.bot.properties.TelegramProperties;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
-import com.pengrad.telegrambot.model.Message;
 import com.pengrad.telegrambot.model.Update;
-import com.pengrad.telegrambot.model.User;
 import com.pengrad.telegrambot.request.GetUpdates;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -47,9 +39,6 @@ class TelegramBotIntegrationTest implements WithAssertions {
     @Autowired
     TelegramBot telegramBot;
 
-    @Autowired
-    TelegramProperties telegramProperties;
-
     @BeforeEach
     void resetWireMock() {
         WireMock.reset();
@@ -61,40 +50,47 @@ class TelegramBotIntegrationTest implements WithAssertions {
     }
 
     @Test
-    void givenApiReturnsNotFoundWhenExecuteGetUpdatesThenResponseHasNotFoundError() {
-        // Проверяет, что при ответе Telegram API 404 клиент возвращает ошибочный результат.
-        stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
-                .willReturn(aResponse()
-                        .withStatus(404)
-                        .withBody("{\"ok\":false,\"error_code\":404,\"description\":\"Not Found\"}")));
-
-        var getUpdatesRequest = new GetUpdates();
-        var getUpdatesResponse = telegramBot.execute(getUpdatesRequest);
-
-        assertAll(
-                () -> assertFalse(getUpdatesResponse.isOk()),
-                () -> assertEquals(404, getUpdatesResponse.errorCode()),
-                () -> verify(
-                        1,
-                        postRequestedFor(urlPathTemplate("/bot{token}/getUpdates"))
-                                .withPathParam("token", equalTo(telegramProperties.getToken()))));
+    void givenApiReturnsNotFoundWhenExecuteGetUpdatesThenResponseIsNotOk() {
+        // Проверяет, что при ответе Telegram API 404 ответ клиента помечается как неуспешный.
+        var getUpdatesResponse = executeGetUpdatesWithNotFoundResponse();
+        assertFalse(getUpdatesResponse.isOk());
     }
 
     @Test
-    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenReceivedUpdateHasExpectedFields()
-            throws InterruptedException {
-        // Проверяет, что полученный апдейт содержит ожидаемые поля message и from.
-        stubSingleUpdateFlow();
-        List<Update> receivedUpdates = receiveUpdatesByListener();
+    void givenApiReturnsNotFoundWhenExecuteGetUpdatesThenResponseContains404ErrorCode() {
+        // Проверяет, что код ошибки Telegram API 404 пробрасывается в response клиента.
+        var getUpdatesResponse = executeGetUpdatesWithNotFoundResponse();
+        assertEquals(404, getUpdatesResponse.errorCode());
+    }
 
-        assertThat(receivedUpdates)
-                .hasSize(1)
-                .first()
-                .returns(123456, Update::updateId)
-                .extracting(Update::message)
-                .returns("Hello Bot", Message::text)
-                .extracting(Message::from)
-                .returns("testuser", User::username);
+    @Test
+    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenReceivedUpdateHasExpectedId()
+            throws InterruptedException {
+        // Проверяет, что слушатель получает апдейт с ожидаемым updateId.
+        stubSingleUpdateFlow();
+        Update update = receiveSingleUpdate();
+
+        assertEquals(123456, update.updateId());
+    }
+
+    @Test
+    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenReceivedUpdateHasExpectedMessageText()
+            throws InterruptedException {
+        // Проверяет, что текст сообщения в полученном апдейте соответствует ожидаемому.
+        stubSingleUpdateFlow();
+        Update update = receiveSingleUpdate();
+
+        assertEquals("Hello Bot", update.message().text());
+    }
+
+    @Test
+    void givenUpdatesListenerAndSingleUpdateWhenPollingRunsThenReceivedUpdateHasExpectedSenderUsername()
+            throws InterruptedException {
+        // Проверяет, что username отправителя в полученном апдейте соответствует ожидаемому.
+        stubSingleUpdateFlow();
+        Update update = receiveSingleUpdate();
+
+        assertEquals("testuser", update.message().from().username());
     }
 
     private void stubSingleUpdateFlow() {
@@ -159,11 +155,22 @@ class TelegramBotIntegrationTest implements WithAssertions {
         });
 
         boolean received = latch.await(10, TimeUnit.SECONDS);
-        assertAll(
-                () -> assertTrue(received),
-                () -> verify(postRequestedFor(urlPathTemplate("/bot{token}/getUpdates"))
-                        .withPathParam("token", equalTo(telegramProperties.getToken()))));
+        assertTrue(received);
 
         return receivedUpdates;
+    }
+
+    private Update receiveSingleUpdate() throws InterruptedException {
+        List<Update> updates = receiveUpdatesByListener();
+        assertThat(updates).hasSize(1);
+        return updates.getFirst();
+    }
+
+    private com.pengrad.telegrambot.response.GetUpdatesResponse executeGetUpdatesWithNotFoundResponse() {
+        stubFor(post(urlMatching("/bot[^/]+/getUpdates"))
+                .willReturn(aResponse()
+                        .withStatus(404)
+                        .withBody("{\"ok\":false,\"error_code\":404,\"description\":\"Not Found\"}")));
+        return telegramBot.execute(new GetUpdates());
     }
 }

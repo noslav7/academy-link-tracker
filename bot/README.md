@@ -35,6 +35,7 @@ SCRAPPER_BASE_URL=http://localhost:8081
 SCRAPPER_TRANSPORT=HTTP
 SCRAPPER_GRPC_HOST=localhost
 SCRAPPER_GRPC_PORT=9091
+SCRAPPER_CLIENT_TIMEOUT=2s
 
 # Kafka для получения уведомлений (по умолчанию используется)
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092,localhost:9093,localhost:9094
@@ -48,6 +49,8 @@ KAFKA_RETRY_BACKOFF_MS=1000
 ```
 
 `bot` автоматически читает `bot/.env` через `spring.config.import` в `bot/src/main/resources/application.yaml`.
+Допустимые значения `SCRAPPER_TRANSPORT`: `HTTP`, `GRPC` (регистр не важен, значение нормализуется).
+Пустые или неподдерживаемые значения отклоняются на этапе чтения конфигурации, чтобы сервис завершался fail-fast.
 
 ## Запуск
 

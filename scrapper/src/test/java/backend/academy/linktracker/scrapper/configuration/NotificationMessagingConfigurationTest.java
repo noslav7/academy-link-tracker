@@ -1,15 +1,19 @@
 package backend.academy.linktracker.scrapper.configuration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import backend.academy.linktracker.scrapper.client.BotNotificationsClient;
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
 import backend.academy.linktracker.scrapper.properties.BotClientProperties;
 import backend.academy.linktracker.scrapper.properties.KafkaProperties;
+import backend.academy.linktracker.scrapper.service.CircuitBreakerFallbackNotificationDispatcher;
+import backend.academy.linktracker.scrapper.service.ClientMessageSender;
 import backend.academy.linktracker.scrapper.service.NotificationDispatcher;
 import backend.academy.linktracker.scrapper.service.outbox.NotificationOutboxRepository;
 import java.util.List;
@@ -38,7 +42,7 @@ class NotificationMessagingConfigurationTest {
     @DisplayName(
             "Given HTTP transport without fallback When context starts Then notification dispatcher bean is created")
     void givenHttpTransportWithoutFallbackWhenContextStartsThenNotificationDispatcherBeanIsCreated() {
-        // Smoke: быстрый контроль, что базовый HTTP dispatcher поднимается в контексте.
+        // Проверяет, что при HTTP без fallback выбирается прямой dispatcher через HTTP-клиент.
         BotNotificationsClient botNotificationsClient = mock(BotNotificationsClient.class);
         NotificationOutboxRepository outboxRepository = mock(NotificationOutboxRepository.class);
 
@@ -46,20 +50,25 @@ class NotificationMessagingConfigurationTest {
                 .withPropertyValues("app.bot.transport=HTTP", "app.bot.http-fallback-to-kafka-enabled=false")
                 .withBean(BotNotificationsClient.class, () -> botNotificationsClient)
                 .withBean(NotificationOutboxRepository.class, () -> outboxRepository)
-                .run(context -> assertNotNull(context.getBean(NotificationDispatcher.class)));
+                .run(context -> {
+                    NotificationDispatcher dispatcher = context.getBean(NotificationDispatcher.class);
+                    assertInstanceOf(ClientMessageSender.class, dispatcher);
+                });
     }
 
     @ParameterizedTest
     @MethodSource("httpTransportProperties")
+    @SuppressWarnings("unchecked")
     void givenHttpTransportWhenDispatchingThenClientMessageSenderIsUsed(String[] propertyValues) {
         // Проверяет: при HTTP-транспорте (с fallback или без него) dispatcher делегирует в BotNotificationsClient.
         BotNotificationsClient botNotificationsClient = mock(BotNotificationsClient.class);
+        KafkaTemplate<String, Object> kafkaTemplate = mock(KafkaTemplate.class);
         NotificationOutboxRepository outboxRepository = mock(NotificationOutboxRepository.class);
 
         contextRunner
                 .withPropertyValues(propertyValues)
                 .withBean(BotNotificationsClient.class, () -> botNotificationsClient)
-                .withBean(KafkaTemplate.class, () -> mock(KafkaTemplate.class))
+                .withBean(KafkaTemplate.class, () -> kafkaTemplate)
                 .withBean(KafkaProperties.class, () -> {
                     KafkaProperties properties = new KafkaProperties();
                     properties.setTopic("link-updates-test");
@@ -74,42 +83,37 @@ class NotificationMessagingConfigurationTest {
                     dispatcher.dispatch(update);
 
                     verify(botNotificationsClient).sendUpdate(update);
+                    verify(kafkaTemplate, never())
+                            .send(
+                                    org.mockito.ArgumentMatchers.anyString(),
+                                    org.mockito.ArgumentMatchers.anyString(),
+                                    org.mockito.ArgumentMatchers.any());
                 });
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void givenHttpTransportWhenPrimaryClientFailsThenHttpClientIsCalled() {
-        // Проверяет, что при fallback-сценарии сначала вызывается HTTP-клиент.
+    void givenHttpTransportWithoutFallbackWhenPrimaryClientFailsThenExceptionIsPropagated() {
+        // Проверяет error-case: без fallback ошибка HTTP-клиента пробрасывается наружу.
         BotNotificationsClient botNotificationsClient = mock(BotNotificationsClient.class);
-        KafkaTemplate<String, Object> kafkaTemplate = mock(KafkaTemplate.class);
         NotificationOutboxRepository outboxRepository = mock(NotificationOutboxRepository.class);
-        KafkaProperties kafkaProperties = new KafkaProperties();
-        kafkaProperties.setTopic("link-updates-fallback");
-        BotClientProperties botClientProperties = new BotClientProperties();
 
         contextRunner
-                .withPropertyValues("app.bot.transport=HTTP")
+                .withPropertyValues("app.bot.transport=HTTP", "app.bot.http-fallback-to-kafka-enabled=false")
                 .withBean(BotNotificationsClient.class, () -> botNotificationsClient)
-                .withBean(KafkaTemplate.class, () -> kafkaTemplate)
-                .withBean(KafkaProperties.class, () -> kafkaProperties)
-                .withBean(BotClientProperties.class, () -> botClientProperties)
                 .withBean(NotificationOutboxRepository.class, () -> outboxRepository)
                 .run(context -> {
-                    doThrow(new IllegalStateException("HTTP unavailable"))
+                    IllegalStateException expected = new IllegalStateException("HTTP unavailable");
+                    doThrow(expected)
                             .when(botNotificationsClient)
                             .sendUpdate(org.mockito.ArgumentMatchers.any(LinkUpdate.class));
                     NotificationDispatcher dispatcher = context.getBean(NotificationDispatcher.class);
                     LinkUpdate update = new LinkUpdate(13L, "https://example.net", "description", List.of(1003L));
 
-                    dispatcher.dispatch(update);
+                    IllegalStateException actual =
+                            assertThrows(IllegalStateException.class, () -> dispatcher.dispatch(update));
 
+                    assertEquals(expected.getMessage(), actual.getMessage());
                     verify(botNotificationsClient).sendUpdate(update);
-                    verify(kafkaTemplate)
-                            .send(
-                                    org.mockito.ArgumentMatchers.eq("link-updates-fallback"),
-                                    org.mockito.ArgumentMatchers.eq("13"),
-                                    org.mockito.ArgumentMatchers.any(GenericRecord.class));
                 });
     }
 
@@ -136,6 +140,7 @@ class NotificationMessagingConfigurationTest {
                             .when(botNotificationsClient)
                             .sendUpdate(org.mockito.ArgumentMatchers.any(LinkUpdate.class));
                     NotificationDispatcher dispatcher = context.getBean(NotificationDispatcher.class);
+                    assertInstanceOf(CircuitBreakerFallbackNotificationDispatcher.class, dispatcher);
                     LinkUpdate update = new LinkUpdate(14L, "https://example.io", "description", List.of(1004L));
 
                     dispatcher.dispatch(update);

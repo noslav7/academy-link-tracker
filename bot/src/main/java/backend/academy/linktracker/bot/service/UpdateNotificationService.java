@@ -2,10 +2,12 @@ package backend.academy.linktracker.bot.service;
 
 import backend.academy.linktracker.bot.client.dto.LinkUpdate;
 import backend.academy.linktracker.bot.command.BotMessages;
+import backend.academy.linktracker.bot.metrics.BotMetricsRecorder;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.request.SendMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -24,13 +26,21 @@ public class UpdateNotificationService {
      */
     private final TelegramBot telegramBot;
 
+    private final BotMetricsRecorder metricsRecorder;
+
     /**
      * Создает сервис отправки уведомлений.
      *
      * @param telegramBot клиент Telegram API
      */
     public UpdateNotificationService(TelegramBot telegramBot) {
+        this(telegramBot, BotMetricsRecorder.noop());
+    }
+
+    @Autowired
+    public UpdateNotificationService(TelegramBot telegramBot, BotMetricsRecorder metricsRecorder) {
         this.telegramBot = telegramBot;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -53,6 +63,7 @@ public class UpdateNotificationService {
             if (response == null || !response.isOk()) {
                 throw new IllegalStateException("Telegram API returned non-success response");
             }
+            metricsRecorder.incrementSentNotification();
             log.atInfo()
                     .addKeyValue("chatId", chatId)
                     .addKeyValue("linkId", update.id())

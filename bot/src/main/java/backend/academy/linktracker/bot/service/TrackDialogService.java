@@ -24,6 +24,10 @@ public class TrackDialogService {
      * Компонент отправки подготовленных данных в scrapper.
      */
     private final TrackDialogSubmissionService submissionService;
+    /**
+     * Компонент сопоставления результата сабмита и текста ответа пользователю.
+     */
+    private final TrackSubmissionResultMessageResolver resultMessageResolver;
 
     /**
      * Создает сервис управления диалогом команды {@code /track}.
@@ -31,9 +35,13 @@ public class TrackDialogService {
      * @param inputParser компонент валидации пользовательского ввода
      * @param submissionService компонент отправки данных в scrapper
      */
-    public TrackDialogService(TrackDialogInputParser inputParser, TrackDialogSubmissionService submissionService) {
+    public TrackDialogService(
+            TrackDialogInputParser inputParser,
+            TrackDialogSubmissionService submissionService,
+            TrackSubmissionResultMessageResolver resultMessageResolver) {
         this.inputParser = inputParser;
         this.submissionService = submissionService;
+        this.resultMessageResolver = resultMessageResolver;
     }
 
     /**
@@ -105,7 +113,7 @@ public class TrackDialogService {
         List<String> filters = inputParser.parseCsvValues(messageText);
         TrackSubmissionResult submitResult = submissionService.submit(chatId, session.link, session.tags, filters);
         activeDialogs.remove(chatId);
-        return submitResult.responseMessage();
+        return resultMessageResolver.resolve(submitResult);
     }
 
     /**

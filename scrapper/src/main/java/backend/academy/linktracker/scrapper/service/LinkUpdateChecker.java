@@ -2,10 +2,12 @@ package backend.academy.linktracker.scrapper.service;
 
 import backend.academy.linktracker.scrapper.domain.TrackedLink;
 import backend.academy.linktracker.scrapper.dto.LinkUpdate;
+import backend.academy.linktracker.scrapper.metrics.ScrapperMetricsRecorder;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,10 +18,13 @@ import org.springframework.stereotype.Component;
 public class LinkUpdateChecker {
 
     private static final Logger log = LoggerFactory.getLogger(LinkUpdateChecker.class);
+    private static final String LLM_AGENT_SCOPE = "llm_agent";
+    private static final String LLM_AGENT_SCOPE_TYPE = "update_description";
 
     private final LinkMetadataResolver linkMetadataResolver;
     private final LinkUpdatePersistenceService persistenceService;
     private final TrackedLinkMaintenanceService maintenanceService;
+    private final ScrapperMetricsRecorder metricsRecorder;
 
     /**
      * Создает компонент проверки обновлений ссылок.
@@ -32,9 +37,19 @@ public class LinkUpdateChecker {
             LinkMetadataResolver linkMetadataResolver,
             LinkUpdatePersistenceService persistenceService,
             TrackedLinkMaintenanceService maintenanceService) {
+        this(linkMetadataResolver, persistenceService, maintenanceService, ScrapperMetricsRecorder.noop());
+    }
+
+    @Autowired
+    public LinkUpdateChecker(
+            LinkMetadataResolver linkMetadataResolver,
+            LinkUpdatePersistenceService persistenceService,
+            TrackedLinkMaintenanceService maintenanceService,
+            ScrapperMetricsRecorder metricsRecorder) {
         this.linkMetadataResolver = linkMetadataResolver;
         this.persistenceService = persistenceService;
         this.maintenanceService = maintenanceService;
+        this.metricsRecorder = metricsRecorder;
     }
 
     /**
@@ -51,7 +66,10 @@ public class LinkUpdateChecker {
             return;
         }
 
-        String description = linkMetadataResolver.resolveUpdateDescription(trackedLink.url());
+        String description = metricsRecorder.recordDuration(
+                LLM_AGENT_SCOPE,
+                LLM_AGENT_SCOPE_TYPE,
+                () -> linkMetadataResolver.resolveUpdateDescription(trackedLink.url()));
         persistenceService.enqueueNotificationAndUpdateTrackedLink(
                 new LinkUpdate(trackedLink.id(), trackedLink.url(), description, List.of(trackedLink.chatId())),
                 trackedLink.withLastCheck(Instant.now(), currentUpdatedAt));

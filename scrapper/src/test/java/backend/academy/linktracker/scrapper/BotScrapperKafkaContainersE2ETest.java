@@ -19,15 +19,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -47,13 +44,12 @@ import org.testcontainers.utility.DockerImageName;
 class BotScrapperKafkaContainersE2ETest {
 
     private static final Network NETWORK = Network.newNetwork();
-    private static final Path PROJECT_ROOT = resolveProjectRoot();
     private static final String BOT_IMAGE = "localhost/link-tracker-bot-it:test";
     private static final String SCRAPPER_IMAGE = "localhost/link-tracker-scrapper-it:test";
 
     static {
-        buildDockerImage(BOT_IMAGE, PROJECT_ROOT.resolve("bot/Dockerfile.it"));
-        buildDockerImage(SCRAPPER_IMAGE, PROJECT_ROOT.resolve("scrapper/Dockerfile.it"));
+        TestDockerImageSupport.ensureImageBuilt(BOT_IMAGE, "bot/Dockerfile.it");
+        TestDockerImageSupport.ensureImageBuilt(SCRAPPER_IMAGE, "scrapper/Dockerfile.it");
     }
 
     @SuppressWarnings("resource")
@@ -110,7 +106,7 @@ class BotScrapperKafkaContainersE2ETest {
             .withEnv("KAFKA_SCHEMA_REGISTRY_URL", "http://schema-registry:8080/apis/registry/v2")
             .withEnv("KAFKA_TOPIC", "link-updates")
             .withEnv("BOT_GRPC_SERVER_ENABLED", "false")
-            .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8080));
+            .waitingFor(Wait.forLogMessage(".*Started BotApplication.*", 1));
 
     @SuppressWarnings("resource")
     @Container
@@ -134,7 +130,7 @@ class BotScrapperKafkaContainersE2ETest {
             .withEnv("DATASOURCE_USERNAME", "postgres")
             .withEnv("DATASOURCE_PASSWORD", "postgres")
             .withEnv("LIQUIBASE_ENABLED", "true")
-            .waitingFor(Wait.forHttp("/actuator/health").forStatusCode(200).forPort(8081));
+            .waitingFor(Wait.forHttp("/health").forStatusCode(200).forPort(8081));
 
     @Test
     void givenUpdatedGithubLinkWhenTransportKafkaThenScrapperSendsToKafkaAndBotNotifiesUser() throws Exception {
@@ -149,66 +145,6 @@ class BotScrapperKafkaContainersE2ETest {
                 Обнаружено обновление по отслеживаемой ссылке.
 
                 Обновление в репозитории octocat/Hello-World (возможно: новый PR или Issue)""".stripTrailing()));
-    }
-
-    private static Path resolveProjectRoot() {
-        String multiModuleRoot = System.getProperty("maven.multiModuleProjectDirectory");
-        if (multiModuleRoot != null && !multiModuleRoot.isBlank()) {
-            Path fromProperty =
-                    findProjectRoot(Path.of(multiModuleRoot).toAbsolutePath().normalize());
-            if (fromProperty != null) {
-                return fromProperty;
-            }
-        }
-
-        Path fromCwd = findProjectRoot(Path.of("").toAbsolutePath().normalize());
-        if (fromCwd != null) {
-            return fromCwd;
-        }
-
-        throw new IllegalStateException(
-                "Unable to resolve multi-module project root directory for Testcontainers build context");
-    }
-
-    private static Path findProjectRoot(Path start) {
-        Path current = start;
-        while (current != null) {
-            if (hasRequiredModules(current)) {
-                return current;
-            }
-            Path nested = current.resolve("link-tracker");
-            if (hasRequiredModules(nested)) {
-                return nested;
-            }
-            current = current.getParent();
-        }
-        return null;
-    }
-
-    private static boolean hasRequiredModules(Path candidate) {
-        return Files.exists(candidate.resolve("bot/pom.xml")) && Files.exists(candidate.resolve("scrapper/pom.xml"));
-    }
-
-    private static void buildDockerImage(String imageTag, Path dockerfile) {
-        ProcessBuilder processBuilder = new ProcessBuilder(
-                "docker", "build", "-f", dockerfile.toString(), "-t", imageTag, PROJECT_ROOT.toString());
-        processBuilder.redirectErrorStream(true);
-        try {
-            Process process = processBuilder.start();
-            String output;
-            try (InputStream stream = process.getInputStream()) {
-                output = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            }
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                throw new IllegalStateException("docker build failed for image '%s'%n%s".formatted(imageTag, output));
-            }
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while building Docker image: " + imageTag, ex);
-        } catch (IOException ex) {
-            throw new IllegalStateException("Failed to execute docker build for image: " + imageTag, ex);
-        }
     }
 
     private void configureWiremock() {

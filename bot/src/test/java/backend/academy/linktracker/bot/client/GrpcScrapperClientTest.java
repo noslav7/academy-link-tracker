@@ -1,10 +1,8 @@
 package backend.academy.linktracker.bot.client;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import backend.academy.linktracker.bot.client.dto.LinkResponse;
 import backend.academy.linktracker.grpc.AddLinkRequest;
 import backend.academy.linktracker.grpc.ChatIdRequest;
 import backend.academy.linktracker.grpc.EmptyMessage;
@@ -30,14 +28,7 @@ class GrpcScrapperClientTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        String serverName = InProcessServerBuilder.generateName();
-        server = InProcessServerBuilder.forName(serverName)
-                .directExecutor()
-                .addService(new FakeScrapperService())
-                .build()
-                .start();
-        channel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
-        client = new GrpcScrapperClient(channel);
+        startClientWithService(new ListLinksScrapperService());
     }
 
     @AfterEach
@@ -53,25 +44,44 @@ class GrpcScrapperClientTest {
     @Test
     void givenGrpcListLinksResponseWhenGetLinksCalledThenReturnsMappedDomainLinks() {
         // Проверяет, что gRPC-ответ со списком ссылок корректно маппится в доменную модель клиента.
-        List<LinkResponse> links = client.getLinks(42L);
+        List<backend.academy.linktracker.bot.client.dto.LinkResponse> links = client.getLinks(42L);
 
-        assertAll(
-                () -> assertEquals(1, links.size()),
-                () -> assertEquals(
-                        List.of(new LinkResponse(
-                                1L, "https://github.com/octocat/Hello-World", List.of("work"), List.of())),
-                        links));
+        assertEquals(
+                List.of(new backend.academy.linktracker.bot.client.dto.LinkResponse(
+                        1L, "https://github.com/octocat/Hello-World", List.of("work"), List.of())),
+                links);
     }
 
     @Test
     void givenGrpcAlreadyExistsErrorWhenAddLinkCalledThenThrowsDomainDuplicateException() {
         // Проверяет, что ошибка ALREADY_EXISTS из gRPC конвертируется в LinkAlreadyTrackedException.
+        reconfigureClient(new DuplicateLinkScrapperService());
         assertThrows(
                 LinkAlreadyTrackedException.class,
                 () -> client.addLink(42L, "https://duplicate", List.of("tag"), List.of("author=me")));
     }
 
-    private static final class FakeScrapperService extends ScrapperApiGrpc.ScrapperApiImplBase {
+    private void reconfigureClient(ScrapperApiGrpc.ScrapperApiImplBase service) {
+        tearDown();
+        try {
+            startClientWithService(service);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to reconfigure in-process gRPC client", exception);
+        }
+    }
+
+    private void startClientWithService(ScrapperApiGrpc.ScrapperApiImplBase service) throws IOException {
+        String serverName = InProcessServerBuilder.generateName();
+        server = InProcessServerBuilder.forName(serverName)
+                .directExecutor()
+                .addService(service)
+                .build()
+                .start();
+        channel = InProcessChannelBuilder.forName(serverName).directExecutor().build();
+        client = new GrpcScrapperClient(channel);
+    }
+
+    private static final class ListLinksScrapperService extends ScrapperApiGrpc.ScrapperApiImplBase {
 
         @Override
         public void registerChat(ChatIdRequest request, StreamObserver<EmptyMessage> responseObserver) {
@@ -83,10 +93,6 @@ class GrpcScrapperClientTest {
         public void addLink(
                 AddLinkRequest request,
                 StreamObserver<backend.academy.linktracker.grpc.LinkResponse> responseObserver) {
-            if ("https://duplicate".equals(request.getLink())) {
-                responseObserver.onError(Status.ALREADY_EXISTS.asRuntimeException());
-                return;
-            }
             responseObserver.onNext(backend.academy.linktracker.grpc.LinkResponse.newBuilder()
                     .setId(1L)
                     .setUrl(request.getLink())
@@ -117,6 +123,15 @@ class GrpcScrapperClientTest {
                     .setSize(1)
                     .build());
             responseObserver.onCompleted();
+        }
+    }
+
+    private static final class DuplicateLinkScrapperService extends ScrapperApiGrpc.ScrapperApiImplBase {
+        @Override
+        public void addLink(
+                AddLinkRequest request,
+                StreamObserver<backend.academy.linktracker.grpc.LinkResponse> responseObserver) {
+            responseObserver.onError(Status.ALREADY_EXISTS.asRuntimeException());
         }
     }
 }

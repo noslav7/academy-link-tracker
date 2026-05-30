@@ -3,6 +3,7 @@ package backend.academy.linktracker.scrapper.configuration;
 import backend.academy.linktracker.scrapper.client.BotNotificationsClient;
 import backend.academy.linktracker.scrapper.client.GrpcBotNotificationsClient;
 import backend.academy.linktracker.scrapper.client.RestBotNotificationsClient;
+import backend.academy.linktracker.scrapper.metrics.ScrapperMetricsRecorder;
 import backend.academy.linktracker.scrapper.properties.BotClientProperties;
 import backend.academy.linktracker.scrapper.properties.TransportMode;
 import io.grpc.ManagedChannel;
@@ -10,6 +11,8 @@ import io.grpc.ManagedChannelBuilder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -23,7 +26,9 @@ public class BotClientConfiguration {
      */
     @Bean
     RestClient botRestClient(RestClient.Builder builder, BotClientProperties properties) {
-        return builder.baseUrl(properties.getBaseUrl()).build();
+        return builder.requestFactory(clientHttpRequestFactory(properties))
+                .baseUrl(properties.getBaseUrl())
+                .build();
     }
 
     /**
@@ -45,8 +50,9 @@ public class BotClientConfiguration {
             name = "transport",
             havingValue = TransportMode.HTTP_VALUE,
             matchIfMissing = true)
-    BotNotificationsClient restBotNotificationsClient(RestClient botRestClient) {
-        return new RestBotNotificationsClient(botRestClient);
+    BotNotificationsClient restBotNotificationsClient(
+            RestClient botRestClient, ScrapperMetricsRecorder metricsRecorder) {
+        return new RestBotNotificationsClient(botRestClient, metricsRecorder);
     }
 
     /**
@@ -54,7 +60,15 @@ public class BotClientConfiguration {
      */
     @Bean
     @ConditionalOnProperty(prefix = "app.bot", name = "transport", havingValue = TransportMode.GRPC_VALUE)
-    BotNotificationsClient grpcBotNotificationsClient(ManagedChannel botGrpcChannel) {
-        return new GrpcBotNotificationsClient(botGrpcChannel);
+    BotNotificationsClient grpcBotNotificationsClient(
+            ManagedChannel botGrpcChannel, BotClientProperties properties, ScrapperMetricsRecorder metricsRecorder) {
+        return new GrpcBotNotificationsClient(botGrpcChannel, properties.getTimeout(), metricsRecorder);
+    }
+
+    private ClientHttpRequestFactory clientHttpRequestFactory(BotClientProperties properties) {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(properties.getTimeout());
+        requestFactory.setReadTimeout(properties.getTimeout());
+        return requestFactory;
     }
 }

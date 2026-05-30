@@ -1,6 +1,7 @@
 package backend.academy.linktracker.scrapper.configuration;
 
 import backend.academy.linktracker.scrapper.controller.IpRateLimitingInterceptor;
+import backend.academy.linktracker.scrapper.metrics.ApiRequestsMetricsInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -19,6 +20,8 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
      */
     private final IpRateLimitingInterceptor ipRateLimitingInterceptor;
 
+    private final ApiRequestsMetricsInterceptor apiRequestsMetricsInterceptor;
+
     /**
      * Создает MVC-конфигурацию с required interceptor-ом.
      *
@@ -27,8 +30,11 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
      *
      * @param ipRateLimitingInterceptor interceptor контроля частоты запросов
      */
-    public WebMvcConfiguration(IpRateLimitingInterceptor ipRateLimitingInterceptor) {
+    public WebMvcConfiguration(
+            IpRateLimitingInterceptor ipRateLimitingInterceptor,
+            ApiRequestsMetricsInterceptor apiRequestsMetricsInterceptor) {
         this.ipRateLimitingInterceptor = ipRateLimitingInterceptor;
+        this.apiRequestsMetricsInterceptor = apiRequestsMetricsInterceptor;
     }
 
     /**
@@ -42,5 +48,6 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(ipRateLimitingInterceptor);
+        registry.addInterceptor(apiRequestsMetricsInterceptor);
     }
 }
