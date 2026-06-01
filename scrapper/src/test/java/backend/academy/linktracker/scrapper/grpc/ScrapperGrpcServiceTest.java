@@ -7,6 +7,7 @@ import backend.academy.linktracker.grpc.AddLinkRequest;
 import backend.academy.linktracker.grpc.ChatIdRequest;
 import backend.academy.linktracker.grpc.LinkResponse;
 import backend.academy.linktracker.grpc.ListLinksResponse;
+import backend.academy.linktracker.grpc.RemoveLinkRequest;
 import backend.academy.linktracker.grpc.ScrapperApiGrpc;
 import backend.academy.linktracker.scrapper.client.GithubClient;
 import backend.academy.linktracker.scrapper.client.StackoverflowClient;
@@ -128,5 +129,51 @@ class ScrapperGrpcServiceTest {
                         AddLinkRequest.newBuilder().setChatId(42L).setLink(" ").build()));
 
         assertEquals(Status.INVALID_ARGUMENT.getCode(), exception.getStatus().getCode());
+    }
+
+    @Test
+    void givenTrackedLinkWhenRemoveLinkCalledThenReturnsRemovedLink() {
+        // Проверяет removeLink happy-path: удаляется именно ранее добавленная ссылка.
+        stub.registerChat(ChatIdRequest.newBuilder().setChatId(42L).build());
+        stub.addLink(AddLinkRequest.newBuilder()
+                .setChatId(42L)
+                .setLink("https://github.com/octocat/Hello-World")
+                .build());
+
+        LinkResponse response = stub.removeLink(RemoveLinkRequest.newBuilder()
+                .setChatId(42L)
+                .setLink("https://github.com/octocat/Hello-World")
+                .build());
+
+        LinkResponse expected = LinkResponse.newBuilder()
+                .setId(1L)
+                .setUrl("https://github.com/octocat/Hello-World")
+                .build();
+        assertEquals(expected, response);
+    }
+
+    @Test
+    void givenMissingTrackedLinkWhenRemoveLinkCalledThenReturnsNotFound() {
+        // Проверяет контракт ошибки removeLink: отсутствующая ссылка возвращает NOT_FOUND.
+        stub.registerChat(ChatIdRequest.newBuilder().setChatId(42L).build());
+
+        StatusRuntimeException exception = assertThrows(
+                StatusRuntimeException.class,
+                () -> stub.removeLink(RemoveLinkRequest.newBuilder()
+                        .setChatId(42L)
+                        .setLink("https://github.com/octocat/Hello-World")
+                        .build()));
+
+        assertEquals(Status.NOT_FOUND.getCode(), exception.getStatus().getCode());
+    }
+
+    @Test
+    void givenMissingChatWhenListLinksCalledThenReturnsNotFound() {
+        // Проверяет контракт listLinks: для несуществующего чата возвращается NOT_FOUND.
+        StatusRuntimeException exception = assertThrows(
+                StatusRuntimeException.class,
+                () -> stub.listLinks(ChatIdRequest.newBuilder().setChatId(4242L).build()));
+
+        assertEquals(Status.NOT_FOUND.getCode(), exception.getStatus().getCode());
     }
 }

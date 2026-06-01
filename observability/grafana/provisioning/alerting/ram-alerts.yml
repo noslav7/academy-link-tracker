@@ -1,0 +1,68 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: link-tracker-memory-alerts
+    folder: LinkTracker
+    interval: 1m
+    rules:
+      - uid: link-tracker-ram-usage-high
+        title: LinkTracker RAM usage is high
+        condition: B
+        data:
+          - refId: A
+            queryType: ""
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 100 * sum by (application, app_type) (process_resident_memory_bytes{app_type=~"bot|scrapper"}) / clamp_min(sum by (application, app_type) (jvm_memory_max_bytes{area="heap", app_type=~"bot|scrapper"}), 1)
+              instant: true
+              intervalMs: 1000
+              legendFormat: "{{application}}"
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 85
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: RAM usage exceeds 85%
+          description: Application RAM usage is above 85% for at least 5 minutes.
+        labels:
+          severity: warning

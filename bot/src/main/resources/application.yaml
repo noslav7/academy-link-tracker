@@ -4,6 +4,17 @@ server:
 management:
   server:
     port: ${BOT_METRICS_PORT:8011}
+  prometheus:
+    metrics:
+      export:
+        pushgateway:
+          enabled: ${BOT_PUSHGATEWAY_ENABLED:true}
+          base-url: ${BOT_PUSHGATEWAY_BASE_URL:http://localhost:9091}
+          push-rate: ${BOT_PUSHGATEWAY_PUSH_RATE:15s}
+          job: ${BOT_PUSHGATEWAY_JOB:bot}
+          grouping-key:
+            application: bot
+            app_type: bot
   endpoint:
     prometheus:
       access: unrestricted
@@ -27,6 +38,10 @@ app:
     token: ${TELEGRAM_TOKEN} # Use env variable. DO NOT KEEP TOKEN HERE
     update-listener-sleep: 1s
     debug: false
+    # Флаги для окружений с ограниченным доступом к Telegram API:
+    # отключают внешние вызовы на старте (setMyCommands/long polling), чтобы bot мог подняться для локальной разработки и метрик.
+    polling-enabled: ${TELEGRAM_POLLING_ENABLED:true}
+    set-my-commands-on-startup: ${TELEGRAM_SET_MY_COMMANDS_ON_STARTUP:true}
   scrapper:
     base-url: ${SCRAPPER_BASE_URL:http://localhost:8081}
     transport: ${SCRAPPER_TRANSPORT:HTTP}
@@ -34,6 +49,7 @@ app:
     grpc-port: ${SCRAPPER_GRPC_PORT:9091}
     timeout: ${SCRAPPER_CLIENT_TIMEOUT:2s}
   kafka:
+    enabled: ${KAFKA_ENABLED:true}
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     schema-registry-url: ${KAFKA_SCHEMA_REGISTRY_URL:http://localhost:8085/apis/registry/v2}
     topic: ${KAFKA_TOPIC:link-updates}

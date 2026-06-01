@@ -22,6 +22,8 @@
 - запущенный `scrapper` для команд `/track`, `/untrack`, `/list` и регистрации чата;
 - доступный Kafka-кластер (по умолчанию `localhost:9092,localhost:9093,localhost:9094`) для приёма уведомлений.
 
+Если Telegram недоступен (например, сетевые ограничения), см. раздел "Режим без Telegram для локальной разработки/метрик".
+
 ## Настройка
 
 1. В корне репозитория создайте файл `bot/.env`.
@@ -87,11 +89,30 @@ Unix/macOS:
 APP_KAFKA_ENABLED=false
 ```
 
+В `bot/.env` также поддерживается ключ:
+
+```properties
+KAFKA_ENABLED=false
+```
+
 Опционально, запуск с переопределением параметров:
 
 ```powershell
 .\mvnw.cmd -f .\bot\pom.xml spring-boot:run "-Dspring-boot.run.arguments=--app.telegram.debug=true --app.telegram.update-listener-sleep=2s --app.telegram.polling-enabled=true --app.telegram.set-my-commands-on-startup=true --app.scrapper.transport=HTTP"
 ```
+
+## Режим без Telegram для локальной разработки/метрик
+
+Если Telegram API недоступен, можно поднять `bot` без внешних вызовов к Telegram:
+
+```properties
+TELEGRAM_POLLING_ENABLED=false
+TELEGRAM_SET_MY_COMMANDS_ON_STARTUP=false
+KAFKA_ENABLED=false
+```
+
+Добавьте эти значения в `bot/.env`, затем запустите сервис как обычно.
+В этом режиме `bot` поднимется, endpoint `metrics` будет доступен, и можно собирать инфраструктурные метрики для Grafana/Prometheus.
 
 ## Команды в Telegram
 
@@ -148,4 +169,11 @@ Unix/macOS:
 
 - Если `scrapper` недоступен, команды, завязанные на него (`/track`, `/untrack`, `/list`), будут возвращать сообщения об ошибке.
 - Порт `bot` по умолчанию: `8080`.
+
+## Семантика ошибок и валидация входа (`bot -> scrapper`)
+
+- Перед отправкой в `scrapper` клиент `bot` валидирует входные строковые данные (`link`, `tags`, `filters`): проверяет `blank`, нормализует `trim`, ограничивает длину.
+- Бизнес-ответы `scrapper` маппятся в доменные ошибки (`LinkAlreadyTrackedException`, `LinkNotFoundException`, `ScrapperClientException`).
+- Транспортные сбои (включая timeout/deadline) маппятся отдельно в `ScrapperServiceUnavailableException`.
+- Это позволяет не трактовать сетевые проблемы как бизнес-ошибки и возвращать пользователю корректный тип результата.
 

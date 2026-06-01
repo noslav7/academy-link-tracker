@@ -62,12 +62,22 @@ Unix/macOS:
 docker compose up -d `
   postgresql liquibase-migrations `
   kafka-1 kafka-2 kafka-3 schema-registry `
-  valkey-node-1 valkey-node-2 valkey-node-3 valkey-cluster-init
+  valkey-node-1 valkey-node-2 valkey-node-3 valkey-cluster-init `
+  pushgateway prometheus grafana
 ```
 
 2. Запустите `scrapper`, `ai-agent` и `bot` из IDE (классы `ScrapperApplication`, `AiAgentApplication` и `BotApplication`) или через Maven-команды из модульных README.
 
 3. Для локальной отказоустойчивости Valkey используется кластер из 3 нод; данные хранятся в именованных volumes `valkey-node-*-data` (переживают рестарты контейнеров).
+
+## Мониторинг и observability
+
+- Полная инструкция по мониторингу, дашбордам Grafana, PromQL и проверке DoD: [`OBSERVABILITY.md`](OBSERVABILITY.md).
+- Сервисы мониторинга в compose:
+  - `prometheus` -> [http://localhost:9090](http://localhost:9090)
+  - `grafana` -> [http://localhost:3000](http://localhost:3000) (`admin/admin`)
+  - `pushgateway` -> [http://localhost:9091](http://localhost:9091)
+- Дашборды Grafana поднимаются автоматически через provisioning из каталога `observability/grafana`.
 
 ## Поведение при старте и Kafka
 

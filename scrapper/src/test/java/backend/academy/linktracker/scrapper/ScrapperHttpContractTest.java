@@ -6,7 +6,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.stubFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlMatching;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -164,6 +164,18 @@ class ScrapperHttpContractTest {
         assertApiError(deleteResponse.body(), "404", "ChatNotFoundException", "Chat not found: 1006");
     }
 
+    @Test
+    void givenUnsupportedLinkWhenAddLinkRequestedThenReturnsBadRequest() throws IOException, InterruptedException {
+        // Проверяет контракт 400: неподдерживаемая ссылка отклоняется с доменной ошибкой.
+        long chatId = 1008L;
+        String unsupportedLink = "https://example.com/not-supported";
+        assertEquals(200, postWithoutBody("/tg-chat/" + chatId).statusCode());
+
+        HttpResponse<String> addResponse = postLink(chatId, unsupportedLink);
+        assertEquals(400, addResponse.statusCode());
+        assertApiError(addResponse.body(), "400", "UnsupportedLinkException", "Unsupported link: " + unsupportedLink);
+    }
+
     private JsonNode parseJson(String body) throws IOException {
         return objectMapper.readTree(body);
     }
@@ -197,7 +209,7 @@ class ScrapperHttpContractTest {
                 () -> assertEquals(
                         expectedMessage, error.path("exceptionMessage").asText()),
                 () -> assertTrue(error.path("stacktrace").isArray()),
-                () -> assertNotEquals(0, error.path("stacktrace").size()));
+                () -> assertFalse(error.path("stacktrace").isEmpty()));
     }
 
     private HttpResponse<String> postLink(long chatId, String link) throws IOException, InterruptedException {

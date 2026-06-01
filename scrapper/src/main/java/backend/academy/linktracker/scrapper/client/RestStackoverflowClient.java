@@ -148,7 +148,7 @@ public class RestStackoverflowClient implements StackoverflowClient {
             return Optional.empty();
         }
         StackoverflowItem question = questionItem.orElseThrow();
-        String questionTitle = normalizeOrFallback(question.title(), UNTITLED_QUESTION);
+        String questionTitle = ExternalApiTextUtils.normalizeOrFallback(question.title(), UNTITLED_QUESTION);
 
         Optional<StackoverflowEvent> latestAnswer =
                 fetchLatestEvent(questionId, "/questions/{id}/answers", StackoverflowEventType.ANSWER);
@@ -191,7 +191,8 @@ public class RestStackoverflowClient implements StackoverflowClient {
         }
         return Optional.of(new StackoverflowEvent(
                 eventType,
-                normalizeOrFallback(item.owner() == null ? null : item.owner().displayName(), UNKNOWN_AUTHOR),
+                ExternalApiTextUtils.normalizeOrFallback(
+                        item.owner() == null ? null : item.owner().displayName(), UNKNOWN_AUTHOR),
                 Instant.ofEpochSecond(item.creationDate()),
                 item.body() == null ? "" : item.body()));
     }
@@ -275,7 +276,7 @@ public class RestStackoverflowClient implements StackoverflowClient {
      */
     private StackoverflowResponse fetchResponse(
             String path, LinkedMultiValueMap<String, String> params, long questionId) {
-        if (!hasTextValue(path)) {
+        if (!ExternalApiTextUtils.hasTextValue(path)) {
             throw new IllegalArgumentException("StackOverflow API path must not be blank");
         }
         return resilientHttpExecutor.execute(() -> restClient
@@ -294,32 +295,6 @@ public class RestStackoverflowClient implements StackoverflowClient {
      */
     private static boolean isValidQuestionId(long questionId) {
         return questionId > 0;
-    }
-
-    /**
-     * Возвращает нормализованное строковое значение либо fallback.
-     * Нужен для устранения null/blank значений из внешнего API.
-     *
-     * @param value исходное значение
-     * @param fallback значение по умолчанию
-     * @return исходное значение или fallback
-     */
-    private static String normalizeOrFallback(String value, String fallback) {
-        if (!hasTextValue(value)) {
-            return fallback;
-        }
-        return value;
-    }
-
-    /**
-     * Проверяет, что строка содержит непустой текст.
-     * Нужен как переиспользуемая проверка в локальных хелперах.
-     *
-     * @param value строковое значение
-     * @return {@code true}, если строка не null и не blank
-     */
-    private static boolean hasTextValue(String value) {
-        return value != null && !value.isBlank();
     }
 
     /**

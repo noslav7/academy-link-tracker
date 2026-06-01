@@ -86,7 +86,13 @@ class LinkUpdatesSchedulerBatchAndPersistenceIntegrationTest extends BaseLinkUpd
                 .toList();
         List<String> expectedUrls =
                 List.of("https://github.com/octocat/bad-repo", "https://github.com/octocat/good-repo");
-        assertEquals(expectedUrls, actualUrls);
+        assertAll(
+                () -> assertEquals(expectedUrls, actualUrls),
+                () -> assertEquals(
+                        0,
+                        actualUrls.stream()
+                                .filter(url -> url.startsWith("system://scheduler-error-report"))
+                                .count()));
     }
 
     @Test

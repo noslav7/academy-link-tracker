@@ -1,0 +1,151 @@
+# ===== Dashboard: LinkTracker - RED & Memory =====
+
+# RED / Request rate (RPS)
+sum by (application, status) (
+  rate(http_server_requests_seconds_count{application=~"$application", app_type=~"$app_type", uri!="/metrics"}[1m])
+)
+
+# RED / Error rate (5xx)
+sum by (application) (
+  rate(http_server_requests_seconds_count{application=~"$application", app_type=~"$app_type", status=~"5..", uri!="/metrics"}[5m])
+)
+/
+clamp_min(
+  sum by (application) (
+    rate(http_server_requests_seconds_count{application=~"$application", app_type=~"$app_type", uri!="/metrics"}[5m])
+  ),
+  1e-9
+)
+
+# RED / Duration p95
+histogram_quantile(
+  0.95,
+  sum by (application, le) (
+    rate(http_server_requests_seconds_bucket{application=~"$application", app_type=~"$app_type", uri!="/metrics"}[5m])
+  )
+)
+
+# JVM memory by area
+sum by (application, area) (
+  jvm_memory_used_bytes{application=~"$application", app_type=~"$app_type"}
+)
+
+# Process memory (RSS)
+sum by (application) (
+  process_resident_memory_bytes{application=~"$application", app_type=~"$app_type"}
+)
+
+# Process memory (virtual)
+sum by (application) (
+  process_virtual_memory_bytes{application=~"$application", app_type=~"$app_type"}
+)
+
+# Alert expression: RAM usage %
+100 * sum by (application, app_type) (
+  process_resident_memory_bytes{app_type=~"bot|scrapper"}
+)
+/
+clamp_min(
+  sum by (application, app_type) (
+    jvm_memory_max_bytes{area="heap", app_type=~"bot|scrapper"}
+  ),
+  1
+)
+
+
+# ===== Dashboard: LinkTracker - Business Metrics =====
+
+# User messages per second (by command)
+sum by (application, command) (
+  rate(command_requests_total{application=~"$application", app_type=~"$app_type"}[1m])
+)
+
+# Active tracked links by domain
+max by (application, tracked_source) (
+  links_on_track_total{application=~"$application", app_type=~"$app_type"}
+)
+
+# Scrape duration p50 by source
+histogram_quantile(
+  0.50,
+  sum by (application, scope_type, le) (
+    rate(request_duration_ms_total_bucket{
+      application=~"$application",
+      app_type=~"$app_type",
+      scope="external_source",
+      scope_type=~"github|stackoverflow"
+    }[5m])
+  )
+)
+
+# Scrape duration p95 by source
+histogram_quantile(
+  0.95,
+  sum by (application, scope_type, le) (
+    rate(request_duration_ms_total_bucket{
+      application=~"$application",
+      app_type=~"$app_type",
+      scope="external_source",
+      scope_type=~"github|stackoverflow"
+    }[5m])
+  )
+)
+
+# Scrape duration p99 by source
+histogram_quantile(
+  0.99,
+  sum by (application, scope_type, le) (
+    rate(request_duration_ms_total_bucket{
+      application=~"$application",
+      app_type=~"$app_type",
+      scope="external_source",
+      scope_type=~"github|stackoverflow"
+    }[5m])
+  )
+)
+
+# Bot command processing p50
+histogram_quantile(
+  0.50,
+  sum by (application, scope_type, le) (
+    rate(command_duration_ms_total_bucket{
+      application=~"$application",
+      app_type=~"$app_type",
+      scope=~"scrapper_sync_api|scrapper_async_api"
+    }[5m])
+  )
+)
+
+# Bot command processing p95
+histogram_quantile(
+  0.95,
+  sum by (application, scope_type, le) (
+    rate(command_duration_ms_total_bucket{
+      application=~"$application",
+      app_type=~"$app_type",
+      scope=~"scrapper_sync_api|scrapper_async_api"
+    }[5m])
+  )
+)
+
+# Bot command processing p99
+histogram_quantile(
+  0.99,
+  sum by (application, scope_type, le) (
+    rate(command_duration_ms_total_bucket{
+      application=~"$application",
+      app_type=~"$app_type",
+      scope=~"scrapper_sync_api|scrapper_async_api"
+    }[5m])
+  )
+)
+
+# Telegram bot requests (aggregated)
+sum by (application) (
+  rate(command_requests_total{application=~"$application", app_type=~"$app_type"}[1m])
+)
+
+# Sent notifications (aggregated)
+sum by (application) (
+  rate(sent_notification_total{application=~"$application", app_type=~"$app_type"}[1m])
+)

@@ -2,6 +2,17 @@ server:
   port: 8081
 
 management:
+  prometheus:
+    metrics:
+      export:
+        pushgateway:
+          enabled: ${SCRAPPER_PUSHGATEWAY_ENABLED:true}
+          base-url: ${SCRAPPER_PUSHGATEWAY_BASE_URL:http://localhost:9091}
+          push-rate: ${SCRAPPER_PUSHGATEWAY_PUSH_RATE:15s}
+          job: ${SCRAPPER_PUSHGATEWAY_JOB:scrapper}
+          grouping-key:
+            application: scrapper
+            app_type: scrapper
   endpoint:
     prometheus:
       access: unrestricted

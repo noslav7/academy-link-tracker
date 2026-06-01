@@ -2,6 +2,7 @@ package backend.academy.linktracker.bot.grpc;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import backend.academy.linktracker.bot.client.dto.LinkUpdate;
 import backend.academy.linktracker.bot.service.UpdateNotificationService;
@@ -10,8 +11,10 @@ import backend.academy.linktracker.grpc.LinkUpdateRequest;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+@Tag("unit")
 class BotUpdatesGrpcServiceTest {
 
     @Test
@@ -56,6 +59,27 @@ class BotUpdatesGrpcServiceTest {
                 () -> assertEquals(1, observer.completedCount));
     }
 
+    @Test
+    void givenNotificationServiceFailureWhenSendUpdateCalledThenPropagatesException() {
+        // Проверяет error-path: исключение сервиса уведомлений не маскируется.
+        FailingUpdateNotificationService notificationService = new FailingUpdateNotificationService();
+        BotUpdatesGrpcService grpcService = new BotUpdatesGrpcService(notificationService);
+        CapturingStreamObserver observer = new CapturingStreamObserver();
+        LinkUpdateRequest request = LinkUpdateRequest.newBuilder()
+                .setId(12L)
+                .setUrl("https://github.com/octocat/failure")
+                .setDescription("updated")
+                .addTgChatIds(777L)
+                .build();
+
+        RuntimeException exception =
+                assertThrows(RuntimeException.class, () -> grpcService.sendUpdate(request, observer));
+        assertAll(
+                () -> assertEquals("Simulated notification failure", exception.getMessage()),
+                () -> assertEquals(0, observer.onNextMessages.size()),
+                () -> assertEquals(0, observer.completedCount));
+    }
+
     private static final class CapturingUpdateNotificationService extends UpdateNotificationService {
         private LinkUpdate capturedUpdate;
 
@@ -87,6 +111,17 @@ class BotUpdatesGrpcServiceTest {
         @Override
         public void onCompleted() {
             completedCount++;
+        }
+    }
+
+    private static final class FailingUpdateNotificationService extends UpdateNotificationService {
+        private FailingUpdateNotificationService() {
+            super(null);
+        }
+
+        @Override
+        public void notifyAboutUpdate(LinkUpdate update) {
+            throw new RuntimeException("Simulated notification failure");
         }
     }
 }

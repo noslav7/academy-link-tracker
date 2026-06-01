@@ -2,7 +2,7 @@ package backend.academy.linktracker.scrapper;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -76,13 +76,16 @@ class RateLimitingHttpContractTest {
     void givenDifferentForwardedIpsWhenOneIpExhaustedThenOtherIpIsStillAllowed()
             throws IOException, InterruptedException {
         // Проверяет изоляцию квот: лимит одного IP не должен блокировать другой IP.
-        assertEquals(200, postWithoutBody("/tg-chat/5011", "203.0.113.10").statusCode());
-        assertEquals(200, postWithoutBody("/tg-chat/5012", "203.0.113.10").statusCode());
-        assertEquals(429, postWithoutBody("/tg-chat/5013", "203.0.113.10").statusCode());
-
+        HttpResponse<String> firstIpFirst = postWithoutBody("/tg-chat/5011", "203.0.113.10");
+        HttpResponse<String> firstIpSecond = postWithoutBody("/tg-chat/5012", "203.0.113.10");
+        HttpResponse<String> firstIpLimited = postWithoutBody("/tg-chat/5013", "203.0.113.10");
         HttpResponse<String> secondIpFirst = postWithoutBody("/tg-chat/5014", "203.0.113.11");
 
-        assertEquals(200, secondIpFirst.statusCode());
+        assertAll(
+                () -> assertEquals(200, firstIpFirst.statusCode()),
+                () -> assertEquals(200, firstIpSecond.statusCode()),
+                () -> assertEquals(429, firstIpLimited.statusCode()),
+                () -> assertEquals(200, secondIpFirst.statusCode()));
     }
 
     private void assertRateLimitError(String body, String expectedClientIp) throws IOException {
@@ -96,7 +99,7 @@ class RateLimitingHttpContractTest {
                         "Rate limit exceeded for IP: " + expectedClientIp,
                         error.path("exceptionMessage").asText()),
                 () -> assertTrue(error.path("stacktrace").isArray()),
-                () -> assertNotEquals(0, error.path("stacktrace").size()));
+                () -> assertFalse(error.path("stacktrace").isEmpty()));
     }
 
     private HttpResponse<String> postWithoutBody(String path, String forwardedForHeader)

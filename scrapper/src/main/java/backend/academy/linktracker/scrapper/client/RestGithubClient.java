@@ -159,12 +159,12 @@ public class RestGithubClient implements GithubClient {
             return Optional.empty();
         }
         GithubIssueResponse first = items.getFirst();
-        if (first == null || !hasTextValue(first.title()) || first.createdAt() == null) {
+        if (first == null || !ExternalApiTextUtils.hasTextValue(first.title()) || first.createdAt() == null) {
             return Optional.empty();
         }
 
-        String authorLogin =
-                normalizeOrFallback(first.user() == null ? null : first.user().login(), UNKNOWN_AUTHOR);
+        String authorLogin = ExternalApiTextUtils.normalizeOrFallback(
+                first.user() == null ? null : first.user().login(), UNKNOWN_AUTHOR);
         String body = first.body() == null ? EMPTY_BODY : first.body();
         boolean isIssue = first.pullRequest() == null;
 
@@ -180,33 +180,7 @@ public class RestGithubClient implements GithubClient {
      * @return {@code true}, если значение допустимо для подстановки в URI
      */
     private static boolean isValidRepositoryPathSegment(String value) {
-        return hasTextValue(value) && value.length() <= MAX_SEGMENT_LENGTH && !value.contains("/");
-    }
-
-    /**
-     * Возвращает нормализованное строковое значение либо fallback.
-     * Нужен для устранения null/blank на границе внешнего API.
-     *
-     * @param value исходное значение
-     * @param fallback значение по умолчанию
-     * @return исходное значение или fallback
-     */
-    private static String normalizeOrFallback(String value, String fallback) {
-        if (!hasTextValue(value)) {
-            return fallback;
-        }
-        return value;
-    }
-
-    /**
-     * Проверяет, что строка не пуста и не состоит из пробелов.
-     * Нужен для переиспользуемой валидации строковых полей.
-     *
-     * @param value проверяемая строка
-     * @return {@code true}, если строка содержит полезный текст
-     */
-    private static boolean hasTextValue(String value) {
-        return value != null && !value.isBlank();
+        return ExternalApiTextUtils.hasTextValue(value) && value.length() <= MAX_SEGMENT_LENGTH && !value.contains("/");
     }
 
     /**

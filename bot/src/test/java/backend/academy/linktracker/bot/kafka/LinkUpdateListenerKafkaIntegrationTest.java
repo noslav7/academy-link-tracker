@@ -11,7 +11,9 @@ import static com.github.tomakehurst.wiremock.client.WireMock.urlPathTemplate;
 import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.bot.command.BotMessages;
 import backend.academy.linktracker.bot.properties.KafkaProperties;
@@ -24,6 +26,7 @@ import java.io.InputStream;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -152,19 +155,20 @@ class LinkUpdateListenerKafkaIntegrationTest {
     @Test
     @Order(3)
     void givenMalformedKafkaPayloadWhenConsumedThenBotSkipsTelegramNotification() {
-        // Проверяет: невалидный бинарный payload не вызывает Telegram API и публикуется в DLQ.
+        // Проверяет: невалидный бинарный payload не вызывает Telegram API.
         publishMalformedBytes("malformed", new byte[] {1, 2, 3, 4, 5});
 
-        await().during(1, SECONDS)
-                .atMost(2, SECONDS)
-                .untilAsserted(() -> verify(
-                        0,
-                        postRequestedFor(urlPathTemplate("/bot{token}/sendMessage"))
-                                .withPathParam("token", equalTo(telegramProperties.getToken()))));
+        awaitNoTelegramCalls();
+    }
 
+    @Test
+    @Order(4)
+    void givenMalformedKafkaPayloadWhenConsumedThenPublishesMessageToDlq() {
+        // Проверяет: невалидный бинарный payload попадает в DLQ.
+        publishMalformedBytes("malformed-dlq", new byte[] {6, 7, 8, 9, 10});
         await().atMost(10, SECONDS).untilAsserted(() -> {
-            ConsumerRecord<String, String> record = pollSingleRecord(DLQ_TOPIC);
-            assertEquals("malformed", record.key());
+            List<ConsumerRecord<String, String>> records = pollRecords(DLQ_TOPIC);
+            assertTrue(records.stream().anyMatch(record -> "malformed-dlq".equals(record.key())));
         });
     }
 
@@ -215,13 +219,21 @@ class LinkUpdateListenerKafkaIntegrationTest {
     private void waitForKafkaListenerAssignment() {
         await().atMost(30, SECONDS).untilAsserted(() -> {
             Collection<MessageListenerContainer> containers = kafkaListenerEndpointRegistry.getListenerContainers();
-            assertEquals(1, containers.size());
             int assignedPartitions = containers.stream()
                     .map(MessageListenerContainer::getAssignedPartitions)
                     .mapToInt(partitions -> partitions == null ? 0 : partitions.size())
                     .sum();
-            assertEquals(1, assignedPartitions);
+            assertAll(() -> assertEquals(1, containers.size()), () -> assertEquals(1, assignedPartitions));
         });
+    }
+
+    private void awaitNoTelegramCalls() {
+        await().during(1, SECONDS)
+                .atMost(2, SECONDS)
+                .untilAsserted(() -> verify(
+                        0,
+                        postRequestedFor(urlPathTemplate("/bot{token}/sendMessage"))
+                                .withPathParam("token", equalTo(telegramProperties.getToken()))));
     }
 
     private void verifySendMessage(long chatId) {
@@ -232,7 +244,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
         assertEquals(String.valueOf(chatId), sentFormData().get("chat_id"));
     }
 
-    private ConsumerRecord<String, String> pollSingleRecord(String topic) {
+    private List<ConsumerRecord<String, String>> pollRecords(String topic) {
         Properties config = new Properties();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString());
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -242,11 +254,12 @@ class LinkUpdateListenerKafkaIntegrationTest {
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(config)) {
             consumer.subscribe(List.of(topic));
+            List<ConsumerRecord<String, String>> records = new ArrayList<>();
             for (ConsumerRecord<String, String> record :
                     consumer.poll(Duration.ofSeconds(2)).records(topic)) {
-                return record;
+                records.add(record);
             }
-            throw new AssertionError("Expected record in topic " + topic);
+            return records;
         }
     }
 

@@ -1,0 +1,373 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Количество пользовательских сообщений в секунду (по командам Telegram).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (application, command) (rate(command_requests_total{application=~\"$application\", app_type=~\"$app_type\"}[1m]))",
+          "legendFormat": "{{application}} {{command}}",
+          "refId": "A"
+        }
+      ],
+      "title": "User messages per second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Количество активных ссылок на мониторинге с разделением по доменам github/stackoverflow.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "max by (application, tracked_source) (links_on_track_total{application=~\"$application\", app_type=~\"$app_type\"})",
+          "legendFormat": "{{application}} {{tracked_source}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Tracked links by source domain",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "50/95/99 перцентили времени scrape-операции по источникам github и stackoverflow.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.50, sum by (application, scope_type, le) (rate(request_duration_ms_total_bucket{application=~\"$application\", app_type=~\"$app_type\", scope=\"external_source\", scope_type=~\"github|stackoverflow\"}[5m])))",
+          "legendFormat": "p50 {{application}} {{scope_type}}",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (application, scope_type, le) (rate(request_duration_ms_total_bucket{application=~\"$application\", app_type=~\"$app_type\", scope=\"external_source\", scope_type=~\"github|stackoverflow\"}[5m])))",
+          "legendFormat": "p95 {{application}} {{scope_type}}",
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (application, scope_type, le) (rate(request_duration_ms_total_bucket{application=~\"$application\", app_type=~\"$app_type\", scope=\"external_source\", scope_type=~\"github|stackoverflow\"}[5m])))",
+          "legendFormat": "p99 {{application}} {{scope_type}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Scrape duration percentiles by source",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "50/95/99 перцентили времени обработки bot-операций (sync/async взаимодействие).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.50, sum by (application, scope_type, le) (rate(command_duration_ms_total_bucket{application=~\"$application\", app_type=~\"$app_type\", scope=~\"scrapper_sync_api|scrapper_async_api\"}[5m])))",
+          "legendFormat": "p50 {{application}} {{scope_type}}",
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by (application, scope_type, le) (rate(command_duration_ms_total_bucket{application=~\"$application\", app_type=~\"$app_type\", scope=~\"scrapper_sync_api|scrapper_async_api\"}[5m])))",
+          "legendFormat": "p95 {{application}} {{scope_type}}",
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.99, sum by (application, scope_type, le) (rate(command_duration_ms_total_bucket{application=~\"$application\", app_type=~\"$app_type\", scope=~\"scrapper_sync_api|scrapper_async_api\"}[5m])))",
+          "legendFormat": "p99 {{application}} {{scope_type}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Bot operation duration percentiles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Скорость запросов к боту в Telegram (агрегировано по приложению).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (application) (rate(command_requests_total{application=~\"$application\", app_type=~\"$app_type\"}[1m]))",
+          "legendFormat": "{{application}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Telegram requests to bot",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Скорость отправленных уведомлений пользователям.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "sum by (application) (rate(sent_notification_total{application=~\"$application\", app_type=~\"$app_type\"}[1m]))",
+          "legendFormat": "{{application}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Sent notifications per second",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "observability",
+    "business",
+    "link-tracker"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(up{job=~\"bot|scrapper\"}, application)",
+        "includeAll": true,
+        "label": "Application",
+        "multi": true,
+        "name": "application",
+        "options": [],
+        "query": {
+          "query": "label_values(up{job=~\"bot|scrapper\"}, application)",
+          "refId": "Prometheus-application-query"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(up{job=~\"bot|scrapper\"}, app_type)",
+        "includeAll": true,
+        "label": "Application type",
+        "multi": true,
+        "name": "app_type",
+        "options": [],
+        "query": {
+          "query": "label_values(up{job=~\"bot|scrapper\"}, app_type)",
+          "refId": "Prometheus-app-type-query"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "LinkTracker - Business Metrics",
+  "uid": "linktracker-business-metrics",
+  "version": 1,
+  "weekStart": ""
+}

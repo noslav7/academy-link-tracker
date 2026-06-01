@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import backend.academy.linktracker.ai.dto.ProcessedLinkUpdate;
 import backend.academy.linktracker.ai.dto.UpdatePriority;
@@ -215,10 +214,9 @@ class RawLinkUpdateKafkaIntegrationTest {
 
         await().atMost(20, SECONDS).untilAsserted(() -> {
             String validationLog = firstListenerLogMessage("Incoming raw update failed validation: ");
-            assertAll(
-                    () -> assertTrue(validationLog.startsWith("Incoming raw update failed validation: ")),
-                    () -> assertTrue(validationLog.contains("propertyPath=tgChatIds")),
-                    () -> assertTrue(validationLog.contains("must not be empty")));
+            assertEquals(
+                    "Incoming raw update failed validation: [ConstraintViolationImpl{interpolatedMessage='must not be empty', propertyPath=tgChatIds, rootBeanClass=class backend.academy.linktracker.ai.dto.RawLinkUpdate, messageTemplate='{jakarta.validation.constraints.NotEmpty.message}'}]",
+                    validationLog);
         });
     }
 

@@ -43,6 +43,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @Tag("performance")
+@Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
 class LinksCacheLoadPerformanceTest {
 

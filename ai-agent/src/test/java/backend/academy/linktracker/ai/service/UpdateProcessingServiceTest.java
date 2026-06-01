@@ -34,33 +34,13 @@ class UpdateProcessingServiceTest {
         service = new UpdateProcessingService(new UpdateFilter(properties), summarizer, prioritizer, properties);
     }
 
-    @Test
-    void givenUpdateWithConfiguredStopWordWhenProcessThenReturnsEmptyResult() {
-        // Цель: проверить отбрасывание обновления по стоп-слову из конфигурации.
-        RawLinkUpdate update = update("Release contains Promo materials and useful details", "alice");
-
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("filteredOutCases")
+    void givenFilteredByRulesWhenProcessThenReturnsEmptyResult(
+            String ignoredCaseName, String description, String author) {
+        // Цель: компактно проверить отбрасывание по всем правилам фильтрации.
+        RawLinkUpdate update = update(description, author);
         Optional<ProcessedLinkUpdate> result = service.process(update);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void givenUpdateFromExcludedAuthorWhenProcessThenReturnsEmptyResult() {
-        // Цель: проверить отбрасывание автора без учета регистра и краевых пробелов.
-        RawLinkUpdate update = update("Regular update with enough useful details", " BOT-USER ");
-
-        Optional<ProcessedLinkUpdate> result = service.process(update);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void givenUpdateShorterThanMinimumLengthWhenProcessThenReturnsEmptyResult() {
-        // Цель: проверить отбрасывание описания короче минимальной длины.
-        RawLinkUpdate update = update("too short", "alice");
-
-        Optional<ProcessedLinkUpdate> result = service.process(update);
-
         assertTrue(result.isEmpty());
     }
 
@@ -195,6 +175,20 @@ class UpdateProcessingServiceTest {
                 Arguments.of("Critical bug fix in release pipeline", UpdatePriority.HIGH),
                 Arguments.of("Regular status update for release plan", UpdatePriority.MEDIUM),
                 Arguments.of("Fix typo in readme docs section", UpdatePriority.LOW));
+    }
+
+    private static Stream<Arguments> filteredOutCases() {
+        return Stream.of(
+                Arguments.of(
+                        "givenUpdateWithConfiguredStopWordWhenProcessThenReturnsEmptyResult",
+                        "Release contains Promo materials and useful details",
+                        "alice"),
+                Arguments.of(
+                        "givenUpdateFromExcludedAuthorWhenProcessThenReturnsEmptyResult",
+                        "Regular update with enough useful details",
+                        " BOT-USER "),
+                Arguments.of(
+                        "givenUpdateShorterThanMinimumLengthWhenProcessThenReturnsEmptyResult", "too short", "alice"));
     }
 
     private static final class CountingSummarizer implements UpdateSummarizer {
