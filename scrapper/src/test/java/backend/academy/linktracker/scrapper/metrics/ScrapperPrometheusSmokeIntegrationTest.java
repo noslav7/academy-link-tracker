@@ -36,8 +36,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Tag("integration")
 @Tag("sanity")
 class ScrapperPrometheusSmokeIntegrationTest {
-    private static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(4);
 
     @LocalServerPort
     private int port;

@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericData;
@@ -101,7 +102,15 @@ class LinkUpdateListenerKafkaIntegrationTest {
 
     private static final String TOPIC = "link-updates-bot-it";
     private static final String DLQ_TOPIC = "link-updates-bot-it-dlq";
+    private static final Duration ASSERT_TIMEOUT = Duration.ofSeconds(8);
+    private static final Duration LISTENER_ASSIGNMENT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration CONSUMER_POLL_TIMEOUT = Duration.ofMillis(300);
+    private static final int KAFKA_REQUEST_TIMEOUT_MS = 5_000;
+    private static final int KAFKA_DELIVERY_TIMEOUT_MS = 6_000;
+    private static final int KAFKA_MAX_BLOCK_MS = 6_000;
+    private static final int CONSUMER_POLL_ATTEMPTS = 4;
     private static final AtomicInteger DLQ_CONSUMER_ID_SEQUENCE = new AtomicInteger();
+    private static final AtomicBoolean LISTENER_READY = new AtomicBoolean();
 
     @Autowired
     private TelegramProperties telegramProperties;
@@ -120,7 +129,9 @@ class LinkUpdateListenerKafkaIntegrationTest {
                         .withStatus(200)
                         .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                         .withBody("{\"ok\":true,\"result\":{\"message_id\":1}}")));
-        waitForKafkaListenerAssignment();
+        if (LISTENER_READY.compareAndSet(false, true)) {
+            waitForKafkaListenerAssignment();
+        }
     }
 
     @Test
@@ -129,7 +140,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
         // Проверяет: валидное Avro-сообщение приводит к отправке корректного уведомления в Telegram.
         publishAvro("15", linkUpdateEvent(15L, "https://example.com/news", "New post detected", List.of(1001L)));
 
-        await().atMost(20, SECONDS).untilAsserted(() -> {
+        await().atMost(ASSERT_TIMEOUT).untilAsserted(() -> {
             verifySendMessage(1001L);
             assertEquals(
                     BotMessages.UPDATE_NOTIFICATION + "\n\nNew post detected",
@@ -144,7 +155,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
         publishAvro(
                 "18", linkUpdateEvent(18L, "https://github.com/octocat/hello-world", "Issue created", List.of(2002L)));
 
-        await().atMost(20, SECONDS).untilAsserted(() -> {
+        await().atMost(ASSERT_TIMEOUT).untilAsserted(() -> {
             verifySendMessage(2002L);
             assertEquals(
                     BotMessages.UPDATE_NOTIFICATION + "\n\nIssue created",
@@ -166,7 +177,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
     void givenMalformedKafkaPayloadWhenConsumedThenPublishesMessageToDlq() {
         // Проверяет: невалидный бинарный payload попадает в DLQ.
         publishMalformedBytes("malformed-dlq", new byte[] {6, 7, 8, 9, 10});
-        await().atMost(10, SECONDS).untilAsserted(() -> {
+        await().atMost(Duration.ofSeconds(6)).untilAsserted(() -> {
             List<ConsumerRecord<String, String>> records = pollRecords(DLQ_TOPIC);
             assertTrue(records.stream().anyMatch(record -> "malformed-dlq".equals(record.key())));
         });
@@ -177,6 +188,9 @@ class LinkUpdateListenerKafkaIntegrationTest {
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, GenericRecordBinarySerializer.class.getName());
+        config.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, KAFKA_REQUEST_TIMEOUT_MS);
+        config.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, KAFKA_DELIVERY_TIMEOUT_MS);
+        config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, KAFKA_MAX_BLOCK_MS);
         try (KafkaProducer<String, GenericRecord> producer = new KafkaProducer<>(config)) {
             producer.send(new ProducerRecord<>(TOPIC, key, event));
             producer.flush();
@@ -210,6 +224,9 @@ class LinkUpdateListenerKafkaIntegrationTest {
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, embeddedKafka.getBrokersAsString());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        config.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, KAFKA_REQUEST_TIMEOUT_MS);
+        config.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, KAFKA_DELIVERY_TIMEOUT_MS);
+        config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, KAFKA_MAX_BLOCK_MS);
         try (KafkaProducer<String, byte[]> producer = new KafkaProducer<>(config)) {
             producer.send(new ProducerRecord<>(TOPIC, key, payload));
             producer.flush();
@@ -217,7 +234,7 @@ class LinkUpdateListenerKafkaIntegrationTest {
     }
 
     private void waitForKafkaListenerAssignment() {
-        await().atMost(30, SECONDS).untilAsserted(() -> {
+        await().atMost(LISTENER_ASSIGNMENT_TIMEOUT).untilAsserted(() -> {
             Collection<MessageListenerContainer> containers = kafkaListenerEndpointRegistry.getListenerContainers();
             int assignedPartitions = containers.stream()
                     .map(MessageListenerContainer::getAssignedPartitions)
@@ -251,13 +268,20 @@ class LinkUpdateListenerKafkaIntegrationTest {
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         config.put(ConsumerConfig.GROUP_ID_CONFIG, "bot-it-dlq-check-" + DLQ_CONSUMER_ID_SEQUENCE.incrementAndGet());
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        config.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, KAFKA_REQUEST_TIMEOUT_MS);
+        config.put(ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, KAFKA_REQUEST_TIMEOUT_MS);
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(config)) {
             consumer.subscribe(List.of(topic));
             List<ConsumerRecord<String, String>> records = new ArrayList<>();
-            for (ConsumerRecord<String, String> record :
-                    consumer.poll(Duration.ofSeconds(2)).records(topic)) {
-                records.add(record);
+            for (int attempt = 0; attempt < CONSUMER_POLL_ATTEMPTS; attempt++) {
+                for (ConsumerRecord<String, String> record :
+                        consumer.poll(CONSUMER_POLL_TIMEOUT).records(topic)) {
+                    records.add(record);
+                }
+                if (!records.isEmpty()) {
+                    return records;
+                }
             }
             return records;
         }

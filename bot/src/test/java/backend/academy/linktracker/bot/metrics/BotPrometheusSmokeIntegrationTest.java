@@ -36,8 +36,8 @@ import org.wiremock.spring.EnableWireMock;
 @Tag("integration")
 @Tag("sanity")
 class BotPrometheusSmokeIntegrationTest {
-    private static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration HTTP_REQUEST_TIMEOUT = Duration.ofSeconds(4);
     private static final String UPDATE_PAYLOAD = """
             {
               "id": 100,

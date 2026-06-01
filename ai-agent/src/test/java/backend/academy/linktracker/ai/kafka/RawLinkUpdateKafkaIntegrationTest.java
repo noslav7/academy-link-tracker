@@ -1,6 +1,5 @@
 package backend.academy.linktracker.ai.kafka;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -65,9 +65,16 @@ class RawLinkUpdateKafkaIntegrationTest {
     private static final Logger LISTENER_LOGGER = (Logger) LoggerFactory.getLogger(RawLinkUpdateListener.class);
     private static final String RAW_TOPIC = "link.raw-updates";
     private static final String PROCESSED_TOPIC = "link.processed-updates";
+    private static final Duration ASSERT_TIMEOUT = Duration.ofSeconds(8);
+    private static final Duration LISTENER_ASSIGNMENT_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration CONSUMER_POLL_TIMEOUT = Duration.ofMillis(250);
+    private static final int KAFKA_REQUEST_TIMEOUT_MS = 5_000;
+    private static final int KAFKA_DELIVERY_TIMEOUT_MS = 6_000;
+    private static final int KAFKA_MAX_BLOCK_MS = 6_000;
     private static final int CONSUMER_POLL_ATTEMPTS = 12;
     private static final AtomicInteger CONSUMER_SEQUENCE = new AtomicInteger();
+    private static final AtomicBoolean TOPICS_INITIALIZED = new AtomicBoolean();
+    private static final AtomicBoolean LISTENER_READY = new AtomicBoolean();
     private static final String MALFORMED_PAYLOAD = "{ this is not a valid json";
 
     @SuppressWarnings("resource")
@@ -87,9 +94,13 @@ class RawLinkUpdateKafkaIntegrationTest {
 
     @BeforeEach
     void setUp() throws ExecutionException, InterruptedException {
-        createTopicIfMissing(RAW_TOPIC);
-        createTopicIfMissing(PROCESSED_TOPIC);
-        waitForKafkaListenerAssignment();
+        if (TOPICS_INITIALIZED.compareAndSet(false, true)) {
+            createTopicIfMissing(RAW_TOPIC);
+            createTopicIfMissing(PROCESSED_TOPIC);
+        }
+        if (LISTENER_READY.compareAndSet(false, true)) {
+            waitForKafkaListenerAssignment();
+        }
         listenerLogAppender = new ListAppender<>();
         listenerLogAppender.start();
         LISTENER_LOGGER.addAppender(listenerLogAppender);
@@ -118,7 +129,7 @@ class RawLinkUpdateKafkaIntegrationTest {
 
         publishRaw(key, payload);
 
-        await().atMost(20, SECONDS).untilAsserted(() -> {
+        await().atMost(ASSERT_TIMEOUT).untilAsserted(() -> {
             String recordPayload = consumeProcessedValueByKey(key);
             assertNotNull(recordPayload);
             ProcessedLinkUpdate processed = objectMapper.readValue(recordPayload, ProcessedLinkUpdate.class);
@@ -146,7 +157,7 @@ class RawLinkUpdateKafkaIntegrationTest {
         String malformedKey = "tc-1-2-malformed-log";
         publishRaw(malformedKey, MALFORMED_PAYLOAD);
 
-        await().atMost(20, SECONDS)
+        await().atMost(ASSERT_TIMEOUT)
                 .untilAsserted(() -> assertEquals(
                         "Failed to deserialize incoming raw update payload: " + MALFORMED_PAYLOAD,
                         firstListenerLogMessage("Failed to deserialize incoming raw update payload: ")));
@@ -167,7 +178,7 @@ class RawLinkUpdateKafkaIntegrationTest {
                 }
                 """);
 
-        await().atMost(20, SECONDS).untilAsserted(() -> {
+        await().atMost(ASSERT_TIMEOUT).untilAsserted(() -> {
             String recordPayload = consumeProcessedValueByKey(validKey);
             assertNotNull(recordPayload);
             ProcessedLinkUpdate processed = objectMapper.readValue(recordPayload, ProcessedLinkUpdate.class);
@@ -212,7 +223,7 @@ class RawLinkUpdateKafkaIntegrationTest {
                 }
                 """);
 
-        await().atMost(20, SECONDS).untilAsserted(() -> {
+        await().atMost(ASSERT_TIMEOUT).untilAsserted(() -> {
             String validationLog = firstListenerLogMessage("Incoming raw update failed validation: ");
             assertEquals(
                     "Incoming raw update failed validation: [ConstraintViolationImpl{interpolatedMessage='must not be empty', propertyPath=tgChatIds, rootBeanClass=class backend.academy.linktracker.ai.dto.RawLinkUpdate, messageTemplate='{jakarta.validation.constraints.NotEmpty.message}'}]",
@@ -251,7 +262,7 @@ class RawLinkUpdateKafkaIntegrationTest {
                 """;
         publishRaw(null, payload);
 
-        await().atMost(20, SECONDS).untilAsserted(() -> {
+        await().atMost(ASSERT_TIMEOUT).untilAsserted(() -> {
             String recordPayload = consumeProcessedValueByKey("505");
             assertNotNull(recordPayload);
             ProcessedLinkUpdate processed = objectMapper.readValue(recordPayload, ProcessedLinkUpdate.class);
@@ -279,7 +290,7 @@ class RawLinkUpdateKafkaIntegrationTest {
         String key = "tc-sanity-empty-log";
         publishRaw(key, "   ");
 
-        await().atMost(20, SECONDS)
+        await().atMost(ASSERT_TIMEOUT)
                 .untilAsserted(() -> assertEquals(
                         "Incoming raw update payload is empty",
                         firstListenerLogMessage("Incoming raw update payload is empty")));
@@ -306,6 +317,9 @@ class RawLinkUpdateKafkaIntegrationTest {
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        config.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, KAFKA_REQUEST_TIMEOUT_MS);
+        config.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, KAFKA_DELIVERY_TIMEOUT_MS);
+        config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, KAFKA_MAX_BLOCK_MS);
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(config)) {
             producer.send(new ProducerRecord<>(RAW_TOPIC, key, payload));
             producer.flush();
@@ -315,11 +329,20 @@ class RawLinkUpdateKafkaIntegrationTest {
     private String consumeProcessedValueByKey(String expectedKey) {
         Properties config = new Properties();
         config.putAll(Map.of(
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers(),
-                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName(),
-                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName(),
-                ConsumerConfig.GROUP_ID_CONFIG, "ai-agent-it-consumer-" + CONSUMER_SEQUENCE.incrementAndGet(),
-                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest"));
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                KAFKA.getBootstrapServers(),
+                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                StringDeserializer.class.getName(),
+                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                StringDeserializer.class.getName(),
+                ConsumerConfig.GROUP_ID_CONFIG,
+                "ai-agent-it-consumer-" + CONSUMER_SEQUENCE.incrementAndGet(),
+                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
+                "earliest",
+                ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG,
+                KAFKA_REQUEST_TIMEOUT_MS,
+                ConsumerConfig.DEFAULT_API_TIMEOUT_MS_CONFIG,
+                KAFKA_REQUEST_TIMEOUT_MS));
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(config)) {
             consumer.subscribe(List.of(PROCESSED_TOPIC));
@@ -336,7 +359,7 @@ class RawLinkUpdateKafkaIntegrationTest {
     }
 
     private void waitForKafkaListenerAssignment() {
-        await().atMost(30, SECONDS).untilAsserted(() -> {
+        await().atMost(LISTENER_ASSIGNMENT_TIMEOUT).untilAsserted(() -> {
             List<MessageListenerContainer> containers = kafkaListenerEndpointRegistry.getListenerContainers().stream()
                     .toList();
             int assignedPartitions = containers.stream()

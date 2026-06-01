@@ -74,7 +74,7 @@ class TelegramCommandFlowIntegrationTest {
         // Проверяет: для каждой входной команды бот отправляет ожидаемый текст ответа.
         stubFlowForSingleUpdate(scenarioName, chatId, command);
         startPolling();
-        await().atMost(10, SECONDS).untilAsserted(() -> verifySendMessage(chatId, expectedText));
+        await().atMost(6, SECONDS).untilAsserted(() -> verifySendMessage(chatId, expectedText));
     }
 
     private void startPolling() {
